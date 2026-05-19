@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -12,7 +13,10 @@ from app.schemas.business_user import (
     BusinessUserResponse,
     CreateBusinessUserRequest,
 )
-from app.services.access_control_service import AccessControlError
+from app.services.access_control_service import (
+    AccessControlError,
+    ensure_business_user_management_access,
+)
 from app.services.auth_service import (
     AuthServiceError,
     DuplicateUsernameError,
@@ -65,6 +69,30 @@ def get_business_or_404(db: Session, business_id: int) -> Business:
         )
 
     return business
+
+
+def get_business_user_or_404(db: Session, user_id: int) -> User:
+    """Return user by id or raise 404."""
+
+    user = db.get(User, user_id)
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kullanıcı bulunamadı.",
+        )
+
+    return user
+
+
+def ensure_user_belongs_to_business(user: User, business_id: int) -> None:
+    """Ensure user record belongs to the requested business."""
+
+    if user.business_id != business_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu kullanıcıya erişim yetkiniz yok.",
+        )
 
 
 def build_business_user_response(user: User) -> BusinessUserResponse:
@@ -167,3 +195,75 @@ def create_business_user_endpoint(
     except Exception:
         db.rollback()
         raise
+
+
+@router.get(
+    "/{business_id}/users",
+    response_model=list[BusinessUserResponse],
+)
+def list_business_users_endpoint(
+    business_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[BusinessUserResponse]:
+    """List users of a business according to the permission matrix."""
+
+    try:
+        business = get_business_or_404(db=db, business_id=business_id)
+
+        ensure_business_user_management_access(
+            current_user=current_user,
+            target_business_id=business.id,
+        )
+
+        users = (
+            db.execute(
+                select(User)
+                .where(User.business_id == business.id)
+                .order_by(User.id.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+        return [build_business_user_response(user) for user in users]
+    except HTTPException:
+        raise
+    except AccessControlError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu işlem için yetkiniz yok.",
+        ) from exc
+
+
+@router.get(
+    "/{business_id}/users/{user_id}",
+    response_model=BusinessUserResponse,
+)
+def get_business_user_detail_endpoint(
+    business_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BusinessUserResponse:
+    """Return a business user detail according to the permission matrix."""
+
+    try:
+        business = get_business_or_404(db=db, business_id=business_id)
+
+        ensure_business_user_management_access(
+            current_user=current_user,
+            target_business_id=business.id,
+        )
+
+        user = get_business_user_or_404(db=db, user_id=user_id)
+        ensure_user_belongs_to_business(user=user, business_id=business.id)
+
+        return build_business_user_response(user)
+    except HTTPException:
+        raise
+    except AccessControlError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu işlem için yetkiniz yok.",
+        ) from exc
