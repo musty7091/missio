@@ -570,6 +570,44 @@ Kurallar:
 
 ---
 
+<!-- MISSIO_SECURITY_GATE_START -->
+## Güvenlik Kapısı / Security Gate
+
+Missio; personel, görev, konum, fotoğraf kanıtı, işlem geçmişi ve rapor verileri tuttuğu için güvenlik ilk sürümden itibaren P0 zorunluluğudur.
+
+Ana güvenlik kuralı:
+
+> Özellik çalışıyor diye tamamlanmış sayılmaz. Güvenlik kontrolü ve testi yoksa özellik tamamlanmış değildir.
+
+Güvenlik kapısı tamamlanmadan görev modülü, fotoğraf kanıtı, raporlama ve frontend cilasına geçilmeyecektir.
+
+Zorunlu güvenlik başlıkları:
+
+- Şifreler güvenli hash yöntemi ile saklanacaktır.
+- Zayıf şifreler kabul edilmeyecektir.
+- JWT access token yapısı kontrollü kullanılacaktır.
+- Production ortamda güçlü secret key zorunlu olacaktır.
+- Login attempt ve brute-force koruması eklenecektir.
+- Başarılı ve başarısız login işlemleri audit log'a yazılacaktır.
+- Personel sadece kendi görevlerini görebilecektir.
+- Yönetici ve patron sadece kendi işletmesine ait verileri görebilecektir.
+- Her işletme verisi için `business_id` izolasyonu zorunludur.
+- Pasif modüller sadece arayüzde değil, backend seviyesinde de kapatılacaktır.
+- Kritik işlemler audit log'a yazılacaktır.
+- Konum sürekli takip edilmeyecek, sadece işlem anında alınacaktır.
+- Fotoğraf yükleme sistemi dosya güvenliği kurallarıyla korunacaktır.
+- API response içinde `password_hash`, secret veya gereksiz hassas veri dönmeyecektir.
+- Production ortamda debug kapalı olacaktır.
+- `.env`, veritabanı, upload dosyaları ve secret bilgileri GitHub'a gönderilmeyecektir.
+- Güvenlik testleri yazılmadan özellik tamamlanmış sayılmayacaktır.
+
+Detaylı güvenlik kontrol listesi:
+
+```text
+docs/SECURITY_CHECKLIST.md
+```
+<!-- MISSIO_SECURITY_GATE_END -->
+
 ## 22. KVKK ve Personel Bilgilendirme Yaklaşımı
 
 Konum verisi ve personel işlem kayıtları hassas veridir.
