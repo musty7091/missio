@@ -90,15 +90,15 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 
 ### 2.5 API Güvenliği
 
-- [ ] Public endpoint listesi açıkça belirlenecek.
-- [ ] Public olmayan endpointlerin tamamı token isteyecek.
+- [x] Public endpoint listesi açıkça belirlenecek.
+- [x] Public olmayan endpointlerin tamamı token isteyecek.
 - [x] Role dependency uygulanacak.
 - [x] Business scope dependency uygulanacak.
 - [ ] Pydantic input validation kullanılacak.
 - [x] Hata cevaplarında teknik detay sızdırılmayacak.
 - [x] Response modellerinde `password_hash`, secret, token gibi alanlar dönmeyecek.
 - [ ] Production CORS ayarları herkese açık olmayacak.
-- [ ] Rate limit eklenecek.
+- [x] Rate limit eklenecek.
 - [x] API testleri yazılacak.
 
 ### 2.6 Fotoğraf Yükleme Güvenliği
