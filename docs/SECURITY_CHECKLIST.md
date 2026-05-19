@@ -256,3 +256,11 @@ Bu komut başarılı olmadan ürün satışa hazır kabul edilmez.
 - [x] bcrypt doğrudan kullanılacak şekilde sadeleştirildi.
 - [x] Dependency health kontrol komutu eklendi.
 - [x] Dependency health kontrolü security gate içine eklendi.
+
+---
+
+## 10. Repository Hygiene
+
+- [x] Repository hygiene kontrol komutu eklendi.
+- [x] Secret, local DB, log, upload ve geçici dosya takip kontrolü eklendi.
+- [x] Repository hygiene kontrolü security gate içine eklendi.

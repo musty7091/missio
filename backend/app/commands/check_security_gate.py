@@ -15,6 +15,10 @@ class SecurityGateStep:
 
 SECURITY_GATE_STEPS: list[SecurityGateStep] = [
     SecurityGateStep(
+        name="Repository hijyen kontrolü",
+        module_name="app.commands.check_repo_hygiene",
+    ),
+    SecurityGateStep(
         name="Dependency health kontrolü",
         module_name="app.commands.check_dependency_health",
     ),
@@ -72,6 +76,7 @@ SECURITY_TEST_PATHS = [
     "tests/test_rate_limit.py",
     "tests/test_security_gate.py",
     "tests/test_dependency_health.py",
+    "tests/test_repo_hygiene.py",
 ]
 
 

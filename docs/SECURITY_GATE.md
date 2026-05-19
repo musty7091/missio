@@ -101,3 +101,21 @@ Detaylı doküman:
 ```text
 docs/DEPENDENCY_SECURITY.md
 ```
+
+---
+
+## Repository Hygiene Kontrolü
+
+Güvenlik kapısı artık repository hijyen kontrolünü de çalıştırır.
+
+Komut:
+
+```powershell
+python -m app.commands.check_repo_hygiene
+```
+
+Detaylı doküman:
+
+```text
+docs/REPO_HYGIENE.md
+```

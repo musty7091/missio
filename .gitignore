@@ -64,3 +64,8 @@ Thumbs.db
 # Local one-off setup helper scripts
 /ADIM_*.py
 /ADIM_*.ps1
+*.db-wal
+*.db-shm
+*.pyc
+temp/
+tmp/
