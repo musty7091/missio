@@ -1,10 +1,11 @@
-﻿"""Alembic environment configuration for Missio."""
+"""Alembic environment configuration for Missio."""
 
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import app.models  # noqa: F401
 from app.core.config import settings
 from app.db.base import Base
 
@@ -47,13 +48,16 @@ def run_migrations_online() -> None:
 
     configuration["sqlalchemy.url"] = settings.database_url
 
+    connect_args: dict[str, bool] = {}
+
+    if settings.database_url.startswith("sqlite"):
+        connect_args = {"check_same_thread": False}
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args={"check_same_thread": False}
-        if settings.database_url.startswith("sqlite")
-        else {},
+        connect_args=connect_args,
     )
 
     with connectable.connect() as connection:
