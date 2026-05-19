@@ -48,8 +48,8 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 ### 2.2 Yetki ve Rol Kontrolü
 
 - [x] Rol sabitleri oluşturulacak.
-- [ ] Endpoint seviyesinde rol dependency yazılacak.
-- [ ] Servis seviyesinde yetki kontrolü uygulanacak.
+- [x] Endpoint seviyesinde rol dependency yazılacak.
+- [x] Servis seviyesinde yetki kontrolü uygulanacak.
 - [ ] Repository sorgularında `business_id` filtresi zorunlu hale getirilecek.
 - [ ] Personel sadece kendi görevlerini görebilecek.
 - [ ] Yönetici sadece kendi işletmesinin verilerini görebilecek.
@@ -92,8 +92,8 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 
 - [ ] Public endpoint listesi açıkça belirlenecek.
 - [ ] Public olmayan endpointlerin tamamı token isteyecek.
-- [ ] Role dependency uygulanacak.
-- [ ] Business scope dependency uygulanacak.
+- [x] Role dependency uygulanacak.
+- [x] Business scope dependency uygulanacak.
 - [ ] Pydantic input validation kullanılacak.
 - [ ] Hata cevaplarında teknik detay sızdırılmayacak.
 - [ ] Response modellerinde `password_hash`, secret, token gibi alanlar dönmeyecek.
