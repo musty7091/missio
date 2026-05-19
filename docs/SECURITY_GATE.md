@@ -119,3 +119,21 @@ Detaylı doküman:
 ```text
 docs/REPO_HYGIENE.md
 ```
+
+---
+
+## Bootstrap Durum Kontrolü
+
+Güvenlik kapısı artık initial super admin bootstrap durum kontrolünü de çalıştırır.
+
+Komut:
+
+```powershell
+python -m app.commands.check_bootstrap_status
+```
+
+Detaylı doküman:
+
+```text
+docs/BOOTSTRAP.md
+```

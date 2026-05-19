@@ -264,3 +264,14 @@ Bu komut başarılı olmadan ürün satışa hazır kabul edilmez.
 - [x] Repository hygiene kontrol komutu eklendi.
 - [x] Secret, local DB, log, upload ve geçici dosya takip kontrolü eklendi.
 - [x] Repository hygiene kontrolü security gate içine eklendi.
+
+---
+
+## 11. Initial Super Admin Bootstrap
+
+- [x] İlk kurulum super_admin bootstrap servisi eklendi.
+- [x] Sabit/default admin şifresi kullanılmayacak.
+- [x] İlk kurulum sadece kullanıcı yokken yapılabilecek.
+- [x] Bootstrap sonrası setup_completed true yapılacak.
+- [x] setup.super_admin_created audit log kaydı oluşturulacak.
+- [x] Bootstrap durum kontrolü security gate içine eklendi.
