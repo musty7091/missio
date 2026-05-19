@@ -859,3 +859,25 @@ Missio’nun marka karakteri:
 Slogan:
 
 Mission is possible.
+
+### GitHub Actions Güvenlik Kapısı
+
+Missio güvenlik kapısı GitHub üzerinde de otomatik çalışır.
+
+Workflow dosyası:
+
+```text
+.github/workflows/security-gate.yml
+```
+
+Her `main` push ve pull request işleminde şu komut çalıştırılır:
+
+```powershell
+python -m app.commands.check_security_gate
+```
+
+Detaylı doküman:
+
+```text
+docs/CI_SECURITY_GATE.md
+```

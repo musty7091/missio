@@ -239,3 +239,11 @@ python -m app.commands.check_security_gate
 ```
 
 Bu komut başarılı olmadan ürün satışa hazır kabul edilmez.
+
+---
+
+## 8. GitHub Actions Güvenlik Kapısı
+
+- [x] GitHub Actions security gate workflow eklenecek.
+- [x] Push ve pull request sonrası güvenlik kapısı otomatik çalışacak.
+- [x] CI ortamında migration, seed ve security gate doğrulanacak.

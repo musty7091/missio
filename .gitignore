@@ -60,3 +60,7 @@ Thumbs.db
 *.crt
 *.pfx
 *.p12
+
+# Local one-off setup helper scripts
+/ADIM_*.py
+/ADIM_*.ps1

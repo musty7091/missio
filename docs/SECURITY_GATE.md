@@ -65,3 +65,21 @@ Bu çıktı yoksa ürün güvenlik kapısından geçmiş sayılmaz.
 Bu komut local geliştirme ortamında çalışır.
 
 Production kuruluma geçildiğinde ayrıca gerçek ortam değişkenleri, HTTPS, dosya yetkileri, backup/restore ve müşteri teslim kontrolleri yapılmalıdır.
+
+---
+
+## GitHub Actions Entegrasyonu
+
+Merkezi güvenlik kapısı GitHub Actions üzerinde de çalıştırılır.
+
+Workflow dosyası:
+
+```text
+.github/workflows/security-gate.yml
+```
+
+Detaylı doküman:
+
+```text
+docs/CI_SECURITY_GATE.md
+```
