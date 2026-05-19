@@ -226,3 +226,16 @@ Mevcut durumda tamamlanan temel güvenlik parçaları:
 Sıradaki güvenlik adımı:
 
 > ADIM 5D — Login attempt, brute-force koruması ve auth audit log.
+
+---
+
+## 7. Güvenlik Kapısı Komutu
+
+Missio güvenlik kapısı tek komutla çalıştırılır:
+
+```powershell
+cd C:\missio\backend
+python -m app.commands.check_security_gate
+```
+
+Bu komut başarılı olmadan ürün satışa hazır kabul edilmez.

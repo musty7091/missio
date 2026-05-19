@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from sqlalchemy import delete
+
 import app.models  # noqa: F401
 from app.core.tokens import decode_access_token
 from app.db.session import SessionLocal
+from app.models.audit_log import AuditLog
+from app.models.login_attempt import LoginAttempt
 from app.models.user import User
-from app.repositories.user_repository import get_user_by_username
+from app.repositories.user_repository import get_user_by_username, normalize_username
 from app.services.auth_service import (
     authenticate_user,
     create_login_token_for_user,
@@ -17,20 +21,34 @@ TEST_PASSWORD = "Missio.2026!"
 
 
 def delete_test_user_if_exists() -> None:
-    """Delete previous test user if it exists."""
+    """Delete previous test user and related security records if they exist."""
 
     db = SessionLocal()
 
     try:
+        normalized_username = normalize_username(TEST_USERNAME)
         user = get_user_by_username(
             db=db,
-            username=TEST_USERNAME,
+            username=normalized_username,
             business_id=None,
         )
+        user_id = user.id if user is not None else None
 
-        if user is not None:
-            db.delete(user)
-            db.commit()
+        if user_id is not None:
+            db.execute(
+                delete(AuditLog).where(AuditLog.user_id == user_id),
+            )
+
+        db.execute(
+            delete(AuditLog).where(AuditLog.detail.like(f"%{normalized_username}%")),
+        )
+        db.execute(
+            delete(LoginAttempt).where(LoginAttempt.username == normalized_username),
+        )
+        db.execute(
+            delete(User).where(User.username == normalized_username),
+        )
+        db.commit()
     finally:
         db.close()
 

@@ -601,6 +601,23 @@ Zorunlu güvenlik başlıkları:
 - `.env`, veritabanı, upload dosyaları ve secret bilgileri GitHub'a gönderilmeyecektir.
 - Güvenlik testleri yazılmadan özellik tamamlanmış sayılmayacaktır.
 
+### Güvenlik Kapısı Komutu
+
+Missio güvenlik kontrolleri tek komutla çalıştırılabilir:
+
+```powershell
+cd C:\missio\backend
+python -m app.commands.check_security_gate
+```
+
+Bu komut auth, token, brute-force, audit log, rol kontrolü, business scope, API security, rate limit ve production config kontrollerini çalıştırır.
+
+Detaylı doküman:
+
+```text
+docs/SECURITY_GATE.md
+```
+
 Detaylı güvenlik kontrol listesi:
 
 ```text

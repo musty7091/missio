@@ -29,15 +29,21 @@ def cleanup_test_data() -> None:
             username=normalized_username,
             business_id=None,
         )
+        user_id = user.id if user is not None else None
 
-        if user is not None:
-            db.delete(user)
+        if user_id is not None:
+            db.execute(
+                delete(AuditLog).where(AuditLog.user_id == user_id),
+            )
 
+        db.execute(
+            delete(AuditLog).where(AuditLog.detail.like(f"%{normalized_username}%")),
+        )
         db.execute(
             delete(LoginAttempt).where(LoginAttempt.username == normalized_username),
         )
         db.execute(
-            delete(AuditLog).where(AuditLog.detail.like(f"%{normalized_username}%")),
+            delete(User).where(User.username == normalized_username),
         )
         db.commit()
     finally:
