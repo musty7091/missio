@@ -34,7 +34,7 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 - [x] JWT access token temeli kurulacak.
 - [x] Kullanıcı oluşturma servisi kurulacak.
 - [x] Kullanıcı doğrulama servisi kurulacak.
-- [ ] Login endpoint yazılacak.
+- [x] Login endpoint yazılacak.
 - [x] Login attempt tablosu eklenecek.
 - [x] Başarısız giriş denemeleri loglanacak.
 - [x] Brute-force koruması eklenecek.
@@ -65,7 +65,7 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 - [x] Geçersiz rol ile token üretimi engellenecek.
 - [ ] Production ortamda zayıf `SECRET_KEY` ile uygulama açılmayacak.
 - [ ] Token içinde gereksiz hassas veri tutulmayacak.
-- [ ] Token response içinde sadece gerekli alanlar dönecek.
+- [x] Token response içinde sadece gerekli alanlar dönecek.
 - [ ] Kritik işlemlerde kullanıcı yetkisi tekrar kontrol edilecek.
 
 ### 2.4 Audit Log
@@ -95,11 +95,11 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 - [x] Role dependency uygulanacak.
 - [x] Business scope dependency uygulanacak.
 - [ ] Pydantic input validation kullanılacak.
-- [ ] Hata cevaplarında teknik detay sızdırılmayacak.
-- [ ] Response modellerinde `password_hash`, secret, token gibi alanlar dönmeyecek.
+- [x] Hata cevaplarında teknik detay sızdırılmayacak.
+- [x] Response modellerinde `password_hash`, secret, token gibi alanlar dönmeyecek.
 - [ ] Production CORS ayarları herkese açık olmayacak.
 - [ ] Rate limit eklenecek.
-- [ ] API testleri yazılacak.
+- [x] API testleri yazılacak.
 
 ### 2.6 Fotoğraf Yükleme Güvenliği
 

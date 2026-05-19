@@ -26,3 +26,16 @@ class TokenPayloadResponse(BaseModel):
     business_id: int | None
     issued_at: str
     expires_at: str
+
+
+class UserMeResponse(BaseModel):
+    """Safe current user response."""
+
+    id: int
+    business_id: int | None
+    full_name: str
+    username: str
+    email: str | None
+    role: str
+    is_active: bool
+    theme_preference: str | None
