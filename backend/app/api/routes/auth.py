@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
-from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
+from app.repositories.business_repository import get_business_by_slug
 from app.schemas.auth import LoginRequest, TokenResponse, UserMeResponse
 from app.services.auth_service import (
     AccountTemporarilyLockedError,
@@ -15,6 +15,7 @@ from app.services.auth_service import (
     InvalidCredentialsError,
     authenticate_user,
     create_login_token_for_user,
+    record_login_failure,
 )
 
 
@@ -46,6 +47,58 @@ def get_user_agent(request: Request) -> str | None:
     return user_agent.strip()[:1000]
 
 
+def raise_safe_login_error() -> None:
+    """Raise generic safe login error without leaking business or user existence."""
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Kullanıcı adı veya şifre hatalı.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def resolve_login_business_id(
+    db: Session,
+    *,
+    business_slug: str | None,
+    username: str,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> int | None:
+    """Resolve optional business slug to business_id for scoped login."""
+
+    if business_slug is None:
+        return None
+
+    business = get_business_by_slug(db=db, slug=business_slug)
+
+    if business is None:
+        record_login_failure(
+            db=db,
+            username=username,
+            business_id=None,
+            user=None,
+            failure_reason="invalid_business_slug",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        raise_safe_login_error()
+
+    if not business.is_active:
+        record_login_failure(
+            db=db,
+            username=username,
+            business_id=business.id,
+            user=None,
+            failure_reason="inactive_business",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        raise_safe_login_error()
+
+    return business.id
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(
     payload: LoginRequest,
@@ -54,14 +107,25 @@ def login(
 ) -> TokenResponse:
     """Authenticate user and return a bearer access token."""
 
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
     try:
+        login_business_id = resolve_login_business_id(
+            db=db,
+            business_slug=payload.business_slug,
+            username=payload.username,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
         user = authenticate_user(
             db=db,
             username=payload.username,
             password=payload.password,
-            business_id=None,
-            ip_address=get_client_ip(request),
-            user_agent=get_user_agent(request),
+            business_id=login_business_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
         login_token = create_login_token_for_user(user)
         db.commit()
@@ -90,6 +154,9 @@ def login(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Giriş işlemi tamamlanamadı.",
         ) from exc
+    except HTTPException:
+        db.commit()
+        raise
     except Exception:
         db.rollback()
         raise

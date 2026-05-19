@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-from sqlalchemy import delete
 from fastapi.testclient import TestClient
+from sqlalchemy import delete, select
 
 import app.models  # noqa: F401
 from app.db.session import SessionLocal
 from app.main import app
 from app.models.audit_log import AuditLog
+from app.models.business import Business
 from app.models.login_attempt import LoginAttempt
 from app.models.user import User
-from app.repositories.user_repository import get_user_by_username, normalize_username
-from app.services.auth_service import create_user_with_password
+from app.repositories.user_repository import normalize_username
+from app.services.auth_service import create_user_with_password, get_utc_now
 
 
 SUPER_ADMIN_USERNAME = "missio_api_security_admin"
 STAFF_USERNAME = "missio_api_security_staff"
+BUSINESS_SLUG = "api-security-business-test"
 TEST_PASSWORD = "Missio.2026!"
 
 
@@ -24,31 +26,71 @@ def cleanup_test_data() -> None:
     db = SessionLocal()
 
     try:
-        for username in [SUPER_ADMIN_USERNAME, STAFF_USERNAME]:
-            normalized_username = normalize_username(username)
-            user = get_user_by_username(
-                db=db,
-                username=normalized_username,
-                business_id=None,
-            )
+        usernames = [
+            normalize_username(SUPER_ADMIN_USERNAME),
+            normalize_username(STAFF_USERNAME),
+        ]
 
-            if user is not None:
-                db.delete(user)
+        business = (
+            db.execute(select(Business).where(Business.slug == BUSINESS_SLUG))
+            .scalars()
+            .one_or_none()
+        )
+        business_id = business.id if business is not None else None
 
-            db.execute(
-                delete(LoginAttempt).where(
-                    LoginAttempt.username == normalized_username,
-                ),
-            )
-            db.execute(
-                delete(AuditLog).where(
-                    AuditLog.detail.like(f"%{normalized_username}%"),
-                ),
-            )
+        users = (
+            db.execute(select(User).where(User.username.in_(usernames)))
+            .scalars()
+            .all()
+        )
+        user_ids = [user.id for user in users]
+
+        if business_id is not None:
+            db.execute(delete(AuditLog).where(AuditLog.business_id == business_id))
+            db.execute(delete(User).where(User.business_id == business_id))
+
+        if user_ids:
+            db.execute(delete(AuditLog).where(AuditLog.user_id.in_(user_ids)))
+
+        for username in usernames:
+            db.execute(delete(AuditLog).where(AuditLog.detail.like(f"%{username}%")))
+            db.execute(delete(LoginAttempt).where(LoginAttempt.username == username))
+
+        db.execute(delete(User).where(User.username.in_(usernames)))
+
+        if business_id is not None:
+            db.execute(delete(Business).where(Business.id == business_id))
 
         db.commit()
     finally:
         db.close()
+
+
+def create_test_business(db) -> Business:
+    """Create business for API security checks."""
+
+    now = get_utc_now()
+
+    business = Business(
+        name="Missio API Security Business",
+        slug=BUSINESS_SLUG,
+        logo_path=None,
+        owner_name="Missio API Security Business Owner",
+        phone=None,
+        email="missio.api.security.business@example.com",
+        address=None,
+        timezone="Europe/Istanbul",
+        default_theme="dark",
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+
+    db.add(business)
+    db.flush()
+    db.refresh(business)
+
+    return business
 
 
 def create_test_users() -> None:
@@ -57,6 +99,8 @@ def create_test_users() -> None:
     db = SessionLocal()
 
     try:
+        business = create_test_business(db)
+
         create_user_with_password(
             db=db,
             full_name="Missio API Security Admin",
@@ -73,7 +117,7 @@ def create_test_users() -> None:
             username=STAFF_USERNAME,
             password=TEST_PASSWORD,
             role="staff",
-            business_id=None,
+            business_id=business.id,
             email="missio.api.security.staff@example.com",
             is_active=True,
         )
@@ -82,15 +126,25 @@ def create_test_users() -> None:
         db.close()
 
 
-def login_and_get_token(client: TestClient, username: str) -> str:
+def login_and_get_token(
+    client: TestClient,
+    *,
+    username: str,
+    business_slug: str | None = None,
+) -> str:
     """Login and return access token."""
+
+    payload = {
+        "username": username,
+        "password": TEST_PASSWORD,
+    }
+
+    if business_slug is not None:
+        payload["business_slug"] = business_slug
 
     response = client.post(
         "/api/v1/auth/login",
-        json={
-            "username": username,
-            "password": TEST_PASSWORD,
-        },
+        json=payload,
     )
 
     if response.status_code != 200:
@@ -115,6 +169,60 @@ def assert_security_headers(response) -> None:
             raise RuntimeError(
                 f"{header_name} header beklenen değerde değil: {actual_value}"
             )
+
+
+def assert_business_user_requires_slug(client: TestClient) -> None:
+    """Validate business user cannot login without business_slug."""
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": STAFF_USERNAME,
+            "password": TEST_PASSWORD,
+        },
+    )
+
+    if response.status_code != 401:
+        raise RuntimeError(
+            "Business kullanıcısı business_slug olmadan login olamamalıydı. "
+            f"Gelen HTTP {response.status_code}: {response.text}"
+        )
+
+    if "password_hash" in response.text:
+        raise RuntimeError("Slug olmadan login response password_hash sızdırıyor.")
+
+
+def assert_business_user_me_response(
+    client: TestClient,
+    *,
+    access_token: str,
+) -> None:
+    """Validate business scoped staff user session response."""
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Staff /auth/me beklenen 200 yerine {response.status_code} döndü: "
+            f"{response.text}"
+        )
+
+    data = response.json()
+
+    if data.get("username") != STAFF_USERNAME:
+        raise RuntimeError("Staff /auth/me username bilgisi hatalı.")
+
+    if data.get("role") != "staff":
+        raise RuntimeError("Staff /auth/me role bilgisi hatalı.")
+
+    if data.get("business_id") is None:
+        raise RuntimeError("Staff /auth/me business_id boş dönmemeli.")
+
+    if "password_hash" in response.text:
+        raise RuntimeError("Staff /auth/me response password_hash sızdırıyor.")
 
 
 def main() -> None:
@@ -151,7 +259,15 @@ def main() -> None:
         if db_health_no_token.status_code != 401:
             raise RuntimeError("/db/health token olmadan 401 dönmeliydi.")
 
-        staff_token = login_and_get_token(client, STAFF_USERNAME)
+        assert_business_user_requires_slug(client)
+
+        staff_token = login_and_get_token(
+            client,
+            username=STAFF_USERNAME,
+            business_slug=BUSINESS_SLUG,
+        )
+        assert_business_user_me_response(client, access_token=staff_token)
+
         db_health_staff = client.get(
             "/api/v1/db/health",
             headers={"Authorization": f"Bearer {staff_token}"},
@@ -160,7 +276,10 @@ def main() -> None:
         if db_health_staff.status_code != 403:
             raise RuntimeError("/db/health staff için 403 dönmeliydi.")
 
-        admin_token = login_and_get_token(client, SUPER_ADMIN_USERNAME)
+        admin_token = login_and_get_token(
+            client,
+            username=SUPER_ADMIN_USERNAME,
+        )
         db_health_admin = client.get(
             "/api/v1/db/health",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -177,6 +296,8 @@ def main() -> None:
         print("HTTP security header kontrolü başarılı.")
         print("Unauthorized endpoint kontrolü başarılı.")
         print("Invalid token kontrolü başarılı.")
+        print("Business user business_slug zorunluluğu kontrolü başarılı.")
+        print("Business user /auth/me kontrolü başarılı.")
         print("Protected db health endpoint kontrolü başarılı.")
         print("API güvenlik temel kontrolü başarılı.")
     finally:

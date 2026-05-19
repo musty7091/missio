@@ -1,13 +1,36 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class LoginRequest(BaseModel):
     """Login request payload."""
 
+    business_slug: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=120,
+    )
     username: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=1, max_length=255)
+
+    @field_validator("business_slug", mode="before")
+    @classmethod
+    def normalize_business_slug(cls, value: object) -> str | None:
+        """Normalize optional business slug for scoped business login."""
+
+        if value is None:
+            return None
+
+        if not isinstance(value, str):
+            return value
+
+        normalized_value = value.strip().lower()
+
+        if not normalized_value:
+            return None
+
+        return normalized_value
 
 
 class TokenResponse(BaseModel):
@@ -39,3 +62,18 @@ class UserMeResponse(BaseModel):
     role: str
     is_active: bool
     theme_preference: str | None
+
+
+class UserSessionResponse(BaseModel):
+    """Safe current user session response for frontend routing."""
+
+    id: int
+    business_id: int | None
+    full_name: str
+    username: str
+    email: str | None
+    role: str
+    is_active: bool
+    theme_preference: str | None
+    dashboard_path: str
+    is_super_admin: bool
