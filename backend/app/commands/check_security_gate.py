@@ -15,6 +15,10 @@ class SecurityGateStep:
 
 SECURITY_GATE_STEPS: list[SecurityGateStep] = [
     SecurityGateStep(
+        name="Dependency health kontrolü",
+        module_name="app.commands.check_dependency_health",
+    ),
+    SecurityGateStep(
         name="Baseline tablo kontrolü",
         module_name="app.commands.check_baseline",
     ),
@@ -66,6 +70,8 @@ SECURITY_TEST_PATHS = [
     "tests/test_security_config.py",
     "tests/test_api_security.py",
     "tests/test_rate_limit.py",
+    "tests/test_security_gate.py",
+    "tests/test_dependency_health.py",
 ]
 
 

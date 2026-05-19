@@ -247,3 +247,12 @@ Bu komut başarılı olmadan ürün satışa hazır kabul edilmez.
 - [x] GitHub Actions security gate workflow eklenecek.
 - [x] Push ve pull request sonrası güvenlik kapısı otomatik çalışacak.
 - [x] CI ortamında migration, seed ve security gate doğrulanacak.
+
+---
+
+## 9. Dependency Health
+
+- [x] passlib parola hash bağımlılığı kaldırıldı.
+- [x] bcrypt doğrudan kullanılacak şekilde sadeleştirildi.
+- [x] Dependency health kontrol komutu eklendi.
+- [x] Dependency health kontrolü security gate içine eklendi.

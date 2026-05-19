@@ -83,3 +83,21 @@ Detaylı doküman:
 ```text
 docs/CI_SECURITY_GATE.md
 ```
+
+---
+
+## Dependency Health Kontrolü
+
+Güvenlik kapısı artık dependency health kontrolünü de çalıştırır.
+
+Komut:
+
+```powershell
+python -m app.commands.check_dependency_health
+```
+
+Detaylı doküman:
+
+```text
+docs/DEPENDENCY_SECURITY.md
+```
