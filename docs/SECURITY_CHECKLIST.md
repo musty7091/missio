@@ -286,3 +286,13 @@ Bu komut başarılı olmadan ürün satışa hazır kabul edilmez.
 - [x] business.created audit log kaydı eklendi.
 - [x] business.owner_created audit log kaydı eklendi.
 - [x] Business creation kontrolü security gate içine eklendi.
+
+---
+
+## 13. Business User Management
+
+- [x] Super admin ile işletme kullanıcısı oluşturma servisi eklendi.
+- [x] Manager ve staff hesapları business_id kapsamına bağlanacak.
+- [x] İşletme kullanıcısı olarak super_admin oluşturma engellendi.
+- [x] business.user_created audit log kaydı eklendi.
+- [x] Business user management kontrolü security gate içine eklendi.

@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
+from sqlalchemy.orm import Session
+
+from app.core.roles import UserRole
+from app.models.business import Business
+from app.models.user import User
+from app.services.access_control_service import require_roles
+from app.services.audit_log_service import create_audit_log
+from app.services.auth_service import create_user_with_password
+
+
+class BusinessUserManagementError(ValueError):
+    """Base error for business user management failures."""
+
+
+class InvalidBusinessUserRoleError(BusinessUserManagementError):
+    """Raised when a business user role is invalid."""
+
+
+ALLOWED_BUSINESS_USER_ROLES = {
+    UserRole.BOSS.value,
+    UserRole.BUSINESS_OWNER.value,
+    UserRole.MANAGER.value,
+    UserRole.STAFF.value,
+}
+
+
+@dataclass(frozen=True)
+class CreatedBusinessUser:
+    """Created business user result."""
+
+    user: User
+    business: Business
+
+
+def get_utc_now() -> datetime:
+    """Return current UTC datetime."""
+
+    return datetime.now(timezone.utc)
+
+
+def validate_business_user_role(role: str) -> None:
+    """Validate business user role."""
+
+    if role not in ALLOWED_BUSINESS_USER_ROLES:
+        raise InvalidBusinessUserRoleError("İşletme kullanıcısı rolü geçersiz.")
+
+
+def create_business_user(
+    db: Session,
+    *,
+    current_user: User,
+    business: Business,
+    full_name: str,
+    username: str,
+    password: str,
+    role: str,
+    email: str | None = None,
+    theme_preference: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> User:
+    """Create a business scoped user as super admin."""
+
+    require_roles(current_user, [UserRole.SUPER_ADMIN])
+    validate_business_user_role(role)
+
+    if not business.is_active:
+        raise BusinessUserManagementError("Pasif işletmeye kullanıcı oluşturulamaz.")
+
+    user = create_user_with_password(
+        db=db,
+        full_name=full_name,
+        username=username,
+        password=password,
+        role=role,
+        business_id=business.id,
+        email=email,
+        theme_preference=theme_preference,
+        is_active=True,
+    )
+
+    create_audit_log(
+        db=db,
+        action="business.user_created",
+        business_id=business.id,
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+        detail={
+            "business_id": business.id,
+            "created_user_id": user.id,
+            "username": user.username,
+            "role": user.role,
+        },
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    return user

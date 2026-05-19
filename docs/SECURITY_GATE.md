@@ -155,3 +155,21 @@ Detaylı doküman:
 ```text
 docs/BUSINESS_CREATION.md
 ```
+
+---
+
+## Business User Management Kontrolü
+
+Güvenlik kapısı artık işletme kullanıcısı oluşturma kontrolünü de çalıştırır.
+
+Komut:
+
+```powershell
+python -m app.commands.check_business_user_management
+```
+
+Detaylı doküman:
+
+```text
+docs/BUSINESS_USER_MANAGEMENT.md
+```
