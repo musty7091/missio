@@ -22,6 +22,13 @@ from app.repositories.user_repository import (
     normalize_username,
     update_last_login_at,
 )
+from app.services.audit_log_service import create_audit_log
+from app.services.login_attempt_service import (
+    LoginAttemptLockedError,
+    assert_login_allowed,
+    record_failed_login_attempt,
+    record_successful_login_attempt,
+)
 
 
 class AuthServiceError(ValueError):
@@ -42,6 +49,14 @@ class InactiveUserError(AuthServiceError):
 
 class InvalidRoleError(AuthServiceError):
     """Raised when role is not supported."""
+
+
+class AccountTemporarilyLockedError(AuthServiceError):
+    """Raised when login is temporarily locked."""
+
+    def __init__(self, locked_until_utc: datetime) -> None:
+        self.locked_until_utc = locked_until_utc
+        super().__init__("Çok fazla hatalı giriş denemesi yapıldı.")
 
 
 class WeakPasswordError(AuthServiceError):
@@ -124,34 +139,175 @@ def create_user_with_password(
     return add_user(db=db, user=user)
 
 
+def record_login_failure(
+    db: Session,
+    *,
+    username: str,
+    business_id: int | None,
+    user: User | None,
+    failure_reason: str,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> None:
+    """Record failed login attempt and audit event."""
+
+    normalized_username = normalize_username(username)
+    effective_business_id = user.business_id if user is not None else business_id
+    attempt_result = record_failed_login_attempt(
+        db=db,
+        username=normalized_username,
+        business_id=effective_business_id,
+        failure_reason=failure_reason,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    create_audit_log(
+        db=db,
+        action="auth.login_failed",
+        business_id=effective_business_id,
+        user_id=user.id if user is not None else None,
+        entity_type="user" if user is not None else "auth",
+        entity_id=str(user.id) if user is not None else None,
+        detail={
+            "username": normalized_username,
+            "failure_reason": failure_reason,
+            "failed_count": attempt_result.failed_count,
+            "locked_until_utc": (
+                attempt_result.locked_until_utc.isoformat()
+                if attempt_result.locked_until_utc is not None
+                else None
+            ),
+        },
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    if attempt_result.locked_until_utc is not None:
+        create_audit_log(
+            db=db,
+            action="auth.login_locked",
+            business_id=effective_business_id,
+            user_id=user.id if user is not None else None,
+            entity_type="user" if user is not None else "auth",
+            entity_id=str(user.id) if user is not None else None,
+            detail={
+                "username": normalized_username,
+                "failed_count": attempt_result.failed_count,
+                "locked_until_utc": attempt_result.locked_until_utc.isoformat(),
+            },
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+
 def authenticate_user(
     db: Session,
     *,
     username: str,
     password: str,
     business_id: int | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> User:
     """Authenticate user by username and password."""
 
+    normalized_username = normalize_username(username)
+
+    try:
+        assert_login_allowed(
+            db=db,
+            username=normalized_username,
+            business_id=business_id,
+        )
+    except LoginAttemptLockedError as exc:
+        create_audit_log(
+            db=db,
+            action="auth.login_blocked",
+            business_id=business_id,
+            user_id=None,
+            entity_type="auth",
+            entity_id=None,
+            detail={
+                "username": normalized_username,
+                "locked_until_utc": exc.locked_until_utc.isoformat(),
+            },
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        raise AccountTemporarilyLockedError(exc.locked_until_utc) from exc
+
     user = get_user_by_username(
         db=db,
-        username=username,
+        username=normalized_username,
         business_id=business_id,
     )
 
     if user is None:
+        record_login_failure(
+            db=db,
+            username=normalized_username,
+            business_id=business_id,
+            user=None,
+            failure_reason="invalid_credentials",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         raise InvalidCredentialsError("Kullanıcı adı veya şifre hatalı.")
 
     if not user.is_active:
+        record_login_failure(
+            db=db,
+            username=normalized_username,
+            business_id=business_id,
+            user=user,
+            failure_reason="inactive_user",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         raise InactiveUserError("Kullanıcı pasif durumda.")
 
     if not verify_password(password, user.password_hash):
+        record_login_failure(
+            db=db,
+            username=normalized_username,
+            business_id=business_id,
+            user=user,
+            failure_reason="invalid_credentials",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         raise InvalidCredentialsError("Kullanıcı adı veya şifre hatalı.")
 
     user.last_login_at = get_utc_now()
     user.updated_at = get_utc_now()
 
-    return update_last_login_at(db=db, user=user)
+    update_last_login_at(db=db, user=user)
+
+    record_successful_login_attempt(
+        db=db,
+        username=normalized_username,
+        business_id=user.business_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    create_audit_log(
+        db=db,
+        action="auth.login_success",
+        business_id=user.business_id,
+        user_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+        detail={
+            "username": normalized_username,
+            "role": user.role,
+        },
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    return user
 
 
 def create_login_token_for_user(user: User) -> LoginToken:

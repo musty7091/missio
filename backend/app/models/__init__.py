@@ -6,6 +6,7 @@ from app.models.business_module import BusinessModule
 from app.models.consent_document import ConsentDocument
 from app.models.daily_report import DailyReport
 from app.models.license import License
+from app.models.login_attempt import LoginAttempt
 from app.models.module import Module
 from app.models.notification import Notification
 from app.models.package import Package
@@ -27,6 +28,7 @@ __all__ = [
     "ConsentDocument",
     "DailyReport",
     "License",
+    "LoginAttempt",
     "Module",
     "Notification",
     "Package",

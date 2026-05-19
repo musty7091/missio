@@ -35,10 +35,10 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 - [x] Kullanıcı oluşturma servisi kurulacak.
 - [x] Kullanıcı doğrulama servisi kurulacak.
 - [ ] Login endpoint yazılacak.
-- [ ] Login attempt tablosu eklenecek.
-- [ ] Başarısız giriş denemeleri loglanacak.
-- [ ] Brute-force koruması eklenecek.
-- [ ] Belirli sayıda hatalı giriş sonrası geçici kilit uygulanacak.
+- [x] Login attempt tablosu eklenecek.
+- [x] Başarısız giriş denemeleri loglanacak.
+- [x] Brute-force koruması eklenecek.
+- [x] Belirli sayıda hatalı giriş sonrası geçici kilit uygulanacak.
 - [ ] Başarılı girişte `last_login_at` güncellenecek.
 - [ ] Başarılı ve başarısız login audit log'a yazılacak.
 - [ ] Pasif kullanıcı login olamayacak.

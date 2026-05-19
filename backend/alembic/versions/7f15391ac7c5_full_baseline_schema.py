@@ -1,8 +1,8 @@
-"""baseline schema
+"""full baseline schema
 
-Revision ID: 724272d67bf2
+Revision ID: 7f15391ac7c5
 Revises: 
-Create Date: 2026-05-19 13:38:39.126646
+Create Date: 2026-05-19 14:29:33.683774
 """
 
 from collections.abc import Sequence
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 
-revision: str = '724272d67bf2'
+revision: str = '7f15391ac7c5'
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -138,6 +138,25 @@ def upgrade() -> None:
     op.create_index(op.f('ix_licenses_id'), 'licenses', ['id'], unique=False)
     op.create_index(op.f('ix_licenses_license_key'), 'licenses', ['license_key'], unique=True)
     op.create_index(op.f('ix_licenses_package_code'), 'licenses', ['package_code'], unique=False)
+    op.create_table('login_attempts',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('business_id', sa.Integer(), nullable=True),
+    sa.Column('username', sa.String(length=100), nullable=False),
+    sa.Column('ip_address', sa.String(length=100), nullable=True),
+    sa.Column('user_agent', sa.Text(), nullable=True),
+    sa.Column('was_successful', sa.Boolean(), nullable=False),
+    sa.Column('failure_reason', sa.String(length=120), nullable=True),
+    sa.Column('locked_until_utc', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at_utc', sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_login_attempts_business_id'), 'login_attempts', ['business_id'], unique=False)
+    op.create_index(op.f('ix_login_attempts_created_at_utc'), 'login_attempts', ['created_at_utc'], unique=False)
+    op.create_index(op.f('ix_login_attempts_id'), 'login_attempts', ['id'], unique=False)
+    op.create_index(op.f('ix_login_attempts_locked_until_utc'), 'login_attempts', ['locked_until_utc'], unique=False)
+    op.create_index(op.f('ix_login_attempts_username'), 'login_attempts', ['username'], unique=False)
+    op.create_index(op.f('ix_login_attempts_was_successful'), 'login_attempts', ['was_successful'], unique=False)
     op.create_table('setup_state',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('business_id', sa.Integer(), nullable=False),
@@ -438,6 +457,13 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_setup_state_id'), table_name='setup_state')
     op.drop_index(op.f('ix_setup_state_business_id'), table_name='setup_state')
     op.drop_table('setup_state')
+    op.drop_index(op.f('ix_login_attempts_was_successful'), table_name='login_attempts')
+    op.drop_index(op.f('ix_login_attempts_username'), table_name='login_attempts')
+    op.drop_index(op.f('ix_login_attempts_locked_until_utc'), table_name='login_attempts')
+    op.drop_index(op.f('ix_login_attempts_id'), table_name='login_attempts')
+    op.drop_index(op.f('ix_login_attempts_created_at_utc'), table_name='login_attempts')
+    op.drop_index(op.f('ix_login_attempts_business_id'), table_name='login_attempts')
+    op.drop_table('login_attempts')
     op.drop_index(op.f('ix_licenses_package_code'), table_name='licenses')
     op.drop_index(op.f('ix_licenses_license_key'), table_name='licenses')
     op.drop_index(op.f('ix_licenses_id'), table_name='licenses')

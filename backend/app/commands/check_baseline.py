@@ -19,6 +19,7 @@ EXPECTED_TABLES = {
     "consent_documents",
     "daily_reports",
     "licenses",
+    "login_attempts",
     "modules",
     "notifications",
     "packages",
