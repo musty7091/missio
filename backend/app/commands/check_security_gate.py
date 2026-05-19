@@ -27,6 +27,10 @@ SECURITY_GATE_STEPS: list[SecurityGateStep] = [
         module_name="app.commands.check_bootstrap_status",
     ),
     SecurityGateStep(
+        name="Business creation kontrolü",
+        module_name="app.commands.check_business_creation",
+    ),
+    SecurityGateStep(
         name="Baseline tablo kontrolü",
         module_name="app.commands.check_baseline",
     ),
@@ -82,6 +86,7 @@ SECURITY_TEST_PATHS = [
     "tests/test_dependency_health.py",
     "tests/test_repo_hygiene.py",
     "tests/test_bootstrap.py",
+    "tests/test_business_service.py",
 ]
 
 

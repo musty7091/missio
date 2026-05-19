@@ -275,3 +275,14 @@ Bu komut başarılı olmadan ürün satışa hazır kabul edilmez.
 - [x] Bootstrap sonrası setup_completed true yapılacak.
 - [x] setup.super_admin_created audit log kaydı oluşturulacak.
 - [x] Bootstrap durum kontrolü security gate içine eklendi.
+
+---
+
+## 12. Business Creation
+
+- [x] Super admin ile işletme oluşturma servisi eklendi.
+- [x] İşletme patronu hesabı açma servisi eklendi.
+- [x] İşletme slug benzersizlik kontrolü eklendi.
+- [x] business.created audit log kaydı eklendi.
+- [x] business.owner_created audit log kaydı eklendi.
+- [x] Business creation kontrolü security gate içine eklendi.

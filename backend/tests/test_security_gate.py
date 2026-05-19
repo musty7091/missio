@@ -8,6 +8,7 @@ def test_security_gate_contains_required_command_steps() -> None:
         "Repository hijyen kontrolü",
         "Dependency health kontrolü",
         "Bootstrap durum kontrolü",
+        "Business creation kontrolü",
         "Baseline tablo kontrolü",
         "Production güvenlik ayar kontrolü",
         "Auth güvenlik temel kontrolü",
@@ -53,6 +54,7 @@ def test_security_gate_test_command_contains_security_tests() -> None:
     assert "tests/test_dependency_health.py" in command_text
     assert "tests/test_repo_hygiene.py" in command_text
     assert "tests/test_bootstrap.py" in command_text
+    assert "tests/test_business_service.py" in command_text
 
 
 def test_run_security_gate_steps_stops_on_failure(monkeypatch) -> None:

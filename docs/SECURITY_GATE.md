@@ -137,3 +137,21 @@ Detaylı doküman:
 ```text
 docs/BOOTSTRAP.md
 ```
+
+---
+
+## Business Creation Kontrolü
+
+Güvenlik kapısı artık super admin ile işletme oluşturma kontrolünü de çalıştırır.
+
+Komut:
+
+```powershell
+python -m app.commands.check_business_creation
+```
+
+Detaylı doküman:
+
+```text
+docs/BUSINESS_CREATION.md
+```
