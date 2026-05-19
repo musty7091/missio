@@ -63,7 +63,7 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 - [x] Access token doğrulama yapılacak.
 - [x] Süresi dolmuş token reddedilecek.
 - [x] Geçersiz rol ile token üretimi engellenecek.
-- [ ] Production ortamda zayıf `SECRET_KEY` ile uygulama açılmayacak.
+- [x] Production ortamda zayıf `SECRET_KEY` ile uygulama açılmayacak.
 - [ ] Token içinde gereksiz hassas veri tutulmayacak.
 - [x] Token response içinde sadece gerekli alanlar dönecek.
 - [ ] Kritik işlemlerde kullanıcı yetkisi tekrar kontrol edilecek.
@@ -145,13 +145,13 @@ Aşağıdaki maddeler tamamlanmadan görev modülü, fotoğraf kanıtı, raporla
 ### 2.9 Konfigürasyon ve Secret Güvenliği
 
 - [x] `.env` dosyası git dışında tutulacak.
-- [ ] Production ortamda debug kapalı olacak.
-- [ ] Production ortamda güçlü `SECRET_KEY` zorunlu olacak.
+- [x] Production ortamda debug kapalı olacak.
+- [x] Production ortamda güçlü `SECRET_KEY` zorunlu olacak.
 - [ ] Varsayılan admin şifresiyle teslim yapılmayacak.
 - [ ] Kurulum teslim raporunda şifre açık yazılmayacak.
 - [ ] Loglarda token veya şifre görünmeyecek.
 - [ ] GitHub'a veritabanı, upload dosyası veya secret gitmeyecek.
-- [ ] Production güvenlik kontrol komutu yazılacak.
+- [x] Production güvenlik kontrol komutu yazılacak.
 
 ---
 
