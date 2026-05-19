@@ -11,13 +11,16 @@ from app.db.base import Base
 from app.models.audit_log import AuditLog
 from app.models.business import Business
 from app.models.user import User
-from app.services.access_control_service import RolePermissionError
+from app.services.access_control_service import (
+    BusinessScopeError,
+    BusinessUserManagementPermissionError,
+)
 from app.services.auth_service import (
     DuplicateUsernameError,
     WeakPasswordError,
     create_user_with_password,
 )
-from app.services.business_service import create_business_with_owner
+from app.services.business_service import BusinessWithOwner, create_business_with_owner
 from app.services.user_management_service import (
     InvalidBusinessUserRoleError,
     create_business_user,
@@ -87,7 +90,10 @@ def create_staff_without_business(db: Session) -> User:
     return user
 
 
-def create_business_fixture(db: Session, super_admin: User) -> Business:
+def create_business_with_owner_fixture(
+    db: Session,
+    super_admin: User,
+) -> BusinessWithOwner:
     result = create_business_with_owner(
         db=db,
         current_user=super_admin,
@@ -99,8 +105,13 @@ def create_business_fixture(db: Session, super_admin: User) -> Business:
     )
     db.commit()
     db.refresh(result.business)
+    db.refresh(result.owner_user)
 
-    return result.business
+    return result
+
+
+def create_business_fixture(db: Session, super_admin: User) -> Business:
+    return create_business_with_owner_fixture(db, super_admin).business
 
 
 def test_create_manager_user(db_session: Session) -> None:
@@ -150,12 +161,119 @@ def test_create_staff_user(db_session: Session) -> None:
     assert user.role == "staff"
 
 
-def test_create_business_user_requires_super_admin(db_session: Session) -> None:
+def test_boss_can_create_manager_and_staff(db_session: Session) -> None:
+    super_admin = create_super_admin(db_session)
+    result = create_business_with_owner_fixture(db_session, super_admin)
+
+    manager = create_business_user(
+        db=db_session,
+        current_user=result.owner_user,
+        business=result.business,
+        full_name="Boss Created Manager",
+        username="bosscreatedmanager",
+        password="Missio.2026!",
+        role="manager",
+    )
+    staff = create_business_user(
+        db=db_session,
+        current_user=result.owner_user,
+        business=result.business,
+        full_name="Boss Created Staff",
+        username="bosscreatedstaff",
+        password="Missio.2026!",
+        role="staff",
+    )
+    db_session.commit()
+    db_session.refresh(manager)
+    db_session.refresh(staff)
+
+    assert manager.business_id == result.business.id
+    assert manager.role == "manager"
+    assert staff.business_id == result.business.id
+    assert staff.role == "staff"
+
+
+def test_manager_can_create_only_staff(db_session: Session) -> None:
+    super_admin = create_super_admin(db_session)
+    business = create_business_fixture(db_session, super_admin)
+
+    manager = create_business_user(
+        db=db_session,
+        current_user=super_admin,
+        business=business,
+        full_name="Manager User",
+        username="manageronlystaff",
+        password="Missio.2026!",
+        role="manager",
+    )
+    db_session.commit()
+    db_session.refresh(manager)
+
+    staff = create_business_user(
+        db=db_session,
+        current_user=manager,
+        business=business,
+        full_name="Manager Created Staff",
+        username="managercreatedstaff",
+        password="Missio.2026!",
+        role="staff",
+    )
+    db_session.commit()
+    db_session.refresh(staff)
+
+    assert staff.business_id == business.id
+    assert staff.role == "staff"
+
+    with pytest.raises(BusinessUserManagementPermissionError):
+        create_business_user(
+            db=db_session,
+            current_user=manager,
+            business=business,
+            full_name="Manager Created Manager",
+            username="managercreatedmanager",
+            password="Missio.2026!",
+            role="manager",
+        )
+
+
+def test_staff_without_business_scope_cannot_create_business_user(
+    db_session: Session,
+) -> None:
     super_admin = create_super_admin(db_session)
     business = create_business_fixture(db_session, super_admin)
     staff = create_staff_without_business(db_session)
 
-    with pytest.raises(RolePermissionError):
+    with pytest.raises(BusinessScopeError):
+        create_business_user(
+            db=db_session,
+            current_user=staff,
+            business=business,
+            full_name="Forbidden User",
+            username="forbiddenuser",
+            password="Missio.2026!",
+            role="staff",
+        )
+
+
+def test_staff_with_business_scope_cannot_create_business_user(
+    db_session: Session,
+) -> None:
+    super_admin = create_super_admin(db_session)
+    business = create_business_fixture(db_session, super_admin)
+
+    staff = create_business_user(
+        db=db_session,
+        current_user=super_admin,
+        business=business,
+        full_name="Staff User",
+        username="scopedstaffuser",
+        password="Missio.2026!",
+        role="staff",
+    )
+    db_session.commit()
+    db_session.refresh(staff)
+
+    with pytest.raises(BusinessUserManagementPermissionError):
         create_business_user(
             db=db_session,
             current_user=staff,
