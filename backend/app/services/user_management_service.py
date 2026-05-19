@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.roles import UserRole
 from app.models.business import Business
 from app.models.user import User
-from app.services.access_control_service import require_roles
+from app.services.access_control_service import ensure_can_create_business_user_role
 from app.services.audit_log_service import create_audit_log
 from app.services.auth_service import create_user_with_password
 
@@ -64,13 +64,18 @@ def create_business_user(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> User:
-    """Create a business scoped user as super admin."""
+    """Create a business scoped user according to the role permission matrix."""
 
-    require_roles(current_user, [UserRole.SUPER_ADMIN])
     validate_business_user_role(role)
 
     if not business.is_active:
         raise BusinessUserManagementError("Pasif işletmeye kullanıcı oluşturulamaz.")
+
+    ensure_can_create_business_user_role(
+        current_user,
+        target_business_id=business.id,
+        target_role=role,
+    )
 
     user = create_user_with_password(
         db=db,
@@ -96,6 +101,8 @@ def create_business_user(
             "created_user_id": user.id,
             "username": user.username,
             "role": user.role,
+            "created_by_user_id": current_user.id,
+            "created_by_role": current_user.role,
         },
         ip_address=ip_address,
         user_agent=user_agent,

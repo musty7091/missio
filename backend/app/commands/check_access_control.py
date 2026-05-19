@@ -9,9 +9,14 @@ from app.models.business import Business
 from app.models.user import User
 from app.services.access_control_service import (
     BusinessScopeError,
+    BusinessUserManagementPermissionError,
     RolePermissionError,
     UserRecordAccessError,
+    ensure_business_admin_access,
     ensure_business_scope,
+    ensure_business_user_management_access,
+    ensure_can_create_business_user_role,
+    ensure_staff_task_access,
     ensure_user_record_access,
     require_roles,
 )
@@ -23,42 +28,53 @@ from app.services.session_user_service import (
 
 
 TEST_BUSINESS_SLUG = "missio-access-control-test"
+OTHER_BUSINESS_SLUG = "missio-access-control-other-test"
 TEST_PASSWORD = "Missio.2026!"
 
 
 def cleanup_test_data() -> None:
-    """Delete test users and business created by this command."""
+    """Delete test users and businesses created by this command."""
 
     db = SessionLocal()
 
     try:
-        business = (
+        businesses = (
             db.query(Business)
-            .filter(Business.slug == TEST_BUSINESS_SLUG)
-            .one_or_none()
+            .filter(Business.slug.in_([TEST_BUSINESS_SLUG, OTHER_BUSINESS_SLUG]))
+            .all()
         )
+        business_ids = [business.id for business in businesses]
 
-        if business is not None:
-            db.execute(delete(User).where(User.business_id == business.id))
-            db.delete(business)
+        if business_ids:
+            db.execute(delete(User).where(User.business_id.in_(business_ids)))
 
         db.execute(delete(User).where(User.username.like("access_%")))
+
+        if business_ids:
+            db.execute(delete(Business).where(Business.id.in_(business_ids)))
+
         db.commit()
     finally:
         db.close()
 
 
-def create_test_business(db) -> Business:
+def create_test_business(
+    db,
+    *,
+    name: str,
+    slug: str,
+    email: str,
+) -> Business:
     """Create test business."""
 
     now = get_utc_now()
     business = Business(
-        name="Missio Access Control Test",
-        slug=TEST_BUSINESS_SLUG,
+        name=name,
+        slug=slug,
         logo_path=None,
         owner_name="Missio",
         phone=None,
-        email="access-control@example.com",
+        email=email,
         address=None,
         timezone="Europe/Istanbul",
         default_theme="dark",
@@ -74,6 +90,22 @@ def create_test_business(db) -> Business:
     return business
 
 
+def assert_permission_denied(
+    func,
+    expected_error_type: type[Exception],
+    message: str,
+) -> None:
+    """Assert an access control call is denied with expected error."""
+
+    try:
+        func()
+    except expected_error_type:
+        print(message)
+        return
+
+    raise RuntimeError(f"Beklenen yetki reddi oluşmadı: {message}")
+
+
 def main() -> None:
     """Run access control checks against local database."""
 
@@ -81,7 +113,18 @@ def main() -> None:
     db = SessionLocal()
 
     try:
-        business = create_test_business(db)
+        business = create_test_business(
+            db,
+            name="Missio Access Control Test",
+            slug=TEST_BUSINESS_SLUG,
+            email="access-control@example.com",
+        )
+        other_business = create_test_business(
+            db,
+            name="Missio Access Control Other Test",
+            slug=OTHER_BUSINESS_SLUG,
+            email="access-control-other@example.com",
+        )
 
         super_admin = create_user_with_password(
             db=db,
@@ -97,6 +140,22 @@ def main() -> None:
             username="access_boss",
             password=TEST_PASSWORD,
             role="boss",
+            business_id=business.id,
+        )
+        business_owner = create_user_with_password(
+            db=db,
+            full_name="Access Business Owner",
+            username="access_business_owner",
+            password=TEST_PASSWORD,
+            role="business_owner",
+            business_id=business.id,
+        )
+        manager = create_user_with_password(
+            db=db,
+            full_name="Access Manager",
+            username="access_manager",
+            password=TEST_PASSWORD,
+            role="manager",
             business_id=business.id,
         )
         staff = create_user_with_password(
@@ -119,8 +178,12 @@ def main() -> None:
         db.commit()
         db.refresh(super_admin)
         db.refresh(boss)
+        db.refresh(business_owner)
+        db.refresh(manager)
         db.refresh(staff)
         db.refresh(other_staff)
+        db.refresh(business)
+        db.refresh(other_business)
 
         staff_token = create_access_token(
             subject=str(staff.id),
@@ -148,34 +211,176 @@ def main() -> None:
         require_roles(super_admin, ["super_admin"])
         require_roles(boss, ["boss", "manager"])
 
-        try:
-            require_roles(staff, ["boss"])
-        except RolePermissionError:
-            print("Rol yetki reddi kontrolü başarılı.")
-        else:
-            raise RuntimeError("Personel patron yetkisi aldı.")
+        assert_permission_denied(
+            lambda: require_roles(staff, ["boss"]),
+            RolePermissionError,
+            "Rol yetki reddi kontrolü başarılı.",
+        )
 
         ensure_business_scope(staff, business.id)
         ensure_business_scope(super_admin, business.id)
 
-        try:
-            ensure_business_scope(staff, business.id + 999)
-        except BusinessScopeError:
-            print("Business scope reddi kontrolü başarılı.")
-        else:
-            raise RuntimeError("Personel başka işletme kapsamına erişti.")
+        assert_permission_denied(
+            lambda: ensure_business_scope(staff, business.id + 999),
+            BusinessScopeError,
+            "Business scope reddi kontrolü başarılı.",
+        )
 
         ensure_user_record_access(staff, staff)
         ensure_user_record_access(boss, staff)
         ensure_user_record_access(super_admin, staff)
 
-        try:
-            ensure_user_record_access(staff, other_staff)
-        except UserRecordAccessError:
-            print("Personel başka personel kaydı reddi başarılı.")
-        else:
-            raise RuntimeError("Personel başka personel kaydına erişti.")
+        assert_permission_denied(
+            lambda: ensure_user_record_access(staff, other_staff),
+            UserRecordAccessError,
+            "Personel başka personel kaydı reddi başarılı.",
+        )
 
+        ensure_staff_task_access(
+            staff,
+            task_business_id=business.id,
+            assigned_to_user_id=staff.id,
+        )
+        ensure_staff_task_access(
+            manager,
+            task_business_id=business.id,
+            assigned_to_user_id=staff.id,
+        )
+        ensure_staff_task_access(
+            boss,
+            task_business_id=business.id,
+            assigned_to_user_id=staff.id,
+        )
+        ensure_staff_task_access(
+            super_admin,
+            task_business_id=business.id,
+            assigned_to_user_id=staff.id,
+        )
+
+        assert_permission_denied(
+            lambda: ensure_staff_task_access(
+                staff,
+                task_business_id=business.id,
+                assigned_to_user_id=other_staff.id,
+            ),
+            UserRecordAccessError,
+            "Personel başka görev erişimi reddi başarılı.",
+        )
+
+        ensure_business_admin_access(super_admin, business.id)
+        ensure_business_admin_access(boss, business.id)
+        ensure_business_admin_access(business_owner, business.id)
+
+        assert_permission_denied(
+            lambda: ensure_business_admin_access(manager, business.id),
+            RolePermissionError,
+            "Manager işletme ayarı yönetimi reddi başarılı.",
+        )
+
+        assert_permission_denied(
+            lambda: ensure_business_admin_access(staff, business.id),
+            RolePermissionError,
+            "Staff işletme ayarı yönetimi reddi başarılı.",
+        )
+
+        ensure_business_user_management_access(super_admin, business.id)
+        ensure_business_user_management_access(boss, business.id)
+        ensure_business_user_management_access(business_owner, business.id)
+        ensure_business_user_management_access(manager, business.id)
+
+        assert_permission_denied(
+            lambda: ensure_business_user_management_access(staff, business.id),
+            RolePermissionError,
+            "Staff kullanıcı yönetimi reddi başarılı.",
+        )
+
+        for target_role in ["boss", "business_owner", "manager", "staff"]:
+            ensure_can_create_business_user_role(
+                super_admin,
+                target_business_id=business.id,
+                target_role=target_role,
+            )
+
+        assert_permission_denied(
+            lambda: ensure_can_create_business_user_role(
+                super_admin,
+                target_business_id=business.id,
+                target_role="super_admin",
+            ),
+            BusinessUserManagementPermissionError,
+            "Business user olarak super_admin oluşturma reddi başarılı.",
+        )
+
+        ensure_can_create_business_user_role(
+            boss,
+            target_business_id=business.id,
+            target_role="manager",
+        )
+        ensure_can_create_business_user_role(
+            boss,
+            target_business_id=business.id,
+            target_role="staff",
+        )
+
+        assert_permission_denied(
+            lambda: ensure_can_create_business_user_role(
+                boss,
+                target_business_id=business.id,
+                target_role="boss",
+            ),
+            BusinessUserManagementPermissionError,
+            "Boss başka boss oluşturma reddi başarılı.",
+        )
+
+        assert_permission_denied(
+            lambda: ensure_can_create_business_user_role(
+                boss,
+                target_business_id=other_business.id,
+                target_role="staff",
+            ),
+            BusinessScopeError,
+            "Boss başka işletmede kullanıcı oluşturma reddi başarılı.",
+        )
+
+        ensure_can_create_business_user_role(
+            manager,
+            target_business_id=business.id,
+            target_role="staff",
+        )
+
+        assert_permission_denied(
+            lambda: ensure_can_create_business_user_role(
+                manager,
+                target_business_id=business.id,
+                target_role="manager",
+            ),
+            BusinessUserManagementPermissionError,
+            "Manager başka manager oluşturma reddi başarılı.",
+        )
+
+        assert_permission_denied(
+            lambda: ensure_can_create_business_user_role(
+                manager,
+                target_business_id=business.id,
+                target_role="boss",
+            ),
+            BusinessUserManagementPermissionError,
+            "Manager boss oluşturma reddi başarılı.",
+        )
+
+        assert_permission_denied(
+            lambda: ensure_can_create_business_user_role(
+                staff,
+                target_business_id=business.id,
+                target_role="staff",
+            ),
+            BusinessUserManagementPermissionError,
+            "Staff kullanıcı oluşturma reddi başarılı.",
+        )
+
+        print("Business admin yetki matrisi kontrolü başarılı.")
+        print("Business user yönetimi yetki matrisi kontrolü başarılı.")
+        print("Business user rol oluşturma matrisi kontrolü başarılı.")
         print("Access control temel kontrolü başarılı.")
     finally:
         db.close()

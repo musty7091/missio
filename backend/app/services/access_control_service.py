@@ -22,6 +22,36 @@ class UserRecordAccessError(AccessControlError):
     """Raised when user tries to access a forbidden user record."""
 
 
+class BusinessUserManagementPermissionError(AccessControlError):
+    """Raised when user cannot manage a business user role."""
+
+
+BOSS_LEVEL_ROLES: set[UserRole] = {
+    UserRole.BOSS,
+    UserRole.BUSINESS_OWNER,
+}
+
+BUSINESS_ADMIN_ROLES: set[UserRole] = {
+    UserRole.SUPER_ADMIN,
+    UserRole.BOSS,
+    UserRole.BUSINESS_OWNER,
+}
+
+BUSINESS_USER_MANAGER_ROLES: set[UserRole] = {
+    UserRole.SUPER_ADMIN,
+    UserRole.BOSS,
+    UserRole.BUSINESS_OWNER,
+    UserRole.MANAGER,
+}
+
+BUSINESS_USER_ROLES: set[UserRole] = {
+    UserRole.BOSS,
+    UserRole.BUSINESS_OWNER,
+    UserRole.MANAGER,
+    UserRole.STAFF,
+}
+
+
 def normalize_allowed_roles(allowed_roles: Iterable[str | UserRole]) -> set[str]:
     """Normalize allowed roles to string values."""
 
@@ -41,10 +71,51 @@ def normalize_allowed_roles(allowed_roles: Iterable[str | UserRole]) -> set[str]
     return normalized_roles
 
 
+def normalize_role_value(role: str | UserRole) -> str:
+    """Normalize and validate a single role value."""
+
+    role_value = role.value if isinstance(role, UserRole) else str(role)
+
+    if not is_valid_role(role_value):
+        raise ValueError(f"Geçersiz rol: {role_value}")
+
+    return role_value
+
+
+def user_has_role(user: User, role: str | UserRole) -> bool:
+    """Return whether user has the given role."""
+
+    return user.role == normalize_role_value(role)
+
+
+def user_has_any_role(user: User, roles: Iterable[str | UserRole]) -> bool:
+    """Return whether user has any of the given roles."""
+
+    return user.role in normalize_allowed_roles(roles)
+
+
 def is_super_admin(user: User) -> bool:
     """Return whether the user is a super admin."""
 
     return user.role == UserRole.SUPER_ADMIN.value
+
+
+def is_boss_level_user(user: User) -> bool:
+    """Return whether user has boss-level business authority."""
+
+    return user_has_any_role(user, BOSS_LEVEL_ROLES)
+
+
+def is_manager_user(user: User) -> bool:
+    """Return whether user is a manager."""
+
+    return user.role == UserRole.MANAGER.value
+
+
+def is_staff_user(user: User) -> bool:
+    """Return whether user is a staff user."""
+
+    return user.role == UserRole.STAFF.value
 
 
 def require_roles(user: User, allowed_roles: Iterable[str | UserRole]) -> None:
@@ -60,6 +131,18 @@ def require_operation_manager_role(user: User) -> None:
     """Raise if user cannot manage operational records."""
 
     require_roles(user, OPERATION_MANAGER_ROLES)
+
+
+def require_business_admin_role(user: User) -> None:
+    """Raise if user cannot manage business-level settings."""
+
+    require_roles(user, BUSINESS_ADMIN_ROLES)
+
+
+def require_business_user_manager_role(user: User) -> None:
+    """Raise if user cannot manage business users."""
+
+    require_roles(user, BUSINESS_USER_MANAGER_ROLES)
 
 
 def ensure_business_scope(
@@ -81,6 +164,92 @@ def ensure_business_scope(
 
     if user.business_id != target_business_id:
         raise BusinessScopeError("Bu işletme verisine erişim yetkiniz yok.")
+
+
+def ensure_business_admin_access(
+    current_user: User,
+    target_business_id: int | None,
+    *,
+    allow_super_admin: bool = True,
+) -> None:
+    """Ensure current user can manage business-level settings."""
+
+    ensure_business_scope(
+        current_user,
+        target_business_id,
+        allow_super_admin=allow_super_admin,
+    )
+    require_business_admin_role(current_user)
+
+
+def ensure_business_user_management_access(
+    current_user: User,
+    target_business_id: int | None,
+    *,
+    allow_super_admin: bool = True,
+) -> None:
+    """Ensure current user can manage users within a business."""
+
+    ensure_business_scope(
+        current_user,
+        target_business_id,
+        allow_super_admin=allow_super_admin,
+    )
+    require_business_user_manager_role(current_user)
+
+
+def ensure_can_create_business_user_role(
+    current_user: User,
+    *,
+    target_business_id: int | None,
+    target_role: str | UserRole,
+    allow_super_admin: bool = True,
+) -> None:
+    """Ensure current user can create a user with the target business role."""
+
+    target_role_value = normalize_role_value(target_role)
+
+    if target_role_value == UserRole.SUPER_ADMIN.value:
+        raise BusinessUserManagementPermissionError(
+            "İşletme kullanıcısı olarak super_admin oluşturulamaz."
+        )
+
+    if UserRole(target_role_value) not in BUSINESS_USER_ROLES:
+        raise BusinessUserManagementPermissionError(
+            "İşletme kullanıcısı rolü geçersiz."
+        )
+
+    ensure_business_scope(
+        current_user,
+        target_business_id,
+        allow_super_admin=allow_super_admin,
+    )
+
+    if is_super_admin(current_user):
+        return
+
+    if is_boss_level_user(current_user):
+        if target_role_value in {
+            UserRole.MANAGER.value,
+            UserRole.STAFF.value,
+        }:
+            return
+
+        raise BusinessUserManagementPermissionError(
+            "Boss sadece manager veya staff kullanıcısı oluşturabilir."
+        )
+
+    if is_manager_user(current_user):
+        if target_role_value == UserRole.STAFF.value:
+            return
+
+        raise BusinessUserManagementPermissionError(
+            "Manager sadece staff kullanıcısı oluşturabilir."
+        )
+
+    raise BusinessUserManagementPermissionError(
+        "Bu kullanıcı işletme kullanıcısı oluşturamaz."
+    )
 
 
 def ensure_user_record_access(
