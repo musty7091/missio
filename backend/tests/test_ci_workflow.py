@@ -29,3 +29,11 @@ def test_security_gate_workflow_uses_python_312() -> None:
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert 'python-version: "3.12"' in content
+
+
+def test_security_gate_workflow_creates_env_without_env_example_dependency() -> None:
+    content = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "cat > .env << 'EOF'" in content
+    assert "MISSIO_SECRET_KEY=ci-local-security-gate-secret-key-for-tests-only-2026" in content
+    assert "cp .env.example .env" not in content

@@ -33,7 +33,18 @@ jobs:
 
       - name: Create CI environment file
         run: |
-          cp .env.example .env
+          cat > .env << 'EOF'
+          MISSIO_APP_NAME=Missio
+          MISSIO_ENVIRONMENT=local
+          MISSIO_DEBUG=true
+          MISSIO_DEFAULT_TIMEZONE=Europe/Istanbul
+          MISSIO_DATABASE_URL=sqlite:///./missio_local.db
+          MISSIO_SECRET_KEY=ci-local-security-gate-secret-key-for-tests-only-2026
+          MISSIO_ACCESS_TOKEN_EXPIRE_MINUTES=60
+          MISSIO_RATE_LIMIT_ENABLED=true
+          MISSIO_RATE_LIMIT_MAX_REQUESTS=120
+          MISSIO_RATE_LIMIT_WINDOW_SECONDS=60
+          EOF
 
       - name: Run database migrations
         run: |
