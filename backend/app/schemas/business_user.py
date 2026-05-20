@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.roles import UserRole
 
@@ -81,6 +81,65 @@ class CreateBusinessUserRequest(BaseModel):
         return normalized_role
 
 
+class UpdateBusinessUserRequest(BaseModel):
+    """Request payload for updating a business scoped user."""
+
+    full_name: str | None = Field(default=None, min_length=2, max_length=200)
+    email: str | None = Field(default=None, max_length=255)
+    theme_preference: str | None = Field(default=None, max_length=30)
+    is_active: bool | None = None
+
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def normalize_optional_full_name(cls, value: object) -> object:
+        """Trim optional full_name field."""
+
+        if value is None:
+            return None
+
+        if isinstance(value, str):
+            return value.strip()
+
+        return value
+
+    @field_validator("email", "theme_preference", mode="before")
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> object:
+        """Trim optional text fields and convert empty strings to None."""
+
+        if value is None:
+            return None
+
+        if not isinstance(value, str):
+            return value
+
+        normalized_value = value.strip()
+
+        if not normalized_value:
+            return None
+
+        return normalized_value
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str | None) -> str | None:
+        """Normalize optional email address for API input."""
+
+        if value is None:
+            return None
+
+        return value.strip().lower()
+
+    @model_validator(mode="after")
+    def validate_at_least_one_field(self) -> UpdateBusinessUserRequest:
+        """Require at least one explicitly provided update field."""
+
+        if not self.model_fields_set:
+            raise ValueError("Güncellenecek en az bir alan gönderilmelidir.")
+
+        return self
+
+
 class BusinessUserResponse(BaseModel):
     """Safe business user response."""
 
@@ -96,6 +155,13 @@ class BusinessUserResponse(BaseModel):
 
 class BusinessUserCreatedResponse(BaseModel):
     """Response returned after creating a business user."""
+
+    user: BusinessUserResponse
+    message: str
+
+
+class BusinessUserUpdatedResponse(BaseModel):
+    """Response returned after updating a business user."""
 
     user: BusinessUserResponse
     message: str
