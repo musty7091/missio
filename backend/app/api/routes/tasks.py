@@ -11,6 +11,7 @@ from app.core.roles import UserRole
 from app.db.session import get_db
 from app.models.business import Business
 from app.models.task import Task
+from app.models.task_event import TaskEvent
 from app.models.task_template import TaskTemplate
 from app.models.user import User
 from app.schemas.task import (
@@ -23,6 +24,8 @@ from app.schemas.task import (
     MyTodayTasksResponse,
     RejectTaskRequest,
     TaskCreatedResponse,
+    TaskEventListResponse,
+    TaskEventResponse,
     TaskResponse,
     TaskStatusChangedResponse,
     TaskTemplateCreatedResponse,
@@ -44,6 +47,7 @@ from app.services.task_service import (
     TaskTemplateNotFoundError,
     approve_task,
     cancel_task,
+    complete_task,
     create_extra_task,
     create_routine_task_template,
     generate_daily_routine_tasks,
@@ -53,6 +57,7 @@ from app.services.task_service import (
     get_task_template_or_error,
     list_business_tasks,
     list_incomplete_tasks_for_report,
+    list_task_events,
     reject_task,
     soft_delete_task,
     start_task,
@@ -213,6 +218,27 @@ def build_task_response(task: Task) -> TaskResponse:
         requires_manager_approval=task.requires_manager_approval,
         created_at_utc=task.created_at_utc,
         updated_at_utc=task.updated_at_utc,
+    )
+
+
+def build_task_event_response(event: TaskEvent) -> TaskEventResponse:
+    """Build safe task event response."""
+
+    return TaskEventResponse(
+        id=event.id,
+        business_id=event.business_id,
+        task_id=event.task_id,
+        user_id=event.user_id,
+        event_type=event.event_type,
+        old_status=event.old_status,
+        new_status=event.new_status,
+        note=event.note,
+        latitude=event.latitude,
+        longitude=event.longitude,
+        location_accuracy=event.location_accuracy,
+        ip_address=event.ip_address,
+        user_agent=event.user_agent,
+        created_at_utc=event.created_at_utc,
     )
 
 
@@ -625,6 +651,7 @@ def list_business_tasks_endpoint(
     except Exception as exc:
         raise map_task_service_error(exc) from exc
 
+
 @router.get(
     "/reports/incomplete",
     response_model=BusinessTaskListResponse,
@@ -665,6 +692,39 @@ def list_incomplete_tasks_for_report_endpoint(
         raise
     except Exception as exc:
         raise map_task_service_error(exc) from exc
+
+
+@router.get(
+    "/{task_id}/events",
+    response_model=TaskEventListResponse,
+)
+def list_task_events_endpoint(
+    task_id: int,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TaskEventListResponse:
+    """Return task event history."""
+
+    try:
+        task = get_task_or_error(db=db, task_id=task_id)
+
+        result = list_task_events(
+            db=db,
+            current_user=current_user,
+            task=task,
+            limit=limit,
+            offset=offset,
+        )
+
+        return TaskEventListResponse(
+            events=[build_task_event_response(event) for event in result.events],
+            total_count=result.total_count,
+        )
+    except Exception as exc:
+        raise map_task_service_error(exc) from exc
+
 
 @router.get(
     "/{task_id}",

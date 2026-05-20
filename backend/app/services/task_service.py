@@ -95,6 +95,14 @@ class BusinessTaskListResult:
     total_count: int
 
 
+@dataclass(frozen=True)
+class TaskEventListResult:
+    """Task event history result."""
+
+    events: list[TaskEvent]
+    total_count: int
+
+
 TASK_ASSIGNABLE_ROLES = {
     UserRole.MANAGER.value,
     UserRole.STAFF.value,
@@ -286,7 +294,9 @@ def ensure_can_perform_task(current_user: User, *, task: Task) -> None:
     ensure_can_view_task(current_user, task=task)
 
     if task.assigned_to_user_id != current_user.id:
-        raise TaskPermissionError("Bu görevi sadece atanan kullanıcı başlatabilir veya tamamlayabilir.")
+        raise TaskPermissionError(
+            "Bu görevi sadece atanan kullanıcı başlatabilir veya tamamlayabilir."
+        )
 
 
 def ensure_task_belongs_to_business(task: Task, *, business_id: int) -> None:
@@ -710,6 +720,8 @@ def generate_daily_routine_tasks(
         skipped_count=skipped_count,
         tasks=created_tasks,
     )
+
+
 def ensure_daily_routine_tasks_for_assigned_user(
     db: Session,
     *,
@@ -719,11 +731,7 @@ def ensure_daily_routine_tasks_for_assigned_user(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> DailyRoutineTaskGenerationResult:
-    """Ensure current user's daily routine tasks exist.
-
-    This is used by the personal daily task screen.
-    Staff and manager users should not need to manually generate their own routines.
-    """
+    """Ensure current user's daily routine tasks exist."""
 
     ensure_business_scope(current_user, business.id)
 
@@ -735,16 +743,20 @@ def ensure_daily_routine_tasks_for_assigned_user(
 
     selected_task_date = task_date or get_business_today(business)
 
-    templates = db.execute(
-        select(TaskTemplate)
-        .where(
-            TaskTemplate.business_id == business.id,
-            TaskTemplate.assigned_to_user_id == current_user.id,
-            TaskTemplate.is_active.is_(True),
-            TaskTemplate.recurrence_type == RECURRENCE_TYPE_DAILY,
+    templates = (
+        db.execute(
+            select(TaskTemplate)
+            .where(
+                TaskTemplate.business_id == business.id,
+                TaskTemplate.assigned_to_user_id == current_user.id,
+                TaskTemplate.is_active.is_(True),
+                TaskTemplate.recurrence_type == RECURRENCE_TYPE_DAILY,
+            )
+            .order_by(TaskTemplate.id.asc())
         )
-        .order_by(TaskTemplate.id.asc())
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     created_tasks: list[Task] = []
     skipped_count = 0
@@ -822,6 +834,7 @@ def ensure_daily_routine_tasks_for_assigned_user(
         tasks=created_tasks,
     )
 
+
 def get_my_today_tasks(
     db: Session,
     *,
@@ -831,10 +844,7 @@ def get_my_today_tasks(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> TodayTasksResult:
-    """Return current user's routine and extra tasks for selected day.
-
-    Daily routine tasks are generated automatically when the user opens this screen.
-    """
+    """Return current user's routine and extra tasks for selected day."""
 
     ensure_business_scope(current_user, business.id)
 
@@ -852,16 +862,20 @@ def get_my_today_tasks(
         user_agent=user_agent,
     )
 
-    tasks = db.execute(
-        select(Task)
-        .where(
-            Task.business_id == business.id,
-            Task.assigned_to_user_id == current_user.id,
-            Task.task_date == selected_task_date,
-            Task.deleted_at_utc.is_(None),
+    tasks = (
+        db.execute(
+            select(Task)
+            .where(
+                Task.business_id == business.id,
+                Task.assigned_to_user_id == current_user.id,
+                Task.task_date == selected_task_date,
+                Task.deleted_at_utc.is_(None),
+            )
+            .order_by(Task.task_type.desc(), Task.id.asc())
         )
-        .order_by(Task.task_type.desc(), Task.id.asc())
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     routine_tasks = [task for task in tasks if task.task_type == TASK_TYPE_ROUTINE]
     extra_tasks = [task for task in tasks if task.task_type == TASK_TYPE_EXTRA]
@@ -924,16 +938,21 @@ def list_business_tasks(
 
     total_count = int(db.execute(count_query).scalar_one())
 
-    tasks = db.execute(
-        query.order_by(Task.task_date.desc(), Task.id.desc())
-        .limit(limit)
-        .offset(offset)
-    ).scalars().all()
+    tasks = (
+        db.execute(
+            query.order_by(Task.task_date.desc(), Task.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
 
     return BusinessTaskListResult(
         tasks=tasks,
         total_count=total_count,
     )
+
 
 def list_incomplete_tasks_for_report(
     db: Session,
@@ -945,10 +964,7 @@ def list_incomplete_tasks_for_report(
     limit: int = 500,
     offset: int = 0,
 ) -> BusinessTaskListResult:
-    """List incomplete tasks for end-of-day reporting.
-
-    Incomplete means the task is not completed, approved, or cancelled.
-    """
+    """List incomplete tasks for end-of-day reporting."""
 
     ensure_task_manager_access(current_user, business_id=business.id)
 
@@ -978,20 +994,25 @@ def list_incomplete_tasks_for_report(
 
     total_count = int(db.execute(count_query).scalar_one())
 
-    tasks = db.execute(
-        query.order_by(
-            Task.assigned_to_user_id.asc(),
-            Task.task_type.desc(),
-            Task.id.asc(),
+    tasks = (
+        db.execute(
+            query.order_by(
+                Task.assigned_to_user_id.asc(),
+                Task.task_type.desc(),
+                Task.id.asc(),
+            )
+            .limit(limit)
+            .offset(offset)
         )
-        .limit(limit)
-        .offset(offset)
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return BusinessTaskListResult(
         tasks=tasks,
         total_count=total_count,
     )
+
 
 def get_task_detail(
     db: Session,
@@ -1005,6 +1026,40 @@ def get_task_detail(
     ensure_can_view_task(current_user, task=task)
 
     return task
+
+
+def list_task_events(
+    db: Session,
+    *,
+    current_user: User,
+    task: Task,
+    limit: int = 100,
+    offset: int = 0,
+) -> TaskEventListResult:
+    """List task event history according to task access rules."""
+
+    ensure_can_view_task(current_user, task=task)
+
+    count_query = select(func.count(TaskEvent.id)).where(TaskEvent.task_id == task.id)
+
+    total_count = int(db.execute(count_query).scalar_one())
+
+    events = (
+        db.execute(
+            select(TaskEvent)
+            .where(TaskEvent.task_id == task.id)
+            .order_by(TaskEvent.id.asc())
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
+
+    return TaskEventListResult(
+        events=events,
+        total_count=total_count,
+    )
 
 
 def update_task(

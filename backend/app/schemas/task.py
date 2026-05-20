@@ -358,7 +358,7 @@ class ChangeTaskStatusRequest(BaseModel):
 
 
 class CompleteTaskRequest(BaseModel):
-    """Request payload for completing a task."""
+    """Request payload for completing, starting, approving, cancelling, or deleting a task."""
 
     note: str | None = Field(default=None, max_length=5000)
     latitude: float | None = Field(default=None, ge=-90, le=90)
@@ -419,6 +419,32 @@ class TaskResponse(BaseModel):
     requires_manager_approval: bool
     created_at_utc: datetime
     updated_at_utc: datetime
+
+
+class TaskEventResponse(BaseModel):
+    """Safe task event response."""
+
+    id: int
+    business_id: int
+    task_id: int
+    user_id: int | None
+    event_type: str
+    old_status: str | None
+    new_status: str | None
+    note: str | None
+    latitude: float | None
+    longitude: float | None
+    location_accuracy: float | None
+    ip_address: str | None
+    user_agent: str | None
+    created_at_utc: datetime
+
+
+class TaskEventListResponse(BaseModel):
+    """Response for task event history."""
+
+    events: list[TaskEventResponse]
+    total_count: int
 
 
 class TaskTemplateResponse(BaseModel):
