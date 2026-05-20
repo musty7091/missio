@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.core.roles import UserRole
+from app.services.access_control_service import AccessControlError
 from app.db.session import get_db
 from app.models.business import Business
 from app.models.task import Task
@@ -160,6 +161,7 @@ def map_task_service_error(exc: Exception) -> HTTPException:
     if isinstance(
         exc,
         (
+            AccessControlError,
             TaskPermissionError,
             TaskAttachmentPermissionError,
         ),
