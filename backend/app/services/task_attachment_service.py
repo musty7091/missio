@@ -35,7 +35,10 @@ MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
 MAX_STORED_FILE_SIZE_BYTES = 3 * 1024 * 1024
 MAX_ATTACHMENTS_PER_TASK = 3
 MAX_IMAGE_LONG_EDGE_PX = 1600
+MAX_IMAGE_PIXELS = 20_000_000
 JPEG_QUALITY = 75
+
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 TASK_ATTACHMENT_STORAGE_ROOT = Path("storage") / "task_attachments"
 
@@ -57,6 +60,14 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
     "image/heif",
     "image/heif-sequence",
     "image/heic-sequence",
+}
+
+ALLOWED_IMAGE_FORMATS = {
+    "JPEG",
+    "PNG",
+    "WEBP",
+    "HEIF",
+    "HEIC",
 }
 
 
@@ -103,6 +114,34 @@ def normalize_file_extension(file_name: str | None) -> str:
     return Path(file_name).suffix.strip().lower()
 
 
+def get_task_attachment_storage_root_absolute() -> Path:
+    """Return absolute task attachment storage root."""
+
+    return TASK_ATTACHMENT_STORAGE_ROOT.resolve(strict=False)
+
+
+def resolve_safe_task_attachment_storage_path(file_path: str | Path) -> Path:
+    """Resolve and validate a task attachment path under storage root."""
+
+    path = Path(file_path)
+
+    if path.is_absolute():
+        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
+
+    if any(part == ".." for part in path.parts):
+        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
+
+    storage_root = get_task_attachment_storage_root_absolute()
+    resolved_path = path.resolve(strict=False)
+
+    try:
+        resolved_path.relative_to(storage_root)
+    except ValueError as exc:
+        raise TaskAttachmentFileError("Geçersiz dosya yolu.") from exc
+
+    return resolved_path
+
+
 def validate_upload_file_metadata(upload_file: UploadFile) -> None:
     """Validate upload file metadata before reading content."""
 
@@ -139,19 +178,42 @@ def read_upload_file_content(upload_file: UploadFile) -> bytes:
     return content
 
 
+def validate_opened_image(image: Image.Image) -> None:
+    """Validate opened image format and dimensions."""
+
+    image_format = (image.format or "").strip().upper()
+
+    if image_format not in ALLOWED_IMAGE_FORMATS:
+        raise TaskAttachmentFileError(
+            "Desteklenmeyen görsel formatı. Sadece JPG, JPEG, PNG, WEBP, HEIC veya HEIF yüklenebilir."
+        )
+
+    if image.width <= 0 or image.height <= 0:
+        raise TaskAttachmentFileError("Görsel ölçüleri geçersiz.")
+
+    pixel_count = image.width * image.height
+
+    if pixel_count > MAX_IMAGE_PIXELS:
+        raise TaskAttachmentFileError(
+            "Görsel çözünürlüğü çok büyük. Lütfen daha düşük çözünürlüklü bir görsel yükleyin."
+        )
+
+
 def open_uploaded_image(content: bytes) -> Image.Image:
     """Open uploaded image safely."""
 
     try:
         image = Image.open(BytesIO(content))
+        validate_opened_image(image)
         image.load()
+    except Image.DecompressionBombError as exc:
+        raise TaskAttachmentFileError(
+            "Görsel çözünürlüğü güvenli sınırın üzerinde."
+        ) from exc
     except UnidentifiedImageError as exc:
         raise TaskAttachmentFileError("Yüklenen dosya geçerli bir görsel değil.") from exc
     except OSError as exc:
         raise TaskAttachmentFileError("Görsel dosyası okunamadı.") from exc
-
-    if image.width <= 0 or image.height <= 0:
-        raise TaskAttachmentFileError("Görsel ölçüleri geçersiz.")
 
     return image
 
@@ -221,9 +283,10 @@ def build_safe_storage_path(task: Task) -> tuple[Path, str]:
     storage_directory = get_attachment_storage_directory(task)
     safe_file_name = f"{uuid4()}.jpg"
     physical_path = storage_directory / safe_file_name
+    safe_physical_path = resolve_safe_task_attachment_storage_path(physical_path)
     relative_path = physical_path.as_posix()
 
-    return physical_path, relative_path
+    return safe_physical_path, relative_path
 
 
 def count_active_task_attachments(db: Session, *, task_id: int) -> int:
@@ -317,44 +380,50 @@ def upload_task_attachment(
     physical_path.parent.mkdir(parents=True, exist_ok=True)
     physical_path.write_bytes(optimized_content)
 
-    event = create_task_event(
-        db=db,
-        task=task,
-        user_id=current_user.id,
-        event_type="task_attachment_uploaded",
-        old_status=task.status,
-        new_status=task.status,
-        note="Göreve fotoğraf kanıtı yüklendi.",
-        latitude=latitude,
-        longitude=longitude,
-        location_accuracy=location_accuracy,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+    try:
+        event = create_task_event(
+            db=db,
+            task=task,
+            user_id=current_user.id,
+            event_type="task_attachment_uploaded",
+            old_status=task.status,
+            new_status=task.status,
+            note="Göreve fotoğraf kanıtı yüklendi.",
+            latitude=latitude,
+            longitude=longitude,
+            location_accuracy=location_accuracy,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
 
-    db.flush()
+        db.flush()
 
-    now = get_utc_now()
+        now = get_utc_now()
 
-    attachment = TaskAttachment(
-        business_id=task.business_id,
-        task_id=task.id,
-        event_id=event.id,
-        uploaded_by_user_id=current_user.id,
-        file_path=relative_path,
-        file_name=physical_path.name,
-        file_type="image/jpeg",
-        file_size=optimized_size,
-        latitude=latitude,
-        longitude=longitude,
-        location_accuracy=location_accuracy,
-        created_at_utc=now,
-    )
+        attachment = TaskAttachment(
+            business_id=task.business_id,
+            task_id=task.id,
+            event_id=event.id,
+            uploaded_by_user_id=current_user.id,
+            file_path=relative_path,
+            file_name=physical_path.name,
+            file_type="image/jpeg",
+            file_size=optimized_size,
+            latitude=latitude,
+            longitude=longitude,
+            location_accuracy=location_accuracy,
+            created_at_utc=now,
+        )
 
-    db.add(attachment)
-    db.flush()
+        db.add(attachment)
+        db.flush()
 
-    return attachment
+        return attachment
+    except Exception:
+        if physical_path.exists() and physical_path.is_file():
+            physical_path.unlink()
+
+        raise
 
 
 def list_task_attachments(
@@ -396,15 +465,7 @@ def list_task_attachments(
 def delete_physical_attachment_file(file_path: str) -> None:
     """Delete physical attachment file if it exists under storage root."""
 
-    path = Path(file_path)
-
-    if path.is_absolute():
-        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
-
-    normalized_path = path.as_posix()
-
-    if not normalized_path.startswith(TASK_ATTACHMENT_STORAGE_ROOT.as_posix() + "/"):
-        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
+    path = resolve_safe_task_attachment_storage_path(file_path)
 
     if path.exists() and path.is_file():
         path.unlink()

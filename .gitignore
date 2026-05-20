@@ -20,6 +20,23 @@ backend/app.db
 backend/*.db
 backend/*.sqlite
 backend/*.sqlite3
+backend/missio_local.db
+missio_local.db
+
+# Runtime storage files
+backend/storage/
+backend/storage/**
+storage/uploads/*
+storage/reports/*
+storage/backups/*
+storage/task_attachments/*
+storage/task_attachments/**
+
+# Keep storage folders
+!storage/uploads/.gitkeep
+!storage/uploads/tasks/.gitkeep
+!storage/reports/.gitkeep
+!storage/backups/.gitkeep
 
 # Alembic / logs
 *.log
@@ -36,17 +53,6 @@ frontend/.vite/
 # Build outputs
 build/
 dist/
-
-# Storage runtime files
-storage/uploads/*
-storage/reports/*
-storage/backups/*
-
-# Keep storage folders
-!storage/uploads/.gitkeep
-!storage/uploads/tasks/.gitkeep
-!storage/reports/.gitkeep
-!storage/backups/.gitkeep
 
 # OS / editor
 .DS_Store
@@ -70,4 +76,5 @@ Thumbs.db
 temp/
 tmp/
 
+# Local database backups
 backend/_db_backup/
