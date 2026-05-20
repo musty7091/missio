@@ -140,6 +140,22 @@ class UpdateBusinessUserRequest(BaseModel):
         return self
 
 
+class ResetBusinessUserPasswordRequest(BaseModel):
+    """Request payload for resetting a business scoped user's password."""
+
+    new_password: str = Field(min_length=1, max_length=255)
+
+    @field_validator("new_password", mode="before")
+    @classmethod
+    def normalize_new_password(cls, value: object) -> object:
+        """Trim new password field."""
+
+        if isinstance(value, str):
+            return value.strip()
+
+        return value
+
+
 class BusinessUserResponse(BaseModel):
     """Safe business user response."""
 
@@ -162,6 +178,13 @@ class BusinessUserCreatedResponse(BaseModel):
 
 class BusinessUserUpdatedResponse(BaseModel):
     """Response returned after updating a business user."""
+
+    user: BusinessUserResponse
+    message: str
+
+
+class BusinessUserPasswordResetResponse(BaseModel):
+    """Response returned after resetting a business user's password."""
 
     user: BusinessUserResponse
     message: str
