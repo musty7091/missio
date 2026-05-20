@@ -1,4 +1,4 @@
-﻿import {
+import {
   Bell,
   Camera,
   CheckCircle2,
@@ -70,7 +70,19 @@ function getPriorityLabel(priority: string) {
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<ThemeMode>("light")
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    const savedTheme = window.localStorage.getItem("missio-theme")
+
+    if (savedTheme === "light" || savedTheme === "dark") {
+      return savedTheme
+    }
+
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark"
+    }
+
+    return "light"
+  })
 
   useEffect(() => {
     const root = document.documentElement
@@ -80,6 +92,8 @@ export default function App() {
     } else {
       root.classList.remove("dark")
     }
+
+    window.localStorage.setItem("missio-theme", theme)
   }, [theme])
 
   const completedCount = todayTasks.filter((task) => task.status === "completed").length
