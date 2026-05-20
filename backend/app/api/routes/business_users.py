@@ -16,7 +16,9 @@ from app.schemas.business_user import (
     BusinessUserCreatedResponse,
     BusinessUserPasswordResetResponse,
     BusinessUserResponse,
+    BusinessUserRoleChangedResponse,
     BusinessUserUpdatedResponse,
+    ChangeBusinessUserRoleRequest,
     CreateBusinessUserRequest,
     ResetBusinessUserPasswordRequest,
     UpdateBusinessUserRequest,
@@ -178,6 +180,51 @@ def ensure_can_reset_business_user_password(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Manager sadece staff kullanıcısının şifresini sıfırlayabilir.",
         )
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Bu işlem için yetkiniz yok.",
+    )
+
+
+def ensure_can_change_business_user_role(
+    current_user: User,
+    target_user: User,
+    new_role: str,
+) -> None:
+    """Ensure current user can change target business user's role safely."""
+
+    allowed_change_roles = {
+        UserRole.MANAGER.value,
+        UserRole.STAFF.value,
+    }
+
+    if target_user.role not in allowed_change_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu kullanıcının rolü bu endpoint üzerinden değiştirilemez.",
+        )
+
+    if new_role not in allowed_change_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rol değişikliği sadece manager veya staff için yapılabilir.",
+        )
+
+    if target_user.role == new_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kullanıcı zaten bu role sahip.",
+        )
+
+    if current_user.role == UserRole.SUPER_ADMIN.value:
+        return
+
+    if current_user.role in {
+        UserRole.BOSS.value,
+        UserRole.BUSINESS_OWNER.value,
+    }:
+        return
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -533,6 +580,84 @@ def reset_business_user_password_endpoint(
         return BusinessUserPasswordResetResponse(
             user=build_business_user_response(user),
             message="İşletme kullanıcısı şifresi sıfırlandı.",
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except AccessControlError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu işlem için yetkiniz yok.",
+        ) from exc
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post(
+    "/{business_id}/users/{user_id}/change-role",
+    response_model=BusinessUserRoleChangedResponse,
+)
+def change_business_user_role_endpoint(
+    business_id: int,
+    user_id: int,
+    payload: ChangeBusinessUserRoleRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BusinessUserRoleChangedResponse:
+    """Change a business scoped user's role according to the permission matrix."""
+
+    try:
+        business = get_business_or_404(db=db, business_id=business_id)
+
+        ensure_business_user_management_access(
+            current_user=current_user,
+            target_business_id=business.id,
+        )
+
+        user = get_business_user_or_404(db=db, user_id=user_id)
+        ensure_user_belongs_to_business(user=user, business_id=business.id)
+
+        old_role = user.role
+
+        ensure_can_change_business_user_role(
+            current_user=current_user,
+            target_user=user,
+            new_role=payload.role,
+        )
+
+        user.role = payload.role
+        user.updated_at = get_utc_now()
+
+        create_audit_log(
+            db=db,
+            action="business.user_role_changed",
+            business_id=business.id,
+            user_id=current_user.id,
+            entity_type="user",
+            entity_id=str(user.id),
+            detail={
+                "business_id": business.id,
+                "role_changed_user_id": user.id,
+                "role_changed_username": user.username,
+                "old_role": old_role,
+                "new_role": user.role,
+                "changed_by_user_id": current_user.id,
+                "changed_by_role": current_user.role,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+        )
+
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        return BusinessUserRoleChangedResponse(
+            user=build_business_user_response(user),
+            message="İşletme kullanıcısı rolü güncellendi.",
         )
     except HTTPException:
         db.rollback()

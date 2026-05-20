@@ -12,6 +12,11 @@ ALLOWED_CREATE_BUSINESS_USER_ROLES = {
     UserRole.STAFF.value,
 }
 
+ALLOWED_CHANGE_BUSINESS_USER_ROLES = {
+    UserRole.MANAGER.value,
+    UserRole.STAFF.value,
+}
+
 
 class CreateBusinessUserRequest(BaseModel):
     """Request payload for creating a business scoped user."""
@@ -156,6 +161,34 @@ class ResetBusinessUserPasswordRequest(BaseModel):
         return value
 
 
+class ChangeBusinessUserRoleRequest(BaseModel):
+    """Request payload for changing a business scoped user's role."""
+
+    role: str = Field(min_length=3, max_length=50)
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, value: object) -> object:
+        """Trim and lowercase role field."""
+
+        if isinstance(value, str):
+            return value.strip().lower()
+
+        return value
+
+    @field_validator("role")
+    @classmethod
+    def validate_business_user_role(cls, value: str) -> str:
+        """Validate changeable business user role."""
+
+        if value not in ALLOWED_CHANGE_BUSINESS_USER_ROLES:
+            raise ValueError(
+                "Rol değişikliği sadece manager veya staff için yapılabilir."
+            )
+
+        return value
+
+
 class BusinessUserResponse(BaseModel):
     """Safe business user response."""
 
@@ -185,6 +218,13 @@ class BusinessUserUpdatedResponse(BaseModel):
 
 class BusinessUserPasswordResetResponse(BaseModel):
     """Response returned after resetting a business user's password."""
+
+    user: BusinessUserResponse
+    message: str
+
+
+class BusinessUserRoleChangedResponse(BaseModel):
+    """Response returned after changing a business user's role."""
 
     user: BusinessUserResponse
     message: str
