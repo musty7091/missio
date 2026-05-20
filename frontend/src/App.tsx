@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
+import { LoginScreen } from "./components/auth/LoginScreen"
 import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation } from "./components/layout/BottomNavigation"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { todayTasks } from "./data/todayTasks"
+import { getCurrentUser } from "./services/authService"
+import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
+import type { UserMeResponse } from "./types/auth"
 import type { ThemeMode } from "./types/task"
 
 export default function App() {
@@ -22,6 +26,9 @@ export default function App() {
     return "light"
   })
 
+  const [currentUser, setCurrentUser] = useState<UserMeResponse | null>(null)
+  const [isCheckingSession, setIsCheckingSession] = useState(() => Boolean(getAccessToken()))
+
   useEffect(() => {
     const root = document.documentElement
 
@@ -34,6 +41,27 @@ export default function App() {
     window.localStorage.setItem("missio-theme", theme)
   }, [theme])
 
+  useEffect(() => {
+    const token = getAccessToken()
+
+    if (!token) {
+      setIsCheckingSession(false)
+      return
+    }
+
+    getCurrentUser()
+      .then((user) => {
+        setCurrentUser(user)
+      })
+      .catch(() => {
+        clearAccessToken()
+        setCurrentUser(null)
+      })
+      .finally(() => {
+        setIsCheckingSession(false)
+      })
+  }, [])
+
   const taskStats = useMemo(() => {
     return {
       totalCount: todayTasks.length,
@@ -43,12 +71,40 @@ export default function App() {
     }
   }, [])
 
+  function handleLogout() {
+    clearAccessToken()
+    setCurrentUser(null)
+  }
+
+  if (isCheckingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[var(--missio-page-bg)] px-4 text-[var(--missio-text-main)]">
+        <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center shadow-xl shadow-slate-900/5">
+          <p className="text-sm font-bold text-[var(--missio-text-muted)]">Missio hazırlanıyor...</p>
+          <h1 className="mt-2 text-2xl font-black">Oturum kontrol ediliyor</h1>
+        </div>
+      </main>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <LoginScreen
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+        onLoginSuccess={setCurrentUser}
+      />
+    )
+  }
+
   return (
     <main className="min-h-screen bg-[var(--missio-page-bg)] px-4 py-5 text-[var(--missio-text-main)] transition-colors duration-300">
       <section className="mx-auto flex min-h-[calc(100vh-40px)] w-full max-w-md flex-col">
         <AppHeader
           theme={theme}
+          displayName={currentUser.full_name}
           onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+          onLogout={handleLogout}
         />
 
         <TodayOperationSummary
