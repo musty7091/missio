@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AppHeader } from "./components/layout/AppHeader"
+import { BottomNavigation } from "./components/layout/BottomNavigation"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
@@ -59,11 +60,13 @@ export default function App() {
 
         <TaskSectionHeader />
 
-        <section className="flex flex-1 flex-col gap-4 pb-6">
+        <section className="flex flex-1 flex-col gap-4 pb-24">
           {todayTasks.map((task) => (
             <TaskCard key={task.id} task={task} />
           ))}
         </section>
+
+        <BottomNavigation />
       </section>
     </main>
   )
