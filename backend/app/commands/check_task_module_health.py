@@ -5,6 +5,8 @@ import sys
 import time
 from dataclasses import dataclass
 
+from app.core.config import settings
+
 
 @dataclass(frozen=True)
 class HealthCheckStep:
@@ -12,6 +14,15 @@ class HealthCheckStep:
 
     title: str
     command: list[str]
+
+
+SAFE_HEALTH_CHECK_ENVIRONMENTS = {
+    "local",
+    "dev",
+    "development",
+    "test",
+    "testing",
+}
 
 
 HEALTH_CHECK_STEPS = [
@@ -114,6 +125,21 @@ HEALTH_CHECK_STEPS = [
 ]
 
 
+def ensure_health_check_environment_is_safe() -> None:
+    """Block demo/test health checks in production-like environments."""
+
+    environment = settings.environment.strip().lower()
+
+    if environment in SAFE_HEALTH_CHECK_ENVIRONMENTS:
+        return
+
+    raise RuntimeError(
+        "Görev modülü sağlık kontrolü production benzeri ortamda çalıştırılamaz. "
+        f"Mevcut MISSIO_ENVIRONMENT={settings.environment!r}. "
+        "Bu komut sadece local/dev/test ortamlarında çalıştırılmalıdır."
+    )
+
+
 def run_step(step_number: int, total_steps: int, step: HealthCheckStep) -> None:
     """Run one health check step."""
 
@@ -149,16 +175,21 @@ def run_step(step_number: int, total_steps: int, step: HealthCheckStep) -> None:
 def main() -> None:
     """Run Missio task module health checks."""
 
+    ensure_health_check_environment_is_safe()
+
     total_steps = len(HEALTH_CHECK_STEPS)
     started_at = time.perf_counter()
 
     print("[INFO] Missio görev modülü genel sağlık kontrolü başladı.")
+    print(f"[INFO] Ortam: MISSIO_ENVIRONMENT={settings.environment}")
     print(f"[INFO] Toplam kontrol adımı: {total_steps}")
     print("[INFO] Herhangi bir adım başarısız olursa komut orada durur.")
     print("")
     print("[INFO] Ön koşul:")
-    print("       Demo veri yoksa önce şu komutu çalıştırın:")
+    print("       Demo veri yoksa önce şu komutu local izinle çalıştırın:")
+    print("       PowerShell: $env:MISSIO_ALLOW_DEMO_SEED='1'")
     print("       python -m app.commands.seed_local_task_demo_data")
+    print("       Remove-Item Env:\\MISSIO_ALLOW_DEMO_SEED -ErrorAction SilentlyContinue")
 
     for index, step in enumerate(HEALTH_CHECK_STEPS, start=1):
         run_step(
