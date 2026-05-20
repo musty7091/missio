@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -41,12 +43,14 @@ from app.schemas.task import (
     UpdateTaskRequest,
 )
 from app.services.task_attachment_service import (
+    TASK_ATTACHMENT_STORAGE_ROOT,
     TaskAttachmentFileError,
     TaskAttachmentLimitError,
     TaskAttachmentNotFoundError,
     TaskAttachmentPermissionError,
     TaskAttachmentServiceError,
     delete_task_attachment,
+    ensure_attachment_belongs_to_task,
     get_task_attachment_or_error,
     list_task_attachments,
     upload_task_attachment,
@@ -66,6 +70,7 @@ from app.services.task_service import (
     complete_task,
     create_extra_task,
     create_routine_task_template,
+    ensure_can_view_task,
     generate_daily_routine_tasks,
     get_my_today_tasks,
     get_task_detail,
@@ -317,6 +322,39 @@ def build_task_attachment_response(attachment: TaskAttachment) -> TaskAttachment
         longitude=attachment.longitude,
         location_accuracy=attachment.location_accuracy,
         created_at_utc=attachment.created_at_utc,
+    )
+
+
+def build_task_attachment_file_response(
+    *,
+    task: Task,
+    attachment: TaskAttachment,
+) -> FileResponse:
+    """Build secure file response for task attachment."""
+
+    ensure_attachment_belongs_to_task(
+        attachment=attachment,
+        task=task,
+    )
+
+    file_path = Path(attachment.file_path)
+
+    if file_path.is_absolute():
+        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
+
+    normalized_file_path = file_path.as_posix()
+    storage_root = TASK_ATTACHMENT_STORAGE_ROOT.as_posix()
+
+    if not normalized_file_path.startswith(storage_root + "/"):
+        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
+
+    if not file_path.exists() or not file_path.is_file():
+        raise TaskAttachmentNotFoundError("Fotoğraf dosyası bulunamadı.")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=attachment.file_type or "image/jpeg",
+        filename=attachment.file_name,
     )
 
 
@@ -855,6 +893,35 @@ def list_task_attachments_endpoint(
                 for attachment in result.attachments
             ],
             total_count=result.total_count,
+        )
+    except Exception as exc:
+        raise map_task_service_error(exc) from exc
+
+
+@router.get(
+    "/{task_id}/attachments/{attachment_id}/file",
+    response_class=FileResponse,
+)
+def get_task_attachment_file_endpoint(
+    task_id: int,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    """Return task photo attachment file securely."""
+
+    try:
+        task = get_task_or_error(db=db, task_id=task_id)
+        attachment = get_task_attachment_or_error(
+            db=db,
+            attachment_id=attachment_id,
+        )
+
+        ensure_can_view_task(current_user, task=task)
+
+        return build_task_attachment_file_response(
+            task=task,
+            attachment=attachment,
         )
     except Exception as exc:
         raise map_task_service_error(exc) from exc
