@@ -72,6 +72,14 @@ HEALTH_CHECK_STEPS = [
         ],
     ),
     HealthCheckStep(
+        title="Fotoğraf yetki kontrolü akışı",
+        command=[
+            sys.executable,
+            "-m",
+            "app.commands.check_task_attachment_access_control_flow",
+        ],
+    ),
+    HealthCheckStep(
         title="Fotoğraf temizlik politikası akışı",
         command=[
             sys.executable,
