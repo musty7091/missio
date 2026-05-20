@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
@@ -43,7 +42,6 @@ from app.schemas.task import (
     UpdateTaskRequest,
 )
 from app.services.task_attachment_service import (
-    TASK_ATTACHMENT_STORAGE_ROOT,
     TaskAttachmentFileError,
     TaskAttachmentLimitError,
     TaskAttachmentNotFoundError,
@@ -53,6 +51,7 @@ from app.services.task_attachment_service import (
     ensure_attachment_belongs_to_task,
     get_task_attachment_or_error,
     list_task_attachments,
+    resolve_safe_task_attachment_storage_path,
     upload_task_attachment,
 )
 from app.services.task_service import (
@@ -337,19 +336,10 @@ def build_task_attachment_file_response(
         task=task,
     )
 
-    file_path = Path(attachment.file_path)
-
-    if file_path.is_absolute():
-        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
-
-    normalized_file_path = file_path.as_posix()
-    storage_root = TASK_ATTACHMENT_STORAGE_ROOT.as_posix()
-
-    if not normalized_file_path.startswith(storage_root + "/"):
-        raise TaskAttachmentFileError("Geçersiz dosya yolu.")
+    file_path = resolve_safe_task_attachment_storage_path(attachment.file_path)
 
     if not file_path.exists() or not file_path.is_file():
-        raise TaskAttachmentNotFoundError("Fotoğraf dosyası bulunamadı.")
+        raise TaskAttachmentNotFoundError("Foto?raf dosyas? bulunamad?.")
 
     return FileResponse(
         path=str(file_path),
