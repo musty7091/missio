@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,7 @@ from app.core.roles import UserRole
 from app.db.session import get_db
 from app.models.business import Business
 from app.models.task import Task
+from app.models.task_attachment import TaskAttachment
 from app.models.task_event import TaskEvent
 from app.models.task_template import TaskTemplate
 from app.models.user import User
@@ -23,6 +24,10 @@ from app.schemas.task import (
     GenerateDailyRoutineTasksRequest,
     MyTodayTasksResponse,
     RejectTaskRequest,
+    TaskAttachmentCreatedResponse,
+    TaskAttachmentDeletedResponse,
+    TaskAttachmentListResponse,
+    TaskAttachmentResponse,
     TaskCreatedResponse,
     TaskEventListResponse,
     TaskEventResponse,
@@ -34,6 +39,17 @@ from app.schemas.task import (
     TaskUpdatedResponse,
     UpdateRoutineTaskTemplateRequest,
     UpdateTaskRequest,
+)
+from app.services.task_attachment_service import (
+    TaskAttachmentFileError,
+    TaskAttachmentLimitError,
+    TaskAttachmentNotFoundError,
+    TaskAttachmentPermissionError,
+    TaskAttachmentServiceError,
+    delete_task_attachment,
+    get_task_attachment_or_error,
+    list_task_attachments,
+    upload_task_attachment,
 )
 from app.services.task_service import (
     InvalidTaskAssigneeError,
@@ -94,16 +110,56 @@ def get_user_agent(request: Request) -> str | None:
     return user_agent.strip()[:1000]
 
 
-def map_task_service_error(exc: Exception) -> HTTPException:
-    """Map task service exceptions to HTTP exceptions."""
+def validate_optional_location_values(
+    *,
+    latitude: float | None,
+    longitude: float | None,
+    location_accuracy: float | None,
+) -> None:
+    """Validate optional location values for multipart form requests."""
 
-    if isinstance(exc, (TaskNotFoundError, TaskTemplateNotFoundError)):
+    if latitude is not None and (latitude < -90 or latitude > 90):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="latitude -90 ile 90 arasında olmalıdır.",
+        )
+
+    if longitude is not None and (longitude < -180 or longitude > 180):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="longitude -180 ile 180 arasında olmalıdır.",
+        )
+
+    if location_accuracy is not None and location_accuracy < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="location_accuracy negatif olamaz.",
+        )
+
+
+def map_task_service_error(exc: Exception) -> HTTPException:
+    """Map task and attachment service exceptions to HTTP exceptions."""
+
+    if isinstance(
+        exc,
+        (
+            TaskNotFoundError,
+            TaskTemplateNotFoundError,
+            TaskAttachmentNotFoundError,
+        ),
+    ):
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         )
 
-    if isinstance(exc, TaskPermissionError):
+    if isinstance(
+        exc,
+        (
+            TaskPermissionError,
+            TaskAttachmentPermissionError,
+        ),
+    ):
         return HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(exc),
@@ -117,6 +173,9 @@ def map_task_service_error(exc: Exception) -> HTTPException:
             TaskEvidenceRequiredError,
             TaskLocationRequiredError,
             RoutineTaskGenerationError,
+            TaskAttachmentFileError,
+            TaskAttachmentLimitError,
+            TaskAttachmentServiceError,
             TaskServiceError,
         ),
     ):
@@ -239,6 +298,25 @@ def build_task_event_response(event: TaskEvent) -> TaskEventResponse:
         ip_address=event.ip_address,
         user_agent=event.user_agent,
         created_at_utc=event.created_at_utc,
+    )
+
+
+def build_task_attachment_response(attachment: TaskAttachment) -> TaskAttachmentResponse:
+    """Build safe task attachment response."""
+
+    return TaskAttachmentResponse(
+        id=attachment.id,
+        business_id=attachment.business_id,
+        task_id=attachment.task_id,
+        event_id=attachment.event_id,
+        uploaded_by_user_id=attachment.uploaded_by_user_id,
+        file_name=attachment.file_name,
+        file_type=attachment.file_type,
+        file_size=attachment.file_size,
+        latitude=attachment.latitude,
+        longitude=attachment.longitude,
+        location_accuracy=attachment.location_accuracy,
+        created_at_utc=attachment.created_at_utc,
     )
 
 
@@ -691,6 +769,137 @@ def list_incomplete_tasks_for_report_endpoint(
     except HTTPException:
         raise
     except Exception as exc:
+        raise map_task_service_error(exc) from exc
+
+
+@router.post(
+    "/{task_id}/attachments",
+    response_model=TaskAttachmentCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_task_attachment_endpoint(
+    task_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    latitude: float | None = Form(default=None),
+    longitude: float | None = Form(default=None),
+    location_accuracy: float | None = Form(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TaskAttachmentCreatedResponse:
+    """Upload task photo attachment."""
+
+    try:
+        validate_optional_location_values(
+            latitude=latitude,
+            longitude=longitude,
+            location_accuracy=location_accuracy,
+        )
+
+        task = get_task_or_error(db=db, task_id=task_id)
+
+        attachment = upload_task_attachment(
+            db=db,
+            current_user=current_user,
+            task=task,
+            upload_file=file,
+            latitude=latitude,
+            longitude=longitude,
+            location_accuracy=location_accuracy,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+        )
+
+        db.commit()
+        db.refresh(attachment)
+
+        return TaskAttachmentCreatedResponse(
+            attachment=build_task_attachment_response(attachment),
+            message="Görev fotoğraf kanıtı yüklendi.",
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise map_task_service_error(exc) from exc
+
+
+@router.get(
+    "/{task_id}/attachments",
+    response_model=TaskAttachmentListResponse,
+)
+def list_task_attachments_endpoint(
+    task_id: int,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TaskAttachmentListResponse:
+    """List task photo attachments."""
+
+    try:
+        task = get_task_or_error(db=db, task_id=task_id)
+
+        result = list_task_attachments(
+            db=db,
+            current_user=current_user,
+            task=task,
+            limit=limit,
+            offset=offset,
+        )
+
+        return TaskAttachmentListResponse(
+            attachments=[
+                build_task_attachment_response(attachment)
+                for attachment in result.attachments
+            ],
+            total_count=result.total_count,
+        )
+    except Exception as exc:
+        raise map_task_service_error(exc) from exc
+
+
+@router.delete(
+    "/{task_id}/attachments/{attachment_id}",
+    response_model=TaskAttachmentDeletedResponse,
+)
+def delete_task_attachment_endpoint(
+    task_id: int,
+    attachment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TaskAttachmentDeletedResponse:
+    """Delete task photo attachment."""
+
+    try:
+        task = get_task_or_error(db=db, task_id=task_id)
+        attachment = get_task_attachment_or_error(
+            db=db,
+            attachment_id=attachment_id,
+        )
+
+        deleted_attachment_id = delete_task_attachment(
+            db=db,
+            current_user=current_user,
+            task=task,
+            attachment=attachment,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+        )
+
+        db.commit()
+
+        return TaskAttachmentDeletedResponse(
+            attachment_id=deleted_attachment_id,
+            message="Görev fotoğraf kanıtı silindi.",
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
         raise map_task_service_error(exc) from exc
 
 

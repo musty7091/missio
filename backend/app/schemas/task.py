@@ -447,6 +447,44 @@ class TaskEventListResponse(BaseModel):
     total_count: int
 
 
+class TaskAttachmentResponse(BaseModel):
+    """Safe task attachment response."""
+
+    id: int
+    business_id: int
+    task_id: int
+    event_id: int | None
+    uploaded_by_user_id: int | None
+    file_name: str
+    file_type: str | None
+    file_size: int | None
+    latitude: float | None
+    longitude: float | None
+    location_accuracy: float | None
+    created_at_utc: datetime
+
+
+class TaskAttachmentCreatedResponse(BaseModel):
+    """Response returned after uploading task attachment."""
+
+    attachment: TaskAttachmentResponse
+    message: str
+
+
+class TaskAttachmentListResponse(BaseModel):
+    """Response for task attachments."""
+
+    attachments: list[TaskAttachmentResponse]
+    total_count: int
+
+
+class TaskAttachmentDeletedResponse(BaseModel):
+    """Response returned after deleting task attachment."""
+
+    attachment_id: int
+    message: str
+
+
 class TaskTemplateResponse(BaseModel):
     """Safe routine task template response."""
 
