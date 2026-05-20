@@ -69,3 +69,5 @@ Thumbs.db
 *.pyc
 temp/
 tmp/
+
+backend/_db_backup/
