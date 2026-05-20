@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from io import BytesIO
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from PIL import Image
 from sqlalchemy import delete, select
 
 import app.models  # noqa: F401
@@ -29,12 +27,19 @@ BUSINESS_SLUG = "missio-demo-market"
 OWNER_USERNAME = "owner"
 STAFF_USERNAME = "ahmet"
 
-TASK_TITLE_PHOTO_REQUIRED_FLOW = "PHOTO REQUIRED DEMO - Fotoğraf zorunlu tamamlama akışı"
+TASK_TITLE_LOCATION_REQUIRED_FLOW = "LOCATION REQUIRED DEMO - Konum zorunlu görev akışı"
+
+START_LATITUDE = 36.8000
+START_LONGITUDE = 34.6333
+START_LOCATION_ACCURACY = 20.0
+
+COMPLETE_LATITUDE = 36.8010
+COMPLETE_LONGITUDE = 34.6340
+COMPLETE_LOCATION_ACCURACY = 18.0
 
 EXPECTED_EVENT_TYPES = {
     "extra_task_created",
     "task_started",
-    "task_attachment_uploaded",
     "task_completed",
     "task_approved",
 }
@@ -52,7 +57,7 @@ def get_demo_business(db) -> Business:
     if business is None:
         raise RuntimeError(
             "Demo işletme bulunamadı. Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return business
@@ -81,7 +86,7 @@ def get_demo_user(
         raise RuntimeError(
             f"Demo kullanıcı bulunamadı: {username}. "
             "Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return user
@@ -108,13 +113,13 @@ def delete_file_if_safe(file_path: str | None) -> None:
 
 
 def cleanup_old_demo_data(db, *, business_id: int) -> None:
-    """Delete old photo required demo data."""
+    """Delete old location required demo data."""
 
     old_tasks = (
         db.execute(
             select(Task).where(
                 Task.business_id == business_id,
-                Task.title == TASK_TITLE_PHOTO_REQUIRED_FLOW,
+                Task.title == TASK_TITLE_LOCATION_REQUIRED_FLOW,
             )
         )
         .scalars()
@@ -144,50 +149,33 @@ def cleanup_old_demo_data(db, *, business_id: int) -> None:
     db.commit()
 
 
-def create_photo_required_task(
+def create_location_required_task(
     db,
     *,
     owner: User,
     business: Business,
     staff: User,
 ) -> Task:
-    """Create fresh photo required demo task."""
+    """Create fresh location required demo task."""
 
     task = create_extra_task(
         db=db,
         current_user=owner,
         business=business,
         assigned_to_user=staff,
-        title=TASK_TITLE_PHOTO_REQUIRED_FLOW,
-        description="Fotoğraf zorunlu görev tamamlama kuralı için demo görev.",
-        requires_photo=True,
-        requires_location=False,
+        title=TASK_TITLE_LOCATION_REQUIRED_FLOW,
+        description="Konum zorunlu görev kuralı için demo görev.",
+        requires_photo=False,
+        requires_location=True,
         requires_manager_approval=True,
         ip_address="127.0.0.1",
-        user_agent="Missio command check_task_photo_required_completion_flow",
+        user_agent="Missio command check_task_location_required_flow",
     )
 
     db.commit()
     db.refresh(task)
 
     return task
-
-
-def create_demo_jpeg_bytes() -> bytes:
-    """Create in-memory demo JPEG image."""
-
-    image = Image.new("RGB", (2400, 1800), (238, 238, 238))
-
-    for x in range(100, 2300, 160):
-        for y in range(100, 1700, 160):
-            for dx in range(80):
-                for dy in range(80):
-                    image.putpixel((x + dx, y + dy), (175, 175, 175))
-
-    output = BytesIO()
-    image.save(output, format="JPEG", quality=95)
-
-    return output.getvalue()
 
 
 def build_get_db_override():
@@ -253,12 +241,12 @@ def assert_task_status(
         )
 
 
-def start_task_with_staff(
+def try_start_without_location_should_fail(
     *,
     staff: User,
     task_id: int,
 ) -> None:
-    """Start task through API as assigned staff."""
+    """Try to start task without location and expect failure."""
 
     set_current_user_override(staff)
 
@@ -267,132 +255,74 @@ def start_task_with_staff(
     response = client.post(
         f"/api/v1/tasks/{task_id}/start",
         json={
-            "note": "Personel fotoğraf zorunlu göreve başladı.",
-        },
-    )
-
-    if response.status_code != 200:
-        raise RuntimeError(
-            "Görev başlatma endpointi başarısız. "
-            f"HTTP {response.status_code}: {response.text}"
-        )
-
-    response_json = response.json()
-    task = response_json.get("task")
-
-    if not isinstance(task, dict):
-        raise RuntimeError("Görev başlatma cevabında task nesnesi yok.")
-
-    if task.get("status") != TASK_STATUS_IN_PROGRESS:
-        raise RuntimeError(
-            "Görev başlatma sonrası status hatalı. "
-            f"Gelen: {task.get('status')}"
-        )
-
-    print("[OK] Personel görevi başlattı.")
-
-
-def try_complete_without_photo_should_fail(
-    *,
-    staff: User,
-    task_id: int,
-) -> None:
-    """Try to complete task without photo and expect failure."""
-
-    set_current_user_override(staff)
-
-    client = TestClient(app)
-
-    response = client.post(
-        f"/api/v1/tasks/{task_id}/complete",
-        json={
-            "note": "Fotoğraf olmadan tamamlamaya çalışıyorum.",
+            "note": "Konum olmadan başlatmaya çalışıyorum.",
         },
     )
 
     if response.status_code != 400:
         raise RuntimeError(
-            "Fotoğrafsız tamamlama başarısız olmalıydı ama beklenen hata gelmedi. "
+            "Konumsuz başlatma başarısız olmalıydı ama beklenen hata gelmedi. "
             f"HTTP {response.status_code}: {response.text}"
         )
 
-    response_json = response.json()
-    detail = str(response_json.get("detail", ""))
+    detail = str(response.json().get("detail", ""))
 
-    if "fotoğraf" not in detail.lower() and "ek" not in detail.lower():
+    if "konum" not in detail.lower():
         raise RuntimeError(
-            "Fotoğrafsız tamamlama hatası beklenen açıklamayı içermiyor. "
+            "Konumsuz başlatma hatası beklenen açıklamayı içermiyor. "
             f"detail={detail}"
         )
 
-    print("[OK] Fotoğraf yokken görev tamamlanamadı.")
+    print("[OK] Konum yokken görev başlatılamadı.")
 
 
-def upload_photo_with_staff(
+def start_with_location(
     *,
     staff: User,
     task_id: int,
-    image_content: bytes,
-) -> int:
-    """Upload proof photo through API as assigned staff."""
+) -> None:
+    """Start task with location through API as assigned staff."""
 
     set_current_user_override(staff)
 
     client = TestClient(app)
 
     response = client.post(
-        f"/api/v1/tasks/{task_id}/attachments",
-        files={
-            "file": (
-                "iphone-proof-photo.jpg",
-                image_content,
-                "image/jpeg",
-            )
-        },
-        data={
-            "latitude": "36.8000",
-            "longitude": "34.6333",
-            "location_accuracy": "22",
+        f"/api/v1/tasks/{task_id}/start",
+        json={
+            "note": "Konum bilgisiyle göreve başladım.",
+            "latitude": START_LATITUDE,
+            "longitude": START_LONGITUDE,
+            "location_accuracy": START_LOCATION_ACCURACY,
         },
     )
 
-    if response.status_code != 201:
+    if response.status_code != 200:
         raise RuntimeError(
-            "Fotoğraf yükleme endpointi başarısız. "
+            "Konumlu görev başlatma endpointi başarısız. "
             f"HTTP {response.status_code}: {response.text}"
         )
 
-    response_json = response.json()
-    attachment = response_json.get("attachment")
+    task = response.json().get("task")
 
-    if not isinstance(attachment, dict):
-        raise RuntimeError("Fotoğraf yükleme cevabında attachment nesnesi yok.")
+    if not isinstance(task, dict):
+        raise RuntimeError("Konumlu başlatma cevabında task nesnesi yok.")
 
-    attachment_id = attachment.get("id")
-
-    if not isinstance(attachment_id, int):
-        raise RuntimeError("Fotoğraf yükleme cevabında attachment id geçersiz.")
-
-    if attachment.get("file_type") != "image/jpeg":
+    if task.get("status") != TASK_STATUS_IN_PROGRESS:
         raise RuntimeError(
-            "Yüklenen fotoğraf image/jpeg olarak dönmedi. "
-            f"file_type={attachment.get('file_type')}"
+            "Konumlu başlatma sonrası status hatalı. "
+            f"Gelen: {task.get('status')}"
         )
 
-    print(
-        "[OK] Personel fotoğraf kanıtı yükledi. "
-        f"attachment_id={attachment_id}, file_size={attachment.get('file_size')}"
-    )
-
-    return attachment_id
+    print("[OK] Konum bilgisiyle görev başlatıldı.")
 
 
-def complete_task_with_staff(
+def try_complete_without_location_should_fail(
     *,
     staff: User,
     task_id: int,
 ) -> None:
-    """Complete task through API as assigned staff."""
+    """Try to complete task without location and expect failure."""
 
     set_current_user_override(staff)
 
@@ -401,32 +331,69 @@ def complete_task_with_staff(
     response = client.post(
         f"/api/v1/tasks/{task_id}/complete",
         json={
-            "note": "Fotoğraf yüklendi, görev tamamlandı.",
+            "note": "Konum olmadan tamamlamaya çalışıyorum.",
+        },
+    )
+
+    if response.status_code != 400:
+        raise RuntimeError(
+            "Konumsuz tamamlama başarısız olmalıydı ama beklenen hata gelmedi. "
+            f"HTTP {response.status_code}: {response.text}"
+        )
+
+    detail = str(response.json().get("detail", ""))
+
+    if "konum" not in detail.lower():
+        raise RuntimeError(
+            "Konumsuz tamamlama hatası beklenen açıklamayı içermiyor. "
+            f"detail={detail}"
+        )
+
+    print("[OK] Konum yokken görev tamamlanamadı.")
+
+
+def complete_with_location(
+    *,
+    staff: User,
+    task_id: int,
+) -> None:
+    """Complete task with location through API as assigned staff."""
+
+    set_current_user_override(staff)
+
+    client = TestClient(app)
+
+    response = client.post(
+        f"/api/v1/tasks/{task_id}/complete",
+        json={
+            "note": "Konum bilgisiyle görevi tamamladım.",
+            "latitude": COMPLETE_LATITUDE,
+            "longitude": COMPLETE_LONGITUDE,
+            "location_accuracy": COMPLETE_LOCATION_ACCURACY,
         },
     )
 
     if response.status_code != 200:
         raise RuntimeError(
-            "Fotoğraf sonrası görev tamamlama endpointi başarısız. "
+            "Konumlu görev tamamlama endpointi başarısız. "
             f"HTTP {response.status_code}: {response.text}"
         )
 
-    response_json = response.json()
-    task = response_json.get("task")
+    task = response.json().get("task")
 
     if not isinstance(task, dict):
-        raise RuntimeError("Görev tamamlama cevabında task nesnesi yok.")
+        raise RuntimeError("Konumlu tamamlama cevabında task nesnesi yok.")
 
     if task.get("status") != TASK_STATUS_COMPLETED:
         raise RuntimeError(
-            "Görev tamamlama sonrası status hatalı. "
+            "Konumlu tamamlama sonrası status hatalı. "
             f"Gelen: {task.get('status')}"
         )
 
-    print("[OK] Fotoğraf yüklendikten sonra görev tamamlandı.")
+    print("[OK] Konum bilgisiyle görev tamamlandı.")
 
 
-def approve_task_with_owner(
+def approve_with_owner(
     *,
     owner: User,
     task_id: int,
@@ -440,7 +407,7 @@ def approve_task_with_owner(
     response = client.post(
         f"/api/v1/tasks/{task_id}/approve",
         json={
-            "note": "Fotoğraf kanıtı kontrol edildi, görev onaylandı.",
+            "note": "Konum bilgisi kontrol edildi, görev onaylandı.",
         },
     )
 
@@ -450,8 +417,7 @@ def approve_task_with_owner(
             f"HTTP {response.status_code}: {response.text}"
         )
 
-    response_json = response.json()
-    task = response_json.get("task")
+    task = response.json().get("task")
 
     if not isinstance(task, dict):
         raise RuntimeError("Görev onaylama cevabında task nesnesi yok.")
@@ -463,34 +429,6 @@ def approve_task_with_owner(
         )
 
     print("[OK] Owner görevi onayladı.")
-
-
-def assert_attachment_exists(
-    db,
-    *,
-    attachment_id: int,
-) -> None:
-    """Validate attachment record and physical file exist."""
-
-    db.expire_all()
-
-    attachment = db.get(TaskAttachment, attachment_id)
-
-    if attachment is None:
-        raise RuntimeError("Fotoğraf kaydı veritabanında bulunamadı.")
-
-    file_path = Path(attachment.file_path)
-
-    if not file_path.exists() or not file_path.is_file():
-        raise RuntimeError(
-            "Fotoğraf fiziksel storage klasöründe bulunamadı. "
-            f"file_path={attachment.file_path}"
-        )
-
-    if attachment.file_size is None or attachment.file_size <= 0:
-        raise RuntimeError("Fotoğraf dosya boyutu geçersiz.")
-
-    print("[OK] Fotoğraf kaydı ve fiziksel dosya doğrulandı.")
 
 
 def assert_expected_events_exist(
@@ -522,8 +460,78 @@ def assert_expected_events_exist(
     print("[OK] Görev geçmişindeki beklenen event kayıtları doğrulandı.")
 
 
+def assert_location_events_exist(
+    db,
+    *,
+    task_id: int,
+) -> None:
+    """Validate start and complete events contain location values."""
+
+    db.expire_all()
+
+    start_event = (
+        db.execute(
+            select(TaskEvent).where(
+                TaskEvent.task_id == task_id,
+                TaskEvent.event_type == "task_started",
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+    if start_event is None:
+        raise RuntimeError("task_started eventi bulunamadı.")
+
+    if start_event.latitude is None or start_event.longitude is None:
+        raise RuntimeError("task_started eventinde konum bilgisi yok.")
+
+    if round(float(start_event.latitude), 4) != round(START_LATITUDE, 4):
+        raise RuntimeError(
+            "task_started latitude hatalı. "
+            f"Beklenen: {START_LATITUDE}, Gelen: {start_event.latitude}"
+        )
+
+    if round(float(start_event.longitude), 4) != round(START_LONGITUDE, 4):
+        raise RuntimeError(
+            "task_started longitude hatalı. "
+            f"Beklenen: {START_LONGITUDE}, Gelen: {start_event.longitude}"
+        )
+
+    complete_event = (
+        db.execute(
+            select(TaskEvent).where(
+                TaskEvent.task_id == task_id,
+                TaskEvent.event_type == "task_completed",
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+    if complete_event is None:
+        raise RuntimeError("task_completed eventi bulunamadı.")
+
+    if complete_event.latitude is None or complete_event.longitude is None:
+        raise RuntimeError("task_completed eventinde konum bilgisi yok.")
+
+    if round(float(complete_event.latitude), 4) != round(COMPLETE_LATITUDE, 4):
+        raise RuntimeError(
+            "task_completed latitude hatalı. "
+            f"Beklenen: {COMPLETE_LATITUDE}, Gelen: {complete_event.latitude}"
+        )
+
+    if round(float(complete_event.longitude), 4) != round(COMPLETE_LONGITUDE, 4):
+        raise RuntimeError(
+            "task_completed longitude hatalı. "
+            f"Beklenen: {COMPLETE_LONGITUDE}, Gelen: {complete_event.longitude}"
+        )
+
+    print("[OK] Başlatma ve tamamlama eventlerinde konum bilgisi doğrulandı.")
+
+
 def main() -> None:
-    """Check photo required task completion flow."""
+    """Check location required task flow."""
 
     db = SessionLocal()
 
@@ -542,20 +550,30 @@ def main() -> None:
 
         cleanup_old_demo_data(db, business_id=business.id)
 
-        task = create_photo_required_task(
+        task = create_location_required_task(
             db=db,
             owner=owner,
             business=business,
             staff=staff,
         )
 
-        print("[INFO] Fotoğraf zorunlu görev tamamlama akışı başladı.")
+        print("[INFO] Konum zorunlu görev akışı başladı.")
         print(f"[INFO] İşletme: {business.name} | business_id={business.id}")
         print(f"[INFO] Görev: id={task.id} | title={task.title}")
         print(f"[INFO] Personel: {staff.username} ({staff.role})")
         print(f"[INFO] Owner: {owner.username} ({owner.role})")
 
-        start_task_with_staff(
+        try_start_without_location_should_fail(
+            staff=staff,
+            task_id=task.id,
+        )
+
+        try_complete_without_location_should_fail(
+            staff=staff,
+            task_id=task.id,
+        )
+
+        start_with_location(
             staff=staff,
             task_id=task.id,
         )
@@ -564,10 +582,10 @@ def main() -> None:
             db,
             task_id=task.id,
             expected_status=TASK_STATUS_IN_PROGRESS,
-            label="Başlatma sonrası DB kontrol",
+            label="Konumlu başlatma sonrası DB kontrol",
         )
 
-        try_complete_without_photo_should_fail(
+        try_complete_without_location_should_fail(
             staff=staff,
             task_id=task.id,
         )
@@ -576,23 +594,10 @@ def main() -> None:
             db,
             task_id=task.id,
             expected_status=TASK_STATUS_IN_PROGRESS,
-            label="Fotoğrafsız tamamlama sonrası DB kontrol",
+            label="Konumsuz tamamlama sonrası DB kontrol",
         )
 
-        image_content = create_demo_jpeg_bytes()
-
-        attachment_id = upload_photo_with_staff(
-            staff=staff,
-            task_id=task.id,
-            image_content=image_content,
-        )
-
-        assert_attachment_exists(
-            db,
-            attachment_id=attachment_id,
-        )
-
-        complete_task_with_staff(
+        complete_with_location(
             staff=staff,
             task_id=task.id,
         )
@@ -601,10 +606,10 @@ def main() -> None:
             db,
             task_id=task.id,
             expected_status=TASK_STATUS_COMPLETED,
-            label="Fotoğraflı tamamlama sonrası DB kontrol",
+            label="Konumlu tamamlama sonrası DB kontrol",
         )
 
-        approve_task_with_owner(
+        approve_with_owner(
             owner=owner,
             task_id=task.id,
         )
@@ -621,8 +626,13 @@ def main() -> None:
             task_id=task.id,
         )
 
+        assert_location_events_exist(
+            db,
+            task_id=task.id,
+        )
+
         print("")
-        print("[OK] Fotoğraf zorunlu görev tamamlama akışı başarılı.")
+        print("[OK] Konum zorunlu görev akışı başarılı.")
     finally:
         db.close()
         app.dependency_overrides.clear()

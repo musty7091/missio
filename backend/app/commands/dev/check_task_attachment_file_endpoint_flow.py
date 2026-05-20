@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
@@ -17,16 +17,14 @@ from app.models.task_attachment import TaskAttachment
 from app.models.task_event import TaskEvent
 from app.models.user import User
 from app.repositories.user_repository import normalize_username
-from app.services.task_attachment_service import delete_physical_attachment_file
 from app.services.task_service import create_extra_task
 
 
 BUSINESS_SLUG = "missio-demo-market"
 OWNER_USERNAME = "owner"
-ASSIGNED_STAFF_USERNAME = "ahmet"
-OTHER_STAFF_USERNAME = "ali"
+STAFF_USERNAME = "ahmet"
 
-TASK_TITLE_ACCESS_CONTROL_FLOW = "SECURITY CHECK - Görev fotoğraf yetki kontrolü"
+TASK_TITLE_ATTACHMENT_FILE_FLOW = "ATTACHMENT DEMO - Fotoğraf görüntüleme akışı"
 
 
 def get_demo_business(db) -> Business:
@@ -41,7 +39,7 @@ def get_demo_business(db) -> Business:
     if business is None:
         raise RuntimeError(
             "Demo işletme bulunamadı. Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return business
@@ -70,32 +68,40 @@ def get_demo_user(
         raise RuntimeError(
             f"Demo kullanıcı bulunamadı: {username}. "
             "Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return user
 
 
 def delete_file_if_safe(file_path: str | None) -> None:
-    """Delete demo attachment file safely."""
+    """Delete demo file if it exists under storage directory."""
 
     if not file_path:
         return
 
-    try:
-        delete_physical_attachment_file(file_path)
-    except Exception as exc:
-        print(f"[WARN] Demo dosyası temizlenemedi: {file_path} | {exc}")
+    path = Path(file_path)
+
+    if path.is_absolute():
+        return
+
+    normalized_path = path.as_posix()
+
+    if not normalized_path.startswith("storage/task_attachments/"):
+        return
+
+    if path.exists() and path.is_file():
+        path.unlink()
 
 
 def cleanup_old_demo_data(db, *, business_id: int) -> None:
-    """Delete old access-control demo data."""
+    """Delete old attachment file endpoint demo data."""
 
     old_tasks = (
         db.execute(
             select(Task).where(
                 Task.business_id == business_id,
-                Task.title == TASK_TITLE_ACCESS_CONTROL_FLOW,
+                Task.title == TASK_TITLE_ATTACHMENT_FILE_FLOW,
             )
         )
         .scalars()
@@ -130,22 +136,22 @@ def create_demo_task(
     *,
     owner: User,
     business: Business,
-    assigned_staff: User,
+    staff: User,
 ) -> Task:
-    """Create fresh demo task assigned to selected staff."""
+    """Create fresh demo task."""
 
     task = create_extra_task(
         db=db,
         current_user=owner,
         business=business,
-        assigned_to_user=assigned_staff,
-        title=TASK_TITLE_ACCESS_CONTROL_FLOW,
-        description="Görev fotoğraf yetki kontrolü için oluşturulan demo görev.",
+        assigned_to_user=staff,
+        title=TASK_TITLE_ATTACHMENT_FILE_FLOW,
+        description="Fotoğraf görüntüleme endpoint akışı için oluşturulan demo görev.",
         requires_photo=True,
         requires_location=False,
         requires_manager_approval=True,
         ip_address="127.0.0.1",
-        user_agent="Missio command check_task_attachment_access_control_flow",
+        user_agent="Missio command check_task_attachment_file_endpoint_flow",
     )
 
     db.commit()
@@ -157,12 +163,12 @@ def create_demo_task(
 def create_demo_jpeg_bytes() -> bytes:
     """Create in-memory demo JPEG image."""
 
-    image = Image.new("RGB", (900, 600), (245, 245, 245))
+    image = Image.new("RGB", (2200, 1600), (245, 245, 245))
 
-    for x in range(80, 820, 120):
-        for y in range(80, 520, 120):
-            for dx in range(50):
-                for dy in range(50):
+    for x in range(100, 2100, 180):
+        for y in range(100, 1500, 180):
+            for dx in range(90):
+                for dy in range(90):
                     image.putpixel((x + dx, y + dy), (170, 170, 170))
 
     output = BytesIO()
@@ -211,29 +217,23 @@ def set_current_user_override(user: User) -> None:
     app.dependency_overrides[get_current_user] = build_get_current_user_override(user.id)
 
 
-def build_client_for_user(user: User) -> TestClient:
-    """Build TestClient with selected current user."""
-
-    set_current_user_override(user)
-
-    return TestClient(app)
-
-
-def upload_attachment_with_assigned_staff(
+def upload_attachment_with_staff(
     *,
-    assigned_staff: User,
+    staff: User,
     task_id: int,
     image_content: bytes,
 ) -> dict:
     """Upload attachment through API as assigned staff."""
 
-    client = build_client_for_user(assigned_staff)
+    set_current_user_override(staff)
+
+    client = TestClient(app)
 
     response = client.post(
         f"/api/v1/tasks/{task_id}/attachments",
         files={
             "file": (
-                "assigned-staff-proof.jpg",
+                "iphone-camera-proof.jpg",
                 image_content,
                 "image/jpeg",
             )
@@ -247,7 +247,7 @@ def upload_attachment_with_assigned_staff(
 
     if response.status_code != 201:
         raise RuntimeError(
-            "Atanan personel fotoğraf yükleme endpointi başarısız. "
+            "Fotoğraf yükleme endpointi başarısız. "
             f"HTTP {response.status_code}: {response.text}"
         )
 
@@ -263,7 +263,7 @@ def upload_attachment_with_assigned_staff(
         raise RuntimeError("Upload cevabında attachment id geçersiz.")
 
     print(
-        "[OK] Atanan personel fotoğraf yükleyebildi. "
+        "[OK] Fotoğraf yüklendi. "
         f"attachment_id={attachment_id}, file_size={attachment.get('file_size')}"
     )
 
@@ -296,16 +296,18 @@ def assert_file_response_is_valid_jpeg(
         raise RuntimeError(f"{label} dosya içeriği JPEG bitişi taşımıyor.")
 
 
-def get_attachment_file_with_allowed_user(
+def get_attachment_file_with_user(
     *,
     user: User,
     task_id: int,
     attachment_id: int,
     label: str,
 ) -> None:
-    """Download attachment file through API with allowed user."""
+    """Download attachment file through API."""
 
-    client = build_client_for_user(user)
+    set_current_user_override(user)
+
+    client = TestClient(app)
 
     response = client.get(
         f"/api/v1/tasks/{task_id}/attachments/{attachment_id}/file"
@@ -331,33 +333,29 @@ def get_attachment_file_with_allowed_user(
     )
 
 
-def assert_forbidden_response(
+def delete_attachment_with_staff(
     *,
-    user: User,
-    method: str,
-    url: str,
-    label: str,
+    staff: User,
+    task_id: int,
+    attachment_id: int,
 ) -> None:
-    """Assert selected user receives HTTP 403 for forbidden operation."""
+    """Delete attachment through API as assigned staff."""
 
-    client = build_client_for_user(user)
+    set_current_user_override(staff)
 
-    normalized_method = method.strip().upper()
+    client = TestClient(app)
 
-    if normalized_method == "GET":
-        response = client.get(url)
-    elif normalized_method == "DELETE":
-        response = client.delete(url)
-    else:
-        raise RuntimeError(f"Desteklenmeyen test metodu: {method}")
+    response = client.delete(
+        f"/api/v1/tasks/{task_id}/attachments/{attachment_id}"
+    )
 
-    if response.status_code != 403:
+    if response.status_code != 200:
         raise RuntimeError(
-            f"{label} için beklenen HTTP 403 idi ancak HTTP {response.status_code} döndü. "
-            f"Response: {response.text}"
+            "Fotoğraf silme endpointi başarısız. "
+            f"HTTP {response.status_code}: {response.text}"
         )
 
-    print(f"[OK] {label} doğru şekilde reddedildi. HTTP 403")
+    print(f"[OK] Test fotoğrafı silindi. attachment_id={attachment_id}")
 
 
 def assert_attachment_file_exists(
@@ -392,56 +390,6 @@ def assert_attachment_file_exists(
     return file_path
 
 
-def assert_attachment_still_exists(
-    db,
-    *,
-    attachment_id: int,
-    previous_file_path: str,
-) -> None:
-    """Validate forbidden delete did not remove attachment."""
-
-    db.expire_all()
-
-    attachment = db.get(TaskAttachment, attachment_id)
-
-    if attachment is None:
-        raise RuntimeError(
-            "Yetkisiz silme denemesinden sonra fotoğraf kaydı kayboldu."
-        )
-
-    path = Path(previous_file_path)
-
-    if not path.exists() or not path.is_file():
-        raise RuntimeError(
-            "Yetkisiz silme denemesinden sonra fiziksel fotoğraf dosyası kayboldu."
-        )
-
-    print("[OK] Yetkisiz silme denemesi fotoğraf kaydını ve dosyasını etkilemedi.")
-
-
-def delete_attachment_with_assigned_staff(
-    *,
-    assigned_staff: User,
-    task_id: int,
-    attachment_id: int,
-) -> None:
-    """Delete attachment through API as assigned staff."""
-
-    client = build_client_for_user(assigned_staff)
-
-    response = client.delete(
-        f"/api/v1/tasks/{task_id}/attachments/{attachment_id}"
-    )
-
-    if response.status_code != 200:
-        raise RuntimeError(
-            "Atanan personel fotoğraf silme endpointi başarısız. "
-            f"HTTP {response.status_code}: {response.text}"
-        )
-
-    print(f"[OK] Test fotoğrafı atanan personel tarafından silindi. attachment_id={attachment_id}")
-
-
 def assert_attachment_deleted(
     db,
     *,
@@ -466,29 +414,21 @@ def assert_attachment_deleted(
 
 
 def main() -> None:
-    """Check task attachment access control flow."""
+    """Check task attachment file endpoint flow."""
 
     db = SessionLocal()
-    business_id: int | None = None
 
     try:
         business = get_demo_business(db)
-        business_id = business.id
-
         owner = get_demo_user(
             db=db,
             business_id=business.id,
             username=OWNER_USERNAME,
         )
-        assigned_staff = get_demo_user(
+        staff = get_demo_user(
             db=db,
             business_id=business.id,
-            username=ASSIGNED_STAFF_USERNAME,
-        )
-        other_staff = get_demo_user(
-            db=db,
-            business_id=business.id,
-            username=OTHER_STAFF_USERNAME,
+            username=STAFF_USERNAME,
         )
 
         cleanup_old_demo_data(db, business_id=business.id)
@@ -497,19 +437,18 @@ def main() -> None:
             db=db,
             owner=owner,
             business=business,
-            assigned_staff=assigned_staff,
+            staff=staff,
         )
 
-        print("[INFO] Görev fotoğraf yetki kontrolü başladı.")
+        print("[INFO] Görev fotoğraf görüntüleme endpoint kontrolü başladı.")
         print(f"[INFO] İşletme: {business.name} | business_id={business.id}")
         print(f"[INFO] Görev: id={task.id} | title={task.title}")
-        print(f"[INFO] Atanan personel: {assigned_staff.username} ({assigned_staff.role})")
-        print(f"[INFO] Diğer personel: {other_staff.username} ({other_staff.role})")
+        print(f"[INFO] Personel: {staff.username} ({staff.role})")
 
         image_content = create_demo_jpeg_bytes()
 
-        uploaded_attachment = upload_attachment_with_assigned_staff(
-            assigned_staff=assigned_staff,
+        uploaded_attachment = upload_attachment_with_staff(
+            staff=staff,
             task_id=task.id,
             image_content=image_content,
         )
@@ -521,49 +460,22 @@ def main() -> None:
             attachment_id=attachment_id,
         )
 
-        get_attachment_file_with_allowed_user(
-            user=assigned_staff,
+        get_attachment_file_with_user(
+            user=staff,
             task_id=task.id,
             attachment_id=attachment_id,
             label="Atanan personel",
         )
 
-        get_attachment_file_with_allowed_user(
+        get_attachment_file_with_user(
             user=owner,
             task_id=task.id,
             attachment_id=attachment_id,
             label="Owner",
         )
 
-        assert_forbidden_response(
-            user=other_staff,
-            method="GET",
-            url=f"/api/v1/tasks/{task.id}/attachments",
-            label="Diğer personelin attachment listeleme denemesi",
-        )
-
-        assert_forbidden_response(
-            user=other_staff,
-            method="GET",
-            url=f"/api/v1/tasks/{task.id}/attachments/{attachment_id}/file",
-            label="Diğer personelin fotoğraf görüntüleme denemesi",
-        )
-
-        assert_forbidden_response(
-            user=other_staff,
-            method="DELETE",
-            url=f"/api/v1/tasks/{task.id}/attachments/{attachment_id}",
-            label="Diğer personelin fotoğraf silme denemesi",
-        )
-
-        assert_attachment_still_exists(
-            db,
-            attachment_id=attachment_id,
-            previous_file_path=previous_file_path,
-        )
-
-        delete_attachment_with_assigned_staff(
-            assigned_staff=assigned_staff,
+        delete_attachment_with_staff(
+            staff=staff,
             task_id=task.id,
             attachment_id=attachment_id,
         )
@@ -574,22 +486,11 @@ def main() -> None:
             previous_file_path=previous_file_path,
         )
 
-        cleanup_old_demo_data(db, business_id=business.id)
-
         print("")
-        print("[OK] Görev fotoğraf yetki kontrolü başarılı.")
+        print("[OK] Görev fotoğraf görüntüleme endpoint akışı başarılı.")
     finally:
+        db.close()
         app.dependency_overrides.clear()
-
-        try:
-            db.rollback()
-
-            if business_id is not None:
-                cleanup_old_demo_data(db, business_id=business_id)
-        except Exception as cleanup_exc:
-            print(f"[WARN] Test sonrası temizlik sırasında hata oluştu: {cleanup_exc}")
-        finally:
-            db.close()
 
 
 if __name__ == "__main__":

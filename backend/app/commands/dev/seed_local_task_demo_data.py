@@ -59,7 +59,7 @@ def ensure_demo_seed_is_allowed() -> None:
             "Demo veri olu?turma komutu kilitli. "
             "Local geli?tirme ortam?nda ?al??t?rmak i?in ?nce ?u ortam de?i?kenini verin: "
             "PowerShell: $env:MISSIO_ALLOW_DEMO_SEED='1' "
-            "Sonra: python -m app.commands.seed_local_task_demo_data"
+            "Sonra: python -m app.commands.dev.seed_local_task_demo_data"
         )
 
 

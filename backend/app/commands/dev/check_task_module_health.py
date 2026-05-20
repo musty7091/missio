@@ -47,7 +47,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_demo_flow",
+            "app.commands.dev.check_task_demo_flow",
         ],
     ),
     HealthCheckStep(
@@ -55,7 +55,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_lifecycle_flow",
+            "app.commands.dev.check_task_lifecycle_flow",
         ],
     ),
     HealthCheckStep(
@@ -63,7 +63,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_event_endpoint_flow",
+            "app.commands.dev.check_task_event_endpoint_flow",
         ],
     ),
     HealthCheckStep(
@@ -71,7 +71,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_attachment_endpoint_flow",
+            "app.commands.dev.check_task_attachment_endpoint_flow",
         ],
     ),
     HealthCheckStep(
@@ -79,7 +79,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_attachment_file_endpoint_flow",
+            "app.commands.dev.check_task_attachment_file_endpoint_flow",
         ],
     ),
     HealthCheckStep(
@@ -87,7 +87,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_attachment_access_control_flow",
+            "app.commands.dev.check_task_attachment_access_control_flow",
         ],
     ),
     HealthCheckStep(
@@ -95,7 +95,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_attachment_cleanup_flow",
+            "app.commands.dev.check_task_attachment_cleanup_flow",
         ],
     ),
     HealthCheckStep(
@@ -103,7 +103,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_photo_required_completion_flow",
+            "app.commands.dev.check_task_photo_required_completion_flow",
         ],
     ),
     HealthCheckStep(
@@ -111,7 +111,7 @@ HEALTH_CHECK_STEPS = [
         command=[
             sys.executable,
             "-m",
-            "app.commands.check_task_location_required_flow",
+            "app.commands.dev.check_task_location_required_flow",
         ],
     ),
     HealthCheckStep(
@@ -188,7 +188,7 @@ def main() -> None:
     print("[INFO] Ön koşul:")
     print("       Demo veri yoksa önce şu komutu local izinle çalıştırın:")
     print("       PowerShell: $env:MISSIO_ALLOW_DEMO_SEED='1'")
-    print("       python -m app.commands.seed_local_task_demo_data")
+    print("       python -m app.commands.dev.seed_local_task_demo_data")
     print("       Remove-Item Env:\\MISSIO_ALLOW_DEMO_SEED -ErrorAction SilentlyContinue")
 
     for index, step in enumerate(HEALTH_CHECK_STEPS, start=1):

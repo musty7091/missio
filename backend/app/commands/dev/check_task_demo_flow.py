@@ -35,7 +35,7 @@ def get_demo_business(db) -> Business:
     if business is None:
         raise RuntimeError(
             "Demo işletme bulunamadı. Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return business
@@ -64,7 +64,7 @@ def get_demo_user(
         raise RuntimeError(
             f"Demo kullanıcı bulunamadı: {username}. "
             "Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return user

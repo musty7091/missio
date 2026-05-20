@@ -40,7 +40,7 @@ def get_demo_business(db) -> Business:
     if business is None:
         raise RuntimeError(
             "Demo işletme bulunamadı. Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return business
@@ -69,7 +69,7 @@ def get_demo_user(
         raise RuntimeError(
             f"Demo kullanıcı bulunamadı: {username}. "
             "Önce şu komutu çalıştırın: "
-            "python -m app.commands.seed_local_task_demo_data"
+            "python -m app.commands.dev.seed_local_task_demo_data"
         )
 
     return user
@@ -96,7 +96,7 @@ def get_lifecycle_approve_task(db, *, business_id: int) -> Task:
         raise RuntimeError(
             "Yaşam döngüsü onay akışı görevi bulunamadı. "
             "Önce şu komutu çalıştırın: "
-            "python -m app.commands.check_task_lifecycle_flow"
+            "python -m app.commands.dev.check_task_lifecycle_flow"
         )
 
     return task
@@ -256,7 +256,7 @@ def main() -> None:
             raise RuntimeError(
                 "Seçilen görevde yeterli event kaydı yok. "
                 "Önce şu komutu tekrar çalıştırın: "
-                "python -m app.commands.check_task_lifecycle_flow"
+                "python -m app.commands.dev.check_task_lifecycle_flow"
             )
 
         print("[INFO] Görev event endpoint kontrolü başladı.")
