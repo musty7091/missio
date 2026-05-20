@@ -8,7 +8,7 @@ import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { getCurrentUser } from "./services/authService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
-import { getMyTodayTasks } from "./services/taskService"
+import { completeTask, getMyTodayTasks, startTask } from "./services/taskService"
 import type { UserMeResponse } from "./types/auth"
 import type { ThemeMode, TodayTask } from "./types/task"
 import { mapMyTodayTasksResponseToTodayTasks } from "./utils/apiTaskMapper"
@@ -33,6 +33,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [tasksErrorMessage, setTasksErrorMessage] = useState<string | null>(null)
+  const [busyTaskId, setBusyTaskId] = useState<number | null>(null)
 
   useEffect(() => {
     const root = document.documentElement
@@ -67,6 +68,26 @@ export default function App() {
       })
   }, [])
 
+  async function loadTodayTasks() {
+    setIsLoadingTasks(true)
+    setTasksErrorMessage(null)
+
+    try {
+      const response = await getMyTodayTasks()
+      setTasks(mapMyTodayTasksResponseToTodayTasks(response))
+    } catch (error) {
+      if (error instanceof Error) {
+        setTasksErrorMessage(error.message)
+      } else {
+        setTasksErrorMessage("Bugünkü görevler alınamadı.")
+      }
+
+      setTasks([])
+    } finally {
+      setIsLoadingTasks(false)
+    }
+  }
+
   useEffect(() => {
     if (!currentUser) {
       setTasks([])
@@ -74,31 +95,15 @@ export default function App() {
       return
     }
 
-    setIsLoadingTasks(true)
-    setTasksErrorMessage(null)
-
-    getMyTodayTasks()
-      .then((response) => {
-        setTasks(mapMyTodayTasksResponseToTodayTasks(response))
-      })
-      .catch((error) => {
-        if (error instanceof Error) {
-          setTasksErrorMessage(error.message)
-        } else {
-          setTasksErrorMessage("Bugünkü görevler alınamadı.")
-        }
-
-        setTasks([])
-      })
-      .finally(() => {
-        setIsLoadingTasks(false)
-      })
+    void loadTodayTasks()
   }, [currentUser])
 
   const taskStats = useMemo(() => {
     return {
       totalCount: tasks.length,
-      completedCount: tasks.filter((task) => task.status === "completed" || task.status === "approved").length,
+      completedCount: tasks.filter(
+        (task) => task.status === "completed" || task.status === "approved",
+      ).length,
       waitingCount: tasks.filter((task) => task.status === "assigned").length,
       activeCount: tasks.filter((task) => task.status === "in_progress").length,
     }
@@ -108,6 +113,42 @@ export default function App() {
     clearAccessToken()
     setCurrentUser(null)
     setTasks([])
+  }
+
+  async function handleStartTask(taskId: number) {
+    setBusyTaskId(taskId)
+    setTasksErrorMessage(null)
+
+    try {
+      await startTask(taskId)
+      await loadTodayTasks()
+    } catch (error) {
+      if (error instanceof Error) {
+        setTasksErrorMessage(error.message)
+      } else {
+        setTasksErrorMessage("Görev başlatılamadı.")
+      }
+    } finally {
+      setBusyTaskId(null)
+    }
+  }
+
+  async function handleCompleteTask(taskId: number) {
+    setBusyTaskId(taskId)
+    setTasksErrorMessage(null)
+
+    try {
+      await completeTask(taskId)
+      await loadTodayTasks()
+    } catch (error) {
+      if (error instanceof Error) {
+        setTasksErrorMessage(error.message)
+      } else {
+        setTasksErrorMessage("Görev tamamlanamadı.")
+      }
+    } finally {
+      setBusyTaskId(null)
+    }
   }
 
   if (isCheckingSession) {
@@ -180,7 +221,13 @@ export default function App() {
 
           {!isLoadingTasks &&
             tasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard
+                key={task.id}
+                task={task}
+                isBusy={busyTaskId === task.id}
+                onStartTask={handleStartTask}
+                onCompleteTask={handleCompleteTask}
+              />
             ))}
         </section>
 
