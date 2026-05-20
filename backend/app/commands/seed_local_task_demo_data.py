@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import time
+import os
 
 from sqlalchemy import select
 
@@ -45,6 +46,21 @@ SECOND_STAFF_FULL_NAME = "Ali Personel"
 SECOND_STAFF_USERNAME = "ali"
 SECOND_STAFF_PASSWORD = "Missio.2026!"
 SECOND_STAFF_EMAIL = "ali@missio.local"
+
+
+
+def ensure_demo_seed_is_allowed() -> None:
+    """Ensure demo seed command is explicitly allowed."""
+
+    allow_demo_seed = os.getenv("MISSIO_ALLOW_DEMO_SEED", "").strip()
+
+    if allow_demo_seed != "1":
+        raise RuntimeError(
+            "Demo veri olu?turma komutu kilitli. "
+            "Local geli?tirme ortam?nda ?al??t?rmak i?in ?nce ?u ortam de?i?kenini verin: "
+            "PowerShell: $env:MISSIO_ALLOW_DEMO_SEED='1' "
+            "Sonra: python -m app.commands.seed_local_task_demo_data"
+        )
 
 
 def get_super_admin(db) -> User:
@@ -359,6 +375,8 @@ def create_extra_task_if_missing(
 
 def main() -> None:
     """Seed local task demo data."""
+
+    ensure_demo_seed_is_allowed()
 
     db = SessionLocal()
 
