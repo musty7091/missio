@@ -18,8 +18,13 @@ import type { FormEvent, ReactNode } from "react"
 import { useState } from "react"
 import { getCurrentUser, loginUser } from "../../services/authService"
 import { setAccessToken } from "../../services/authTokenStorage"
+import { ApiError } from "../../services/httpClient"
 import type { UserMeResponse } from "../../types/auth"
 import type { ThemeMode } from "../../types/task"
+
+const IS_DEVELOPMENT_MODE = import.meta.env.DEV
+const DEVELOPMENT_BUSINESS_SLUG = "missio-demo-market"
+const DEVELOPMENT_USERNAME = "ahmet"
 
 type LoginScreenProps = {
   theme: ThemeMode
@@ -34,6 +39,8 @@ type LoginInputProps = {
   autoComplete: string
   icon: ReactNode
   type?: string
+  autoCapitalize?: string
+  spellCheck?: boolean
   rightElement?: ReactNode
   onChange: (value: string) => void
 }
@@ -45,6 +52,8 @@ function LoginInput({
   autoComplete,
   icon,
   type = "text",
+  autoCapitalize,
+  spellCheck,
   rightElement,
   onChange,
 }: LoginInputProps) {
@@ -63,6 +72,8 @@ function LoginInput({
           className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[var(--missio-text-main)] outline-none placeholder:text-[var(--missio-text-muted)]"
           placeholder={placeholder}
           autoComplete={autoComplete}
+          autoCapitalize={autoCapitalize}
+          spellCheck={spellCheck}
           type={type}
         />
 
@@ -87,18 +98,75 @@ function MissioLogoMark() {
   )
 }
 
+function getReadableLoginErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    if (error.status === 0) {
+      return "Sunucuya bağlanılamadı. Lütfen internet bağlantını ve uygulama adresini kontrol et."
+    }
+
+    if (error.status === 401) {
+      return "İşletme kodu, kullanıcı adı veya şifre hatalı."
+    }
+
+    if (error.status === 403) {
+      return error.message || "Bu hesapla giriş yapılamıyor."
+    }
+
+    if (error.status === 429) {
+      return "Çok fazla giriş denemesi yapıldı. Lütfen biraz bekleyip tekrar dene."
+    }
+
+    if (error.status >= 500) {
+      return "Sunucu tarafında geçici bir sorun oluştu. Lütfen tekrar dene."
+    }
+
+    return error.message || "Giriş işlemi başarısız oldu."
+  }
+
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return "Giriş işlemi başarısız oldu."
+}
+
 export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScreenProps) {
-  const [businessSlug, setBusinessSlug] = useState("missio-demo-market")
-  const [username, setUsername] = useState("ahmet")
+  const [businessSlug, setBusinessSlug] = useState(() =>
+    IS_DEVELOPMENT_MODE ? DEVELOPMENT_BUSINESS_SLUG : "",
+  )
+  const [username, setUsername] = useState(() =>
+    IS_DEVELOPMENT_MODE ? DEVELOPMENT_USERNAME : "",
+  )
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  function clearErrorMessage() {
+    if (errorMessage) {
+      setErrorMessage(null)
+    }
+  }
+
+  function handleBusinessSlugChange(value: string) {
+    clearErrorMessage()
+    setBusinessSlug(value)
+  }
+
+  function handleUsernameChange(value: string) {
+    clearErrorMessage()
+    setUsername(value)
+  }
+
+  function handlePasswordChange(value: string) {
+    clearErrorMessage()
+    setPassword(value)
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const cleanBusinessSlug = businessSlug.trim()
+    const cleanBusinessSlug = businessSlug.trim().toLowerCase()
     const cleanUsername = username.trim()
 
     if (!cleanBusinessSlug) {
@@ -131,11 +199,7 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
       const currentUser = await getCurrentUser()
       onLoginSuccess(currentUser)
     } catch (error) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message)
-      } else {
-        setErrorMessage("Giriş işlemi başarısız oldu.")
-      }
+      setErrorMessage(getReadableLoginErrorMessage(error))
     } finally {
       setIsSubmitting(false)
     }
@@ -230,27 +294,33 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
             <LoginInput
               label="İşletme kodu"
               value={businessSlug}
-              onChange={setBusinessSlug}
+              onChange={handleBusinessSlugChange}
               placeholder="missio-demo-market"
               autoComplete="organization"
+              autoCapitalize="none"
+              spellCheck={false}
               icon={<Building2 size={19} />}
             />
 
             <LoginInput
               label="Kullanıcı adı"
               value={username}
-              onChange={setUsername}
+              onChange={handleUsernameChange}
               placeholder="ahmet"
               autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               icon={<User size={19} />}
             />
 
             <LoginInput
               label="Şifre"
               value={password}
-              onChange={setPassword}
+              onChange={handlePasswordChange}
               placeholder="Şifreni gir"
               autoComplete="current-password"
+              autoCapitalize="none"
+              spellCheck={false}
               type={showPassword ? "text" : "password"}
               icon={<LockKeyhole size={19} />}
               rightElement={
@@ -291,10 +361,7 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
             )}
           </button>
         </form>
-
-
       </section>
     </main>
   )
 }
-
