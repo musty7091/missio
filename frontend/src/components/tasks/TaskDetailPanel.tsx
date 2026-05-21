@@ -1,4 +1,5 @@
 ﻿import {
+  ArrowLeft,
   Camera,
   CheckCircle2,
   ClipboardCheck,
@@ -10,11 +11,14 @@
   MapPin,
   PlayCircle,
   ShieldCheck,
+  Trash2,
   X,
+  ZoomIn,
 } from "lucide-react"
 import type { ChangeEvent, ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
 import {
+  deleteTaskAttachment,
   getTaskAttachmentFileBlob,
   listTaskAttachments,
   type TaskAttachment,
@@ -167,9 +171,13 @@ export function TaskDetailPanel({
   onUploadPhoto,
 }: TaskDetailPanelProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const photoPreviewHistoryTokenRef = useRef<string | null>(null)
+
   const [attachmentPreviews, setAttachmentPreviews] = useState<AttachmentPreview[]>([])
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false)
   const [attachmentErrorMessage, setAttachmentErrorMessage] = useState<string | null>(null)
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null)
+  const [selectedPreview, setSelectedPreview] = useState<AttachmentPreview | null>(null)
 
   const canUseMainAction =
     task.status === "assigned" || task.status === "in_progress" || task.status === "rejected"
@@ -178,6 +186,8 @@ export function TaskDetailPanel({
     task.status === "completed" ||
     task.status === "approved" ||
     task.status === "cancelled"
+
+  const canDeleteAttachments = !isClosedTask
 
   async function loadAttachments() {
     if (!task.requiresPhoto) {
@@ -234,6 +244,61 @@ export function TaskDetailPanel({
     }
   }, [task.id])
 
+  function openPhotoPreview(preview: AttachmentPreview) {
+    const historyToken = `missio-photo-preview-${preview.attachment.id}-${Date.now()}`
+    photoPreviewHistoryTokenRef.current = historyToken
+
+    window.history.pushState(
+      {
+        ...(window.history.state ?? {}),
+        missioPhotoPreviewToken: historyToken,
+      },
+      "",
+      window.location.href,
+    )
+
+    setSelectedPreview(preview)
+  }
+
+  function closePhotoPreview() {
+    if (
+      selectedPreview !== null &&
+      photoPreviewHistoryTokenRef.current !== null &&
+      window.history.state?.missioPhotoPreviewToken === photoPreviewHistoryTokenRef.current
+    ) {
+      window.history.back()
+      return
+    }
+
+    photoPreviewHistoryTokenRef.current = null
+    setSelectedPreview(null)
+  }
+
+  useEffect(() => {
+    function handlePhotoPreviewBack(event: PopStateEvent) {
+      if (selectedPreview === null) {
+        return
+      }
+
+      const stillInsidePhotoPreview =
+        photoPreviewHistoryTokenRef.current !== null &&
+        event.state?.missioPhotoPreviewToken === photoPreviewHistoryTokenRef.current
+
+      if (stillInsidePhotoPreview) {
+        return
+      }
+
+      photoPreviewHistoryTokenRef.current = null
+      setSelectedPreview(null)
+    }
+
+    window.addEventListener("popstate", handlePhotoPreviewBack)
+
+    return () => {
+      window.removeEventListener("popstate", handlePhotoPreviewBack)
+    }
+  }, [selectedPreview])
+
   function handleMainAction() {
     if (task.status === "assigned") {
       onStartTask(task)
@@ -257,6 +322,30 @@ export function TaskDetailPanel({
       await loadAttachments()
     } finally {
       event.target.value = ""
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: number) {
+    const confirmed = window.confirm("Bu fotoğraf kanıtını silmek istiyor musun?")
+
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingAttachmentId(attachmentId)
+    setAttachmentErrorMessage(null)
+
+    try {
+      await deleteTaskAttachment(task.id, attachmentId)
+      await loadAttachments()
+    } catch (error) {
+      if (error instanceof Error) {
+        setAttachmentErrorMessage(error.message)
+      } else {
+        setAttachmentErrorMessage("Fotoğraf kanıtı silinemedi.")
+      }
+    } finally {
+      setDeletingAttachmentId(null)
     }
   }
 
@@ -437,18 +526,25 @@ export function TaskDetailPanel({
               {attachmentPreviews.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {attachmentPreviews.map((preview) => (
-                    <a
+                    <div
                       key={preview.attachment.id}
-                      href={preview.objectUrl}
-                      target="_blank"
-                      rel="noreferrer"
                       className="group overflow-hidden rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)]"
                     >
-                      <img
-                        src={preview.objectUrl}
-                        alt={preview.attachment.file_name}
-                        className="aspect-square w-full object-cover transition group-active:scale-95"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => openPhotoPreview(preview)}
+                        className="relative block w-full overflow-hidden text-left"
+                      >
+                        <img
+                          src={preview.objectUrl}
+                          alt={preview.attachment.file_name}
+                          className="aspect-square w-full object-cover transition group-active:scale-95"
+                        />
+
+                        <span className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-950/70 text-white backdrop-blur-sm">
+                          <ZoomIn size={14} />
+                        </span>
+                      </button>
 
                       <div className="px-2 py-1.5">
                         <p className="truncate text-[0.62rem] font-black text-[var(--missio-text-main)]">
@@ -457,8 +553,24 @@ export function TaskDetailPanel({
                         <p className="text-[0.58rem] font-bold text-[var(--missio-text-muted)]">
                           {formatFileSize(preview.attachment.file_size)}
                         </p>
+
+                        {canDeleteAttachments && (
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteAttachment(preview.attachment.id)}
+                            disabled={deletingAttachmentId === preview.attachment.id}
+                            className="mt-1 flex w-full items-center justify-center gap-1 rounded-xl border border-red-200 bg-red-50 px-2 py-1.5 text-[0.62rem] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+                          >
+                            {deletingAttachmentId === preview.attachment.id ? (
+                              <Loader2 className="animate-spin" size={12} />
+                            ) : (
+                              <Trash2 size={12} />
+                            )}
+                            Sil
+                          </button>
+                        )}
                       </div>
-                    </a>
+                    </div>
                   ))}
                 </div>
               )}
@@ -466,6 +578,15 @@ export function TaskDetailPanel({
           )}
 
           <div className="sticky bottom-0 -mx-4 mt-5 border-t border-[var(--missio-border)] bg-[var(--missio-card-bg)]/95 px-4 pb-1 pt-4 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={onClose}
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black text-[var(--missio-text-main)] active:scale-[0.99]"
+            >
+              <ArrowLeft size={18} />
+              Listeye dön
+            </button>
+
             {isClosedTask ? (
               <div className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black text-[var(--missio-text-muted)]">
                 <CheckCircle2 size={18} />
@@ -518,6 +639,52 @@ export function TaskDetailPanel({
           </div>
         </div>
       </section>
+
+      {selectedPreview && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white">
+          <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 pb-3 pt-5">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
+                Fotoğraf kanıtı
+              </p>
+              <h3 className="mt-1 truncate text-base font-black">
+                {selectedPreview.attachment.file_name}
+              </h3>
+              <p className="mt-1 text-xs font-bold text-slate-400">
+                {formatFileSize(selectedPreview.attachment.file_size)}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={closePhotoPreview}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white"
+              aria-label="Fotoğrafı kapat"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="flex min-h-0 flex-1 items-center justify-center px-3 py-4">
+            <img
+              src={selectedPreview.objectUrl}
+              alt={selectedPreview.attachment.file_name}
+              className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl shadow-black/40"
+            />
+          </div>
+
+          <div className="border-t border-white/10 bg-slate-950/95 px-4 pb-5 pt-4">
+            <button
+              type="button"
+              onClick={closePhotoPreview}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 active:scale-[0.99]"
+            >
+              <ArrowLeft size={18} />
+              Detaya dön
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

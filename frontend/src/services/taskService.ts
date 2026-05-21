@@ -45,6 +45,11 @@ type TaskAttachmentListResponse = {
   total_count: number
 }
 
+type DeleteTaskAttachmentResponse = {
+  attachment_id: number
+  message: string
+}
+
 type UploadTaskAttachmentPayload = {
   file: File
   latitude?: number | null
@@ -136,6 +141,15 @@ export function listTaskAttachments(taskId: number) {
   return apiRequest<TaskAttachmentListResponse>(`/tasks/${taskId}/attachments`, {
     method: "GET",
   })
+}
+
+export function deleteTaskAttachment(taskId: number, attachmentId: number) {
+  return apiRequest<DeleteTaskAttachmentResponse>(
+    `/tasks/${taskId}/attachments/${attachmentId}`,
+    {
+      method: "DELETE",
+    },
+  )
 }
 
 export function getTaskAttachmentFileBlob(taskId: number, attachmentId: number) {

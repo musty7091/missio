@@ -1,5 +1,5 @@
 ﻿import { AlertCircle, BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { LoginScreen } from "./components/auth/LoginScreen"
 import {
   AppStatePanel,
@@ -128,6 +128,7 @@ export default function App() {
   const [isCheckingSession, setIsCheckingSession] = useState(() => Boolean(getAccessToken()))
   const [activeTab, setActiveTab] = useState<AppTab>("tasks")
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
+  const taskDetailHistoryTokenRef = useRef<string | null>(null)
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [tasksErrorMessage, setTasksErrorMessage] = useState<string | null>(null)
@@ -204,6 +205,61 @@ export default function App() {
     return tasks.find((task) => task.id === selectedTaskId) ?? null
   }, [selectedTaskId, tasks])
 
+  function openTaskDetails(task: TodayTask) {
+    const historyToken = `missio-task-detail-${task.id}-${Date.now()}`
+    taskDetailHistoryTokenRef.current = historyToken
+
+    window.history.pushState(
+      {
+        ...(window.history.state ?? {}),
+        missioTaskDetailToken: historyToken,
+      },
+      "",
+      window.location.href,
+    )
+
+    setSelectedTaskId(task.id)
+  }
+
+  function closeTaskDetails() {
+    if (
+      selectedTaskId !== null &&
+      taskDetailHistoryTokenRef.current !== null &&
+      window.history.state?.missioTaskDetailToken === taskDetailHistoryTokenRef.current
+    ) {
+      window.history.back()
+      return
+    }
+
+    taskDetailHistoryTokenRef.current = null
+    setSelectedTaskId(null)
+  }
+
+  useEffect(() => {
+    function handleBrowserBack(event: PopStateEvent) {
+      if (selectedTaskId === null) {
+        return
+      }
+
+      const stillInsideTaskDetail =
+        taskDetailHistoryTokenRef.current !== null &&
+        event.state?.missioTaskDetailToken === taskDetailHistoryTokenRef.current
+
+      if (stillInsideTaskDetail) {
+        return
+      }
+
+      taskDetailHistoryTokenRef.current = null
+      setSelectedTaskId(null)
+    }
+
+    window.addEventListener("popstate", handleBrowserBack)
+
+    return () => {
+      window.removeEventListener("popstate", handleBrowserBack)
+    }
+  }, [selectedTaskId])
+
   const taskStats = useMemo(() => {
     return {
       totalCount: tasks.length,
@@ -225,6 +281,7 @@ export default function App() {
     setCurrentUser(null)
     setTasks([])
     setSelectedTaskId(null)
+    taskDetailHistoryTokenRef.current = null
     setActiveTab("tasks")
   }
 
@@ -365,7 +422,7 @@ export default function App() {
                     key={task.id}
                     task={task}
                     isBusy={busyTaskId === task.id}
-                    onOpenDetails={(task) => setSelectedTaskId(task.id)}
+                    onOpenDetails={openTaskDetails}
                   />
                 ))}
             </section>
@@ -385,7 +442,7 @@ export default function App() {
           <TaskDetailPanel
             task={selectedTask}
             isBusy={busyTaskId === selectedTask.id}
-            onClose={() => setSelectedTaskId(null)}
+            onClose={closeTaskDetails}
             onStartTask={handleStartTask}
             onCompleteTask={handleCompleteTask}
             onUploadPhoto={handleUploadPhoto}
