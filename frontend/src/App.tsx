@@ -248,6 +248,7 @@ export default function App() {
         <AppHeader
           theme={theme}
           displayName={currentUser.full_name}
+          role={currentUser.role}
           onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
           onLogout={handleLogout}
         />
@@ -307,3 +308,4 @@ export default function App() {
     </main>
   )
 }
+

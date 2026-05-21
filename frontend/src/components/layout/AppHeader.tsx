@@ -4,45 +4,104 @@ import type { ThemeMode } from "../../types/task"
 type AppHeaderProps = {
   theme: ThemeMode
   displayName: string
+  role: string
   onToggleTheme: () => void
   onLogout: () => void
 }
 
-export function AppHeader({ theme, displayName, onToggleTheme, onLogout }: AppHeaderProps) {
+function getRoleLabel(role: string) {
+  if (role === "owner") {
+    return "Patron"
+  }
+
+  if (role === "manager") {
+    return "Manager"
+  }
+
+  if (role === "staff") {
+    return "Personel"
+  }
+
+  if (role === "admin") {
+    return "Admin"
+  }
+
+  return role
+}
+
+function MissioMiniLogo() {
   return (
-    <header className="mb-5 flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-[var(--missio-text-muted)]">Missio</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Günaydın {displayName} 👋</h1>
+    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-400/10 shadow-xl shadow-cyan-500/10">
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-300/30 via-blue-500/10 to-transparent" />
+      <div className="relative h-7 w-8">
+        <div className="absolute left-0 top-1 h-6 w-2 rounded-sm bg-cyan-300" />
+        <div className="absolute left-2 top-0 h-7 w-2 rotate-[-38deg] rounded-sm bg-cyan-400" />
+        <div className="absolute right-2 top-0 h-7 w-2 rotate-[38deg] rounded-sm bg-blue-500" />
+        <div className="absolute right-0 top-1 h-6 w-2 rounded-sm bg-blue-600" />
+        <div className="absolute right-[-3px] top-[-6px] h-2.5 w-2.5 rounded-full bg-cyan-300" />
       </div>
+    </div>
+  )
+}
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="relative rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm"
-          aria-label="Bildirimler"
-        >
-          <Bell size={20} />
-          <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[var(--missio-danger)] ring-2 ring-[var(--missio-card-bg)]" />
-        </button>
+export function AppHeader({
+  theme,
+  displayName,
+  role,
+  onToggleTheme,
+  onLogout,
+}: AppHeaderProps) {
+  return (
+    <header className="mb-5 rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <MissioMiniLogo />
 
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm"
-          aria-label="Tema değiştir"
-        >
-          {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
-        </button>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-black leading-none tracking-tight">Missio</p>
+              <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
+                {getRoleLabel(role)}
+              </span>
+            </div>
 
-        <button
-          type="button"
-          onClick={onLogout}
-          className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm"
-          aria-label="Çıkış yap"
-        >
-          <LogOut size={20} />
-        </button>
+            <p className="mt-1 truncate text-sm font-bold text-[var(--missio-text-muted)]">
+              Merhaba, {displayName}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            className="relative rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-[var(--missio-text-muted)] shadow-sm transition active:scale-95"
+            aria-label="Bildirimler"
+            title="Bildirimler"
+          >
+            <Bell size={19} />
+            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[var(--missio-danger)] ring-2 ring-[var(--missio-card-bg)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-[var(--missio-text-main)] shadow-sm transition active:scale-95"
+            aria-label="Tema değiştir"
+            title="Tema değiştir"
+          >
+            {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+          </button>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="rounded-2xl border border-red-200 bg-red-50 p-3 text-red-600 shadow-sm transition active:scale-95 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+            aria-label="Çıkış yap"
+            title="Çıkış yap"
+          >
+            <LogOut size={19} />
+          </button>
+        </div>
       </div>
     </header>
   )
