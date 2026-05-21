@@ -1,8 +1,8 @@
-﻿import { AlertCircle } from "lucide-react"
+﻿import { AlertCircle, BarChart3, Bell, UserRound } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { LoginScreen } from "./components/auth/LoginScreen"
 import { AppHeader } from "./components/layout/AppHeader"
-import { BottomNavigation } from "./components/layout/BottomNavigation"
+import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
@@ -22,6 +22,10 @@ type LocationPayload = {
   latitude?: number | null
   longitude?: number | null
   location_accuracy?: number | null
+}
+
+type ComingSoonPanelProps = {
+  tab: Exclude<AppTab, "tasks">
 }
 
 function getCurrentLocationPayload(): Promise<LocationPayload> {
@@ -59,6 +63,51 @@ async function getLocationPayloadForTask(task: TodayTask): Promise<LocationPaylo
   return getCurrentLocationPayload()
 }
 
+function ComingSoonPanel({ tab }: ComingSoonPanelProps) {
+  const panelInfo = {
+    notifications: {
+      title: "Bildirimler hazırlanıyor",
+      description:
+        "Görev atama, onay, ret ve gün sonu uyarıları burada toplanacak.",
+      icon: Bell,
+    },
+    reports: {
+      title: "Raporlar hazırlanıyor",
+      description:
+        "Günlük görev performansı, eksik işler ve personel özeti bu ekranda gösterilecek.",
+      icon: BarChart3,
+    },
+    profile: {
+      title: "Profil hazırlanıyor",
+      description:
+        "Kullanıcı bilgileri, rol, tema tercihi ve hesap ayarları burada yer alacak.",
+      icon: UserRound,
+    },
+  }[tab]
+
+  const Icon = panelInfo.icon
+
+  return (
+    <section className="flex flex-1 flex-col pb-24">
+      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center shadow-xl shadow-slate-900/5">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+          <Icon size={30} />
+        </div>
+
+        <h2 className="mt-5 text-2xl font-black tracking-tight">{panelInfo.title}</h2>
+
+        <p className="mt-3 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
+          {panelInfo.description}
+        </p>
+
+        <div className="mt-5 rounded-2xl border border-dashed border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-muted)]">
+          Bu ekranı sırayla, temel frontend planına göre geliştireceğiz.
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const savedTheme = window.localStorage.getItem("missio-theme")
@@ -76,6 +125,7 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<UserMeResponse | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(() => Boolean(getAccessToken()))
+  const [activeTab, setActiveTab] = useState<AppTab>("tasks")
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [tasksErrorMessage, setTasksErrorMessage] = useState<string | null>(null)
@@ -159,6 +209,7 @@ export default function App() {
     clearAccessToken()
     setCurrentUser(null)
     setTasks([])
+    setActiveTab("tasks")
   }
 
   async function handleStartTask(task: TodayTask) {
@@ -253,59 +304,66 @@ export default function App() {
           onLogout={handleLogout}
         />
 
-        <TodayOperationSummary
-          totalCount={taskStats.totalCount}
-          completedCount={taskStats.completedCount}
-          activeCount={taskStats.activeCount}
-          waitingCount={taskStats.waitingCount}
-        />
+        {activeTab === "tasks" ? (
+          <>
+            <TodayOperationSummary
+              totalCount={taskStats.totalCount}
+              completedCount={taskStats.completedCount}
+              activeCount={taskStats.activeCount}
+              waitingCount={taskStats.waitingCount}
+            />
 
-        <TaskSectionHeader />
+            <TaskSectionHeader />
 
-        {tasksErrorMessage && (
-          <div className="mb-4 flex items-start gap-3 rounded-[1.5rem] border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-            <AlertCircle className="mt-0.5 shrink-0" size={18} />
-            <p>{tasksErrorMessage}</p>
-          </div>
+            {tasksErrorMessage && (
+              <div className="mb-4 flex items-start gap-3 rounded-[1.5rem] border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                <AlertCircle className="mt-0.5 shrink-0" size={18} />
+                <p>{tasksErrorMessage}</p>
+              </div>
+            )}
+
+            <section className="flex flex-1 flex-col gap-4 pb-24">
+              {isLoadingTasks && (
+                <div className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 shadow-sm">
+                  <p className="text-sm font-bold text-[var(--missio-text-muted)]">
+                    Görevler yükleniyor...
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    <div className="h-4 w-3/4 rounded-full bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-4 w-1/2 rounded-full bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-10 w-full rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                  </div>
+                </div>
+              )}
+
+              {!isLoadingTasks && !tasksErrorMessage && tasks.length === 0 && (
+                <div className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 text-center shadow-sm">
+                  <p className="text-lg font-black">Bugün atanmış görev yok.</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--missio-text-muted)]">
+                    Yeni görev atandığında burada görünecek.
+                  </p>
+                </div>
+              )}
+
+              {!isLoadingTasks &&
+                tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    isBusy={busyTaskId === task.id}
+                    onStartTask={handleStartTask}
+                    onCompleteTask={handleCompleteTask}
+                    onUploadPhoto={handleUploadPhoto}
+                  />
+                ))}
+            </section>
+          </>
+        ) : (
+          <ComingSoonPanel tab={activeTab} />
         )}
 
-        <section className="flex flex-1 flex-col gap-4 pb-24">
-          {isLoadingTasks && (
-            <div className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 shadow-sm">
-              <p className="text-sm font-bold text-[var(--missio-text-muted)]">Görevler yükleniyor...</p>
-              <div className="mt-4 space-y-3">
-                <div className="h-4 w-3/4 rounded-full bg-slate-200 dark:bg-slate-800" />
-                <div className="h-4 w-1/2 rounded-full bg-slate-200 dark:bg-slate-800" />
-                <div className="h-10 w-full rounded-2xl bg-slate-200 dark:bg-slate-800" />
-              </div>
-            </div>
-          )}
-
-          {!isLoadingTasks && !tasksErrorMessage && tasks.length === 0 && (
-            <div className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 text-center shadow-sm">
-              <p className="text-lg font-black">Bugün atanmış görev yok.</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--missio-text-muted)]">
-                Yeni görev atandığında burada görünecek.
-              </p>
-            </div>
-          )}
-
-          {!isLoadingTasks &&
-            tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                isBusy={busyTaskId === task.id}
-                onStartTask={handleStartTask}
-                onCompleteTask={handleCompleteTask}
-                onUploadPhoto={handleUploadPhoto}
-              />
-            ))}
-        </section>
-
-        <BottomNavigation />
+        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       </section>
     </main>
   )
 }
-

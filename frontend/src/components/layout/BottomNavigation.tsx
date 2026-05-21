@@ -1,47 +1,71 @@
 ﻿import { BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
 
-const navigationItems = [
+export type AppTab = "tasks" | "notifications" | "reports" | "profile"
+
+type NavigationItem = {
+  id: AppTab
+  label: string
+  shortLabel: string
+  icon: typeof ClipboardCheck
+}
+
+type BottomNavigationProps = {
+  activeTab: AppTab
+  onTabChange: (tab: AppTab) => void
+}
+
+const navigationItems: NavigationItem[] = [
   {
+    id: "tasks",
     label: "Görevler",
+    shortLabel: "Görev",
     icon: ClipboardCheck,
-    isActive: true,
   },
   {
-    label: "Bildirim",
+    id: "notifications",
+    label: "Bildirimler",
+    shortLabel: "Bildirim",
     icon: Bell,
-    isActive: false,
   },
   {
-    label: "Rapor",
+    id: "reports",
+    label: "Raporlar",
+    shortLabel: "Rapor",
     icon: BarChart3,
-    isActive: false,
   },
   {
+    id: "profile",
     label: "Profil",
+    shortLabel: "Profil",
     icon: UserRound,
-    isActive: false,
   },
 ]
 
-export function BottomNavigation() {
+export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
   return (
-    <nav className="sticky bottom-4 z-20 mt-auto rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)]/95 p-2 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:shadow-black/30">
+    <nav
+      className="sticky bottom-3 z-20 mt-auto rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)]/95 p-2 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:shadow-black/30"
+      aria-label="Alt navigasyon"
+    >
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
           const Icon = item.icon
+          const isActive = item.id === activeTab
 
           return (
             <button
-              key={item.label}
+              key={item.id}
               type="button"
+              onClick={() => onTabChange(item.id)}
+              aria-current={isActive ? "page" : undefined}
               className={
-                item.isActive
-                  ? "flex flex-col items-center justify-center gap-1 rounded-3xl bg-[var(--missio-primary)] px-2 py-3 text-xs font-bold text-white shadow-lg shadow-teal-500/20"
-                  : "flex flex-col items-center justify-center gap-1 rounded-3xl px-2 py-3 text-xs font-bold text-[var(--missio-text-muted)]"
+                isActive
+                  ? "flex min-h-[4.15rem] flex-col items-center justify-center gap-1 rounded-3xl bg-[var(--missio-primary)] px-2 py-3 text-xs font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95"
+                  : "flex min-h-[4.15rem] flex-col items-center justify-center gap-1 rounded-3xl px-2 py-3 text-xs font-black text-[var(--missio-text-muted)] transition active:scale-95"
               }
             >
               <Icon size={20} />
-              <span>{item.label}</span>
+              <span className="leading-none">{item.shortLabel}</span>
             </button>
           )
         })}
