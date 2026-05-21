@@ -1,10 +1,16 @@
-﻿import { AlertCircle, BarChart3, Bell, UserRound } from "lucide-react"
+﻿import { AlertCircle, BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { LoginScreen } from "./components/auth/LoginScreen"
+import {
+  AppStatePanel,
+  FullScreenStatus,
+  TaskLoadingSkeleton,
+} from "./components/common/AppStatePanel"
 import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
+import { ProfilePanel } from "./components/profile/ProfilePanel"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { getCurrentUser } from "./services/authService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
@@ -66,18 +72,21 @@ async function getLocationPayloadForTask(task: TodayTask): Promise<LocationPaylo
 function ComingSoonPanel({ tab }: ComingSoonPanelProps) {
   const panelInfo = {
     notifications: {
+      eyebrow: "Bildirim merkezi",
       title: "Bildirimler hazırlanıyor",
       description:
         "Görev atama, onay, ret ve gün sonu uyarıları burada toplanacak.",
       icon: Bell,
     },
     reports: {
+      eyebrow: "Operasyon raporları",
       title: "Raporlar hazırlanıyor",
       description:
         "Günlük görev performansı, eksik işler ve personel özeti bu ekranda gösterilecek.",
       icon: BarChart3,
     },
     profile: {
+      eyebrow: "Kullanıcı profili",
       title: "Profil hazırlanıyor",
       description:
         "Kullanıcı bilgileri, rol, tema tercihi ve hesap ayarları burada yer alacak.",
@@ -89,21 +98,12 @@ function ComingSoonPanel({ tab }: ComingSoonPanelProps) {
 
   return (
     <section className="flex flex-1 flex-col pb-24">
-      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center shadow-xl shadow-slate-900/5">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-          <Icon size={30} />
-        </div>
-
-        <h2 className="mt-5 text-2xl font-black tracking-tight">{panelInfo.title}</h2>
-
-        <p className="mt-3 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-          {panelInfo.description}
-        </p>
-
-        <div className="mt-5 rounded-2xl border border-dashed border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-muted)]">
-          Bu ekranı sırayla, temel frontend planına göre geliştireceğiz.
-        </div>
-      </div>
+      <AppStatePanel
+        icon={<Icon size={30} />}
+        eyebrow={panelInfo.eyebrow}
+        title={panelInfo.title}
+        description={panelInfo.description}
+      />
     </section>
   )
 }
@@ -274,12 +274,10 @@ export default function App() {
 
   if (isCheckingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--missio-page-bg)] px-4 text-[var(--missio-text-main)]">
-        <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center shadow-xl shadow-slate-900/5">
-          <p className="text-sm font-bold text-[var(--missio-text-muted)]">Missio hazırlanıyor...</p>
-          <h1 className="mt-2 text-2xl font-black">Oturum kontrol ediliyor</h1>
-        </div>
-      </main>
+      <FullScreenStatus
+        title="Missio hazırlanıyor"
+        description="Oturum bilgilerin kontrol ediliyor."
+      />
     )
   }
 
@@ -315,37 +313,32 @@ export default function App() {
 
             <TaskSectionHeader />
 
-            {tasksErrorMessage && (
-              <div className="mb-4 flex items-start gap-3 rounded-[1.5rem] border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-                <AlertCircle className="mt-0.5 shrink-0" size={18} />
-                <p>{tasksErrorMessage}</p>
-              </div>
-            )}
-
             <section className="flex flex-1 flex-col gap-4 pb-24">
-              {isLoadingTasks && (
-                <div className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 shadow-sm">
-                  <p className="text-sm font-bold text-[var(--missio-text-muted)]">
-                    Görevler yükleniyor...
-                  </p>
-                  <div className="mt-4 space-y-3">
-                    <div className="h-4 w-3/4 rounded-full bg-slate-200 dark:bg-slate-800" />
-                    <div className="h-4 w-1/2 rounded-full bg-slate-200 dark:bg-slate-800" />
-                    <div className="h-10 w-full rounded-2xl bg-slate-200 dark:bg-slate-800" />
-                  </div>
-                </div>
+              {isLoadingTasks && <TaskLoadingSkeleton />}
+
+              {!isLoadingTasks && tasksErrorMessage && (
+                <AppStatePanel
+                  icon={<AlertCircle size={30} />}
+                  eyebrow="Görev ekranı"
+                  title="Görevler alınamadı"
+                  description={tasksErrorMessage}
+                  tone="error"
+                  actionLabel="Tekrar dene"
+                  onAction={() => void loadTodayTasks()}
+                />
               )}
 
               {!isLoadingTasks && !tasksErrorMessage && tasks.length === 0 && (
-                <div className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 text-center shadow-sm">
-                  <p className="text-lg font-black">Bugün atanmış görev yok.</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--missio-text-muted)]">
-                    Yeni görev atandığında burada görünecek.
-                  </p>
-                </div>
+                <AppStatePanel
+                  icon={<ClipboardCheck size={30} />}
+                  eyebrow="Bugünün görevleri"
+                  title="Bugün atanmış görev yok"
+                  description="Yeni görev atandığında burada görünecek."
+                />
               )}
 
               {!isLoadingTasks &&
+                !tasksErrorMessage &&
                 tasks.map((task) => (
                   <TaskCard
                     key={task.id}
@@ -358,6 +351,13 @@ export default function App() {
                 ))}
             </section>
           </>
+        ) : activeTab === "profile" ? (
+          <ProfilePanel
+            user={currentUser}
+            theme={theme}
+            onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+            onLogout={handleLogout}
+          />
         ) : (
           <ComingSoonPanel tab={activeTab} />
         )}
@@ -367,3 +367,4 @@ export default function App() {
     </main>
   )
 }
+
