@@ -24,14 +24,15 @@ import {
   type TaskAttachment,
 } from "../../services/taskService"
 import type { TodayTask } from "../../types/task"
+import { TaskEventTimeline } from "./TaskEventTimeline"
 import { getActionLabel, getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
 
 type TaskDetailPanelProps = {
   task: TodayTask
   isBusy: boolean
   onClose: () => void
-  onStartTask: (task: TodayTask) => void
-  onCompleteTask: (task: TodayTask) => void
+  onStartTask: (task: TodayTask) => Promise<void>
+  onCompleteTask: (task: TodayTask) => Promise<void>
   onUploadPhoto: (task: TodayTask, file: File) => Promise<void>
 }
 
@@ -178,6 +179,7 @@ export function TaskDetailPanel({
   const [attachmentErrorMessage, setAttachmentErrorMessage] = useState<string | null>(null)
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null)
   const [selectedPreview, setSelectedPreview] = useState<AttachmentPreview | null>(null)
+  const [timelineRefreshVersion, setTimelineRefreshVersion] = useState(0)
 
   const canUseMainAction =
     task.status === "assigned" || task.status === "in_progress" || task.status === "rejected"
@@ -299,14 +301,16 @@ export function TaskDetailPanel({
     }
   }, [selectedPreview])
 
-  function handleMainAction() {
+  async function handleMainAction() {
     if (task.status === "assigned") {
-      onStartTask(task)
+      await onStartTask(task)
+      setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
       return
     }
 
     if (task.status === "in_progress" || task.status === "rejected") {
-      onCompleteTask(task)
+      await onCompleteTask(task)
+      setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
     }
   }
 
@@ -320,6 +324,7 @@ export function TaskDetailPanel({
     try {
       await onUploadPhoto(task, file)
       await loadAttachments()
+      setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
     } finally {
       event.target.value = ""
     }
@@ -338,6 +343,7 @@ export function TaskDetailPanel({
     try {
       await deleteTaskAttachment(task.id, attachmentId)
       await loadAttachments()
+      setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
     } catch (error) {
       if (error instanceof Error) {
         setAttachmentErrorMessage(error.message)
@@ -577,6 +583,8 @@ export function TaskDetailPanel({
             </div>
           )}
 
+          <TaskEventTimeline taskId={task.id} refreshVersion={timelineRefreshVersion} />
+
           <div className="sticky bottom-0 -mx-4 mt-5 border-t border-[var(--missio-border)] bg-[var(--missio-card-bg)]/95 px-4 pb-1 pt-4 backdrop-blur-xl">
             <button
               type="button"
@@ -688,3 +696,4 @@ export function TaskDetailPanel({
     </div>
   )
 }
+

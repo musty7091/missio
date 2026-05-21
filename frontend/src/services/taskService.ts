@@ -35,6 +35,23 @@ export type TaskAttachment = {
   created_at_utc: string
 }
 
+export type TaskEvent = {
+  id: number
+  business_id: number
+  task_id: number
+  user_id: number | null
+  event_type: string
+  old_status: string | null
+  new_status: string | null
+  note: string | null
+  latitude: number | null
+  longitude: number | null
+  location_accuracy: number | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at_utc: string
+}
+
 type UploadTaskAttachmentResponse = {
   attachment: TaskAttachment
   message: string
@@ -48,6 +65,11 @@ type TaskAttachmentListResponse = {
 type DeleteTaskAttachmentResponse = {
   attachment_id: number
   message: string
+}
+
+type TaskEventListResponse = {
+  events: TaskEvent[]
+  total_count: number
 }
 
 type UploadTaskAttachmentPayload = {
@@ -150,6 +172,12 @@ export function deleteTaskAttachment(taskId: number, attachmentId: number) {
       method: "DELETE",
     },
   )
+}
+
+export function listTaskEvents(taskId: number) {
+  return apiRequest<TaskEventListResponse>(`/tasks/${taskId}/events`, {
+    method: "GET",
+  })
 }
 
 export function getTaskAttachmentFileBlob(taskId: number, attachmentId: number) {

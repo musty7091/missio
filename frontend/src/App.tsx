@@ -11,7 +11,8 @@ import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigat
 import { ProfilePanel } from "./components/profile/ProfilePanel"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
-import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
+import { TaskFilterTabs, type TaskListFilter } from "./components/tasks/TaskFilterTabs"
+import { TaskGroupHeader } from "./components/tasks/TaskGroupHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { getCurrentUser } from "./services/authService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
@@ -129,6 +130,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("tasks")
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
   const taskDetailHistoryTokenRef = useRef<string | null>(null)
+  const [taskListFilter, setTaskListFilter] = useState<TaskListFilter>("all")
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [tasksErrorMessage, setTasksErrorMessage] = useState<string | null>(null)
@@ -198,7 +200,7 @@ export default function App() {
   }, [currentUser])
 
   const selectedTask = useMemo(() => {
-    if (!selectedTaskId) {
+    if (selectedTaskId === null) {
       return null
     }
 
@@ -271,10 +273,32 @@ export default function App() {
       remainingCount: tasks.filter(
         (task) => task.status !== "completed" && task.status !== "approved",
       ).length,
-      routineCount: tasks.filter((task) => task.taskType === "routine").length,
-      extraCount: tasks.filter((task) => task.taskType === "extra").length,
     }
   }, [tasks])
+
+  const filteredTasks = useMemo(() => {
+    if (taskListFilter === "waiting") {
+      return tasks.filter((task) => task.status === "assigned")
+    }
+
+    if (taskListFilter === "active") {
+      return tasks.filter((task) => task.status === "in_progress")
+    }
+
+    if (taskListFilter === "completed") {
+      return tasks.filter((task) => task.status === "completed" || task.status === "approved")
+    }
+
+    return tasks
+  }, [taskListFilter, tasks])
+
+  const routineFilteredTasks = useMemo(() => {
+    return filteredTasks.filter((task) => task.taskType === "routine")
+  }, [filteredTasks])
+
+  const extraFilteredTasks = useMemo(() => {
+    return filteredTasks.filter((task) => task.taskType === "extra")
+  }, [filteredTasks])
 
   function handleLogout() {
     clearAccessToken()
@@ -282,6 +306,7 @@ export default function App() {
     setTasks([])
     setSelectedTaskId(null)
     taskDetailHistoryTokenRef.current = null
+    setTaskListFilter("all")
     setActiveTab("tasks")
   }
 
@@ -385,11 +410,13 @@ export default function App() {
               remainingCount={taskStats.remainingCount}
             />
 
-            <TaskSectionHeader
-              totalCount={taskStats.totalCount}
-              routineCount={taskStats.routineCount}
-              extraCount={taskStats.extraCount}
-            />
+            {tasks.length > 0 && (
+              <TaskFilterTabs
+                activeFilter={taskListFilter}
+                tasks={tasks}
+                onFilterChange={setTaskListFilter}
+              />
+            )}
 
             <section className="flex flex-1 flex-col gap-2.5 pb-24">
               {isLoadingTasks && <TaskLoadingSkeleton />}
@@ -417,14 +444,49 @@ export default function App() {
 
               {!isLoadingTasks &&
                 !tasksErrorMessage &&
-                tasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    isBusy={busyTaskId === task.id}
-                    onOpenDetails={openTaskDetails}
+                tasks.length > 0 &&
+                filteredTasks.length === 0 && (
+                  <AppStatePanel
+                    icon={<ClipboardCheck size={30} />}
+                    eyebrow="Görev filtresi"
+                    title="Bu filtrede görev yok"
+                    description="Başka bir filtre seçerek diğer görevleri görüntüleyebilirsin."
                   />
-                ))}
+                )}
+
+              {!isLoadingTasks &&
+                !tasksErrorMessage &&
+                routineFilteredTasks.length > 0 && (
+                  <>
+                    <TaskGroupHeader type="routine" count={routineFilteredTasks.length} />
+
+                    {routineFilteredTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        isBusy={busyTaskId === task.id}
+                        onOpenDetails={openTaskDetails}
+                      />
+                    ))}
+                  </>
+                )}
+
+              {!isLoadingTasks &&
+                !tasksErrorMessage &&
+                extraFilteredTasks.length > 0 && (
+                  <>
+                    <TaskGroupHeader type="extra" count={extraFilteredTasks.length} />
+
+                    {extraFilteredTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        isBusy={busyTaskId === task.id}
+                        onOpenDetails={openTaskDetails}
+                      />
+                    ))}
+                  </>
+                )}
             </section>
           </>
         ) : activeTab === "profile" ? (
@@ -454,4 +516,3 @@ export default function App() {
     </main>
   )
 }
-
