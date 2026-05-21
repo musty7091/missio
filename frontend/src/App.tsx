@@ -8,9 +8,10 @@ import {
 } from "./components/common/AppStatePanel"
 import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
-import { TaskCard } from "./components/tasks/TaskCard"
-import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
+import { TaskCard } from "./components/tasks/TaskCard"
+import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
+import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { getCurrentUser } from "./services/authService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
@@ -126,6 +127,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserMeResponse | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(() => Boolean(getAccessToken()))
   const [activeTab, setActiveTab] = useState<AppTab>("tasks")
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [tasksErrorMessage, setTasksErrorMessage] = useState<string | null>(null)
@@ -194,6 +196,14 @@ export default function App() {
     void loadTodayTasks()
   }, [currentUser])
 
+  const selectedTask = useMemo(() => {
+    if (!selectedTaskId) {
+      return null
+    }
+
+    return tasks.find((task) => task.id === selectedTaskId) ?? null
+  }, [selectedTaskId, tasks])
+
   const taskStats = useMemo(() => {
     return {
       totalCount: tasks.length,
@@ -202,6 +212,11 @@ export default function App() {
       ).length,
       waitingCount: tasks.filter((task) => task.status === "assigned").length,
       activeCount: tasks.filter((task) => task.status === "in_progress").length,
+      remainingCount: tasks.filter(
+        (task) => task.status !== "completed" && task.status !== "approved",
+      ).length,
+      routineCount: tasks.filter((task) => task.taskType === "routine").length,
+      extraCount: tasks.filter((task) => task.taskType === "extra").length,
     }
   }, [tasks])
 
@@ -209,6 +224,7 @@ export default function App() {
     clearAccessToken()
     setCurrentUser(null)
     setTasks([])
+    setSelectedTaskId(null)
     setActiveTab("tasks")
   }
 
@@ -309,11 +325,16 @@ export default function App() {
               completedCount={taskStats.completedCount}
               activeCount={taskStats.activeCount}
               waitingCount={taskStats.waitingCount}
+              remainingCount={taskStats.remainingCount}
             />
 
-            <TaskSectionHeader />
+            <TaskSectionHeader
+              totalCount={taskStats.totalCount}
+              routineCount={taskStats.routineCount}
+              extraCount={taskStats.extraCount}
+            />
 
-            <section className="flex flex-1 flex-col gap-4 pb-24">
+            <section className="flex flex-1 flex-col gap-2.5 pb-24">
               {isLoadingTasks && <TaskLoadingSkeleton />}
 
               {!isLoadingTasks && tasksErrorMessage && (
@@ -344,9 +365,7 @@ export default function App() {
                     key={task.id}
                     task={task}
                     isBusy={busyTaskId === task.id}
-                    onStartTask={handleStartTask}
-                    onCompleteTask={handleCompleteTask}
-                    onUploadPhoto={handleUploadPhoto}
+                    onOpenDetails={(task) => setSelectedTaskId(task.id)}
                   />
                 ))}
             </section>
@@ -360,6 +379,17 @@ export default function App() {
           />
         ) : (
           <ComingSoonPanel tab={activeTab} />
+        )}
+
+        {selectedTask && (
+          <TaskDetailPanel
+            task={selectedTask}
+            isBusy={busyTaskId === selectedTask.id}
+            onClose={() => setSelectedTaskId(null)}
+            onStartTask={handleStartTask}
+            onCompleteTask={handleCompleteTask}
+            onUploadPhoto={handleUploadPhoto}
+          />
         )}
 
         <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />

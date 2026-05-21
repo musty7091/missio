@@ -1,139 +1,98 @@
-﻿import { Camera, CheckCircle2, Clock3, MapPin, PlayCircle } from "lucide-react"
-import { useRef } from "react"
+﻿import {
+  Camera,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  FileCheck2,
+  MapPin,
+  PlayCircle,
+} from "lucide-react"
 import type { TodayTask } from "../../types/task"
-import { getActionLabel, getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
+import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
 
 type TaskCardProps = {
   task: TodayTask
   isBusy: boolean
-  onStartTask: (task: TodayTask) => void
-  onCompleteTask: (task: TodayTask) => void
-  onUploadPhoto: (task: TodayTask, file: File) => void
+  onOpenDetails: (task: TodayTask) => void
 }
 
-export function TaskCard({
-  task,
-  isBusy,
-  onStartTask,
-  onCompleteTask,
-  onUploadPhoto,
-}: TaskCardProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-
-  function handleMainAction() {
-    if (task.status === "assigned") {
-      onStartTask(task)
-      return
-    }
-
-    if (task.status === "in_progress" || task.status === "rejected") {
-      onCompleteTask(task)
-    }
+function getStatusIcon(task: TodayTask) {
+  if (task.status === "completed" || task.status === "approved") {
+    return <CheckCircle2 size={20} />
   }
 
-  function handlePhotoButtonClick() {
-    fileInputRef.current?.click()
+  if (task.status === "in_progress") {
+    return <PlayCircle size={20} />
   }
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
+  return <Clock3 size={20} />
+}
 
-    if (!file) {
-      return
-    }
-
-    onUploadPhoto(task, file)
-    event.target.value = ""
-  }
-
-  const canUseMainAction =
-    task.status === "assigned" || task.status === "in_progress" || task.status === "rejected"
-
+export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
   return (
-    <article className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm transition-colors duration-300">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[var(--missio-primary-soft)] px-3 py-1 text-xs font-bold text-teal-700 dark:text-teal-200">
+    <button
+      type="button"
+      onClick={() => onOpenDetails(task)}
+      disabled={isBusy}
+      className="w-full rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 text-left shadow-sm transition active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+          {getStatusIcon(task)}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
               {getStatusLabel(task.status)}
             </span>
-            <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
-              {getPriorityLabel(task.priority)}
-            </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.65rem] font-black text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {task.taskType === "routine" ? "Rutin" : "Ekstra"}
             </span>
+
+            {task.priority !== "normal" && (
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[0.65rem] font-black text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                {getPriorityLabel(task.priority)}
+              </span>
+            )}
           </div>
 
-          <h3 className="text-base font-bold leading-6">{task.title}</h3>
-          <p className="mt-1 text-sm leading-6 text-[var(--missio-text-muted)]">
-            {task.description}
-          </p>
+          <h3 className="truncate text-sm font-black text-[var(--missio-text-main)]">
+            {task.title}
+          </h3>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.7rem] font-bold text-[var(--missio-text-muted)]">
+            <span className="inline-flex items-center gap-1">
+              <Clock3 size={12} />
+              {task.time}
+            </span>
+
+            {task.requiresPhoto && (
+              <span className="inline-flex items-center gap-1">
+                <Camera size={12} />
+                Fotoğraf
+              </span>
+            )}
+
+            {task.requiresLocation && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin size={12} />
+                Konum
+              </span>
+            )}
+
+            {task.requiresManagerApproval && (
+              <span className="inline-flex items-center gap-1">
+                <FileCheck2 size={12} />
+                Onay
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-100 p-3 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-          {task.status === "completed" || task.status === "approved" ? (
-            <CheckCircle2 size={22} />
-          ) : (
-            <Clock3 size={22} />
-          )}
-        </div>
+        <ChevronRight className="shrink-0 text-[var(--missio-text-muted)]" size={20} />
       </div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--missio-border)] px-3 py-1.5 text-xs font-semibold text-[var(--missio-text-muted)]">
-          <Clock3 size={14} />
-          {task.time}
-        </span>
-
-        {task.requiresPhoto && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--missio-border)] px-3 py-1.5 text-xs font-semibold text-[var(--missio-text-muted)]">
-            <Camera size={14} />
-            Fotoğraf
-          </span>
-        )}
-
-        {task.requiresLocation && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--missio-border)] px-3 py-1.5 text-xs font-semibold text-[var(--missio-text-muted)]">
-            <MapPin size={14} />
-            Konum
-          </span>
-        )}
-      </div>
-
-      <div className="flex gap-3">
-        {task.requiresPhoto && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-
-            <button
-              type="button"
-              onClick={handlePhotoButtonClick}
-              disabled={isBusy}
-              className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] px-4 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Camera size={18} />
-              Fotoğraf
-            </button>
-          </>
-        )}
-
-        <button
-          type="button"
-          onClick={handleMainAction}
-          disabled={!canUseMainAction || isBusy}
-          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-teal-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <PlayCircle size={18} />
-          {isBusy ? "İşleniyor..." : getActionLabel(task.status)}
-        </button>
-      </div>
-    </article>
+    </button>
   )
 }
