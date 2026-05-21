@@ -21,9 +21,17 @@ export class ApiError extends Error {
   }
 }
 
+function resolveApiBaseUrl() {
+  if (API_BASE_URL.startsWith("/")) {
+    return `${window.location.origin}${API_BASE_URL}`
+  }
+
+  return API_BASE_URL.replace(/\/+$/, "")
+}
+
 function buildApiUrl(path: string, query?: Record<string, QueryValue>) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`
-  const url = new URL(`${API_BASE_URL}${normalizedPath}`)
+  const url = new URL(`${resolveApiBaseUrl()}${normalizedPath}`)
 
   if (query) {
     Object.entries(query).forEach(([key, value]) => {

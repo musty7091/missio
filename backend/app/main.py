@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
@@ -26,12 +26,27 @@ def create_app() -> FastAPI:
     app.middleware("http")(add_security_headers)
     app.middleware("http")(add_rate_limit)
 
+    local_development_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175",
+    ]
+
+    local_network_origin_regex = (
+        r"^http://("
+        r"192\.168\.\d{1,3}\.\d{1,3}|"
+        r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+        r"172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+        r"):(5173|5174|5175)$"
+    )
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        ],
+        allow_origins=[] if is_production else local_development_origins,
+        allow_origin_regex=None if is_production else local_network_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

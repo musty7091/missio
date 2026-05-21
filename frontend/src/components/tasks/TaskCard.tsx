@@ -18,7 +18,6 @@ export function TaskCard({ task, isBusy, onStartTask, onCompleteTask }: TaskCard
 
     if (task.status === "in_progress" || task.status === "rejected") {
       onCompleteTask(task.id)
-      return
     }
   }
 
