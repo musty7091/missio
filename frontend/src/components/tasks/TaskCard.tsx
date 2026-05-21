@@ -1,24 +1,49 @@
 ﻿import { Camera, CheckCircle2, Clock3, MapPin, PlayCircle } from "lucide-react"
+import { useRef } from "react"
 import type { TodayTask } from "../../types/task"
 import { getActionLabel, getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
 
 type TaskCardProps = {
   task: TodayTask
   isBusy: boolean
-  onStartTask: (taskId: number) => void
-  onCompleteTask: (taskId: number) => void
+  onStartTask: (task: TodayTask) => void
+  onCompleteTask: (task: TodayTask) => void
+  onUploadPhoto: (task: TodayTask, file: File) => void
 }
 
-export function TaskCard({ task, isBusy, onStartTask, onCompleteTask }: TaskCardProps) {
+export function TaskCard({
+  task,
+  isBusy,
+  onStartTask,
+  onCompleteTask,
+  onUploadPhoto,
+}: TaskCardProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
   function handleMainAction() {
     if (task.status === "assigned") {
-      onStartTask(task.id)
+      onStartTask(task)
       return
     }
 
     if (task.status === "in_progress" || task.status === "rejected") {
-      onCompleteTask(task.id)
+      onCompleteTask(task)
     }
+  }
+
+  function handlePhotoButtonClick() {
+    fileInputRef.current?.click()
+  }
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    onUploadPhoto(task, file)
+    event.target.value = ""
   }
 
   const canUseMainAction =
@@ -78,13 +103,25 @@ export function TaskCard({ task, isBusy, onStartTask, onCompleteTask }: TaskCard
 
       <div className="flex gap-3">
         {task.requiresPhoto && (
-          <button
-            type="button"
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] px-4 py-3 text-sm font-bold"
-          >
-            <Camera size={18} />
-            Fotoğraf
-          </button>
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            <button
+              type="button"
+              onClick={handlePhotoButtonClick}
+              disabled={isBusy}
+              className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] px-4 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Camera size={18} />
+              Fotoğraf
+            </button>
+          </>
         )}
 
         <button

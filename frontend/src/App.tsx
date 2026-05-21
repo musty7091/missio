@@ -8,10 +8,56 @@ import { TaskSectionHeader } from "./components/tasks/TaskSectionHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { getCurrentUser } from "./services/authService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
-import { completeTask, getMyTodayTasks, startTask } from "./services/taskService"
+import {
+  completeTask,
+  getMyTodayTasks,
+  startTask,
+  uploadTaskAttachment,
+} from "./services/taskService"
 import type { UserMeResponse } from "./types/auth"
 import type { ThemeMode, TodayTask } from "./types/task"
 import { mapMyTodayTasksResponseToTodayTasks } from "./utils/apiTaskMapper"
+
+type LocationPayload = {
+  latitude?: number | null
+  longitude?: number | null
+  location_accuracy?: number | null
+}
+
+function getCurrentLocationPayload(): Promise<LocationPayload> {
+  return new Promise((resolve, reject) => {
+    if (!("geolocation" in navigator)) {
+      reject(new Error("Bu cihazda konum desteği bulunamadı."))
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          location_accuracy: position.coords.accuracy,
+        })
+      },
+      () => {
+        reject(new Error("Konum izni alınamadı. Lütfen tarayıcı konum iznini kontrol edin."))
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 30000,
+      },
+    )
+  })
+}
+
+async function getLocationPayloadForTask(task: TodayTask): Promise<LocationPayload> {
+  if (!task.requiresLocation) {
+    return {}
+  }
+
+  return getCurrentLocationPayload()
+}
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -115,12 +161,13 @@ export default function App() {
     setTasks([])
   }
 
-  async function handleStartTask(taskId: number) {
-    setBusyTaskId(taskId)
+  async function handleStartTask(task: TodayTask) {
+    setBusyTaskId(task.id)
     setTasksErrorMessage(null)
 
     try {
-      await startTask(taskId)
+      const locationPayload = await getLocationPayloadForTask(task)
+      await startTask(task.id, locationPayload)
       await loadTodayTasks()
     } catch (error) {
       if (error instanceof Error) {
@@ -133,18 +180,41 @@ export default function App() {
     }
   }
 
-  async function handleCompleteTask(taskId: number) {
-    setBusyTaskId(taskId)
+  async function handleCompleteTask(task: TodayTask) {
+    setBusyTaskId(task.id)
     setTasksErrorMessage(null)
 
     try {
-      await completeTask(taskId)
+      const locationPayload = await getLocationPayloadForTask(task)
+      await completeTask(task.id, locationPayload)
       await loadTodayTasks()
     } catch (error) {
       if (error instanceof Error) {
         setTasksErrorMessage(error.message)
       } else {
         setTasksErrorMessage("Görev tamamlanamadı.")
+      }
+    } finally {
+      setBusyTaskId(null)
+    }
+  }
+
+  async function handleUploadPhoto(task: TodayTask, file: File) {
+    setBusyTaskId(task.id)
+    setTasksErrorMessage(null)
+
+    try {
+      const locationPayload = task.requiresLocation ? await getCurrentLocationPayload() : {}
+      await uploadTaskAttachment(task.id, {
+        file,
+        ...locationPayload,
+      })
+      await loadTodayTasks()
+    } catch (error) {
+      if (error instanceof Error) {
+        setTasksErrorMessage(error.message)
+      } else {
+        setTasksErrorMessage("Fotoğraf yüklenemedi.")
       }
     } finally {
       setBusyTaskId(null)
@@ -227,6 +297,7 @@ export default function App() {
                 isBusy={busyTaskId === task.id}
                 onStartTask={handleStartTask}
                 onCompleteTask={handleCompleteTask}
+                onUploadPhoto={handleUploadPhoto}
               />
             ))}
         </section>
