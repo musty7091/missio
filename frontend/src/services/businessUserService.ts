@@ -1,4 +1,4 @@
-﻿import { apiRequest } from "./httpClient"
+import { apiRequest } from "./httpClient"
 
 export type BusinessUser = {
   id: number

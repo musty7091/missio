@@ -1,4 +1,4 @@
-﻿import type { ApiTask } from "../types/apiTask"
+import type { ApiTask } from "../types/apiTask"
 import type { TodayTask } from "../types/task"
 
 function formatTaskTime(task: ApiTask) {

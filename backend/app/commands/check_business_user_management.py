@@ -239,7 +239,7 @@ def main() -> None:
             full_name="Super Admin Created Business Owner",
             username=SUPER_ADMIN_CREATED_BUSINESS_OWNER_USERNAME,
             password=TEST_PASSWORD,
-            role="business_owner",
+            role="boss",
             email="admin.created.business.owner@example.com",
             ip_address="127.0.0.1",
             user_agent="Missio business user management check",
@@ -313,7 +313,7 @@ def main() -> None:
             (super_admin_created_boss, "boss", SUPER_ADMIN_CREATED_BOSS_USERNAME),
             (
                 super_admin_created_business_owner,
-                "business_owner",
+                "boss",
                 SUPER_ADMIN_CREATED_BUSINESS_OWNER_USERNAME,
             ),
             (

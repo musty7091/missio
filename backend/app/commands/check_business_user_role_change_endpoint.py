@@ -537,7 +537,7 @@ def main() -> None:
 
         if boss_target_role_change_response.status_code != 403:
             raise RuntimeError(
-                "Boss/business_owner hedef kullanıcının rolü bu endpoint ile "
+                "Patron hedef kullanıcının rolü bu endpoint ile "
                 "değiştirilememeli ve 403 dönmeliydi. "
                 f"Gelen HTTP {boss_target_role_change_response.status_code}: "
                 f"{boss_target_role_change_response.text}"

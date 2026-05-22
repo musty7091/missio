@@ -1,1 +1,1 @@
-﻿"""Core package for Missio backend."""
+"""Core package for Missio backend."""

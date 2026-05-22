@@ -1,4 +1,4 @@
-﻿export type ApiTaskType = "routine" | "extra"
+export type ApiTaskType = "routine" | "extra"
 
 export type ApiTaskStatus =
   | "assigned"

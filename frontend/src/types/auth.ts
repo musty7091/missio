@@ -1,4 +1,4 @@
-﻿export type LoginRequest = {
+export type LoginRequest = {
   business_slug?: string | null
   username: string
   password: string

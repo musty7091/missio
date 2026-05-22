@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.db.base import Base
 
 
-BASELINE_REVISION = "7f15391ac7c5"
+CURRENT_SCHEMA_REVISION = "b4f1c9d8a2e3"
 
 
 def resolve_sqlite_database_path() -> Path:
@@ -102,7 +102,7 @@ def create_fresh_database(database_path: Path) -> None:
                 "INSERT INTO alembic_version (version_num) "
                 "VALUES (:version_num)"
             ),
-            {"version_num": BASELINE_REVISION},
+            {"version_num": CURRENT_SCHEMA_REVISION},
         )
 
     inspector = inspect(engine)
@@ -130,14 +130,14 @@ def create_fresh_database(database_path: Path) -> None:
             text("SELECT version_num FROM alembic_version")
         ).fetchall()
 
-    if revision_rows != [(BASELINE_REVISION,)]:
+    if revision_rows != [(CURRENT_SCHEMA_REVISION,)]:
         raise RuntimeError(
             "Alembic revision kaydı beklenen değerde değil. "
             f"Gelen kayıtlar: {revision_rows}"
         )
 
     print("[OK] Temiz SQLite veritabanı oluşturuldu.")
-    print(f"[OK] Alembic revision yazıldı: {BASELINE_REVISION}")
+    print(f"[OK] Alembic current schema revision yazıldı: {CURRENT_SCHEMA_REVISION}")
 
 
 def main() -> None:

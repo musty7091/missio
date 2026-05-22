@@ -1,4 +1,4 @@
-﻿import { LogOut, Moon, Sun } from "lucide-react"
+import { LogOut, Moon, Sun } from "lucide-react"
 import type { ThemeMode } from "../../types/task"
 
 type AppHeaderProps = {
@@ -10,8 +10,12 @@ type AppHeaderProps = {
 }
 
 function getRoleLabel(role: string) {
-  if (role === "owner" || role === "boss") {
+  if (role === "boss") {
     return "Patron"
+  }
+
+  if (role === "super_admin") {
+    return "Süper Admin"
   }
 
   if (role === "manager") {
@@ -20,10 +24,6 @@ function getRoleLabel(role: string) {
 
   if (role === "staff") {
     return "Personel"
-  }
-
-  if (role === "admin") {
-    return "Admin"
   }
 
   return role
@@ -96,4 +96,3 @@ export function AppHeader({
     </header>
   )
 }
-

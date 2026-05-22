@@ -27,10 +27,10 @@ from app.services.user_management_service import create_business_user
 BUSINESS_NAME = "Missio Demo Market"
 BUSINESS_SLUG = "missio-demo-market"
 
-OWNER_FULL_NAME = "Demo Owner"
-OWNER_USERNAME = "owner"
+OWNER_FULL_NAME = "Demo Patron"
+OWNER_USERNAME = "patron"
 OWNER_PASSWORD = "Missio.2026!"
-OWNER_EMAIL = "owner@missio.local"
+OWNER_EMAIL = "patron@missio.local"
 
 MANAGER_FULL_NAME = "Demo Manager"
 MANAGER_USERNAME = "manager"
@@ -150,7 +150,7 @@ def get_or_create_business_and_owner(
         db.refresh(result.owner_user)
 
         print(f"[OK] Demo işletme oluşturuldu: {result.business.name}")
-        print(f"[OK] Demo owner oluşturuldu: {result.owner_user.username}")
+        print(f"[OK] Demo patron oluşturuldu: {result.owner_user.username}")
 
         return result.business, result.owner_user
 
@@ -177,10 +177,10 @@ def get_or_create_business_and_owner(
         db.commit()
         db.refresh(owner)
 
-        print(f"[OK] Eksik demo owner oluşturuldu: {owner.username}")
+        print(f"[OK] Eksik demo patron oluşturuldu: {owner.username}")
     else:
         print(f"[INFO] Demo işletme zaten var: {business.name}")
-        print(f"[INFO] Demo owner zaten var: {owner.username}")
+        print(f"[INFO] Demo patron zaten var: {owner.username}")
 
     return business, owner
 
@@ -516,7 +516,7 @@ def main() -> None:
         print("")
         print("[OK] Demo görev verisi hazırlandı.")
         print(f"[OK] İşletme: {business.name} | business_id={business.id}")
-        print(f"[OK] Owner: username={owner.username} | password={OWNER_PASSWORD}")
+        print(f"[OK] Patron: username={owner.username} | password={OWNER_PASSWORD}")
         print(f"[OK] Manager: username={manager.username} | password={MANAGER_PASSWORD}")
         print(f"[OK] Staff 1: username={staff.username} | password={STAFF_PASSWORD}")
         print(f"[OK] Staff 2: username={second_staff.username} | password={SECOND_STAFF_PASSWORD}")

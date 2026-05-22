@@ -1,4 +1,4 @@
-﻿import type { TodayTask } from "../../types/task"
+import type { TodayTask } from "../../types/task"
 
 export type TaskListFilter = "all" | "waiting" | "active" | "completed"
 

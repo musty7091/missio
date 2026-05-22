@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadgeCheck,
   Building2,
   Camera,
@@ -37,8 +37,12 @@ type ComingSoonActionCardProps = {
 }
 
 function getRoleLabel(role: string) {
-  if (role === "owner") {
+  if (role === "boss") {
     return "Patron"
+  }
+
+  if (role === "super_admin") {
+    return "Süper Admin"
   }
 
   if (role === "manager") {
@@ -47,10 +51,6 @@ function getRoleLabel(role: string) {
 
   if (role === "staff") {
     return "Personel"
-  }
-
-  if (role === "admin") {
-    return "Admin"
   }
 
   return role

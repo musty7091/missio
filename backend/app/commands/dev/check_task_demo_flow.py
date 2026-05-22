@@ -17,7 +17,7 @@ from app.services.task_service import (
 
 BUSINESS_SLUG = "missio-demo-market"
 
-OWNER_USERNAME = "owner"
+OWNER_USERNAME = "patron"
 MANAGER_USERNAME = "manager"
 STAFF_USERNAME = "ahmet"
 SECOND_STAFF_USERNAME = "ali"

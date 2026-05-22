@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--role",
         required=True,
-        choices=["boss", "business_owner", "manager", "staff"],
+        choices=["boss", "manager", "staff"],
     )
     parser.add_argument("--password", required=False)
     parser.add_argument("--yes", action="store_true")

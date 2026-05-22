@@ -1,4 +1,4 @@
-﻿import { ACCESS_TOKEN_STORAGE_KEY } from "../config/api"
+import { ACCESS_TOKEN_STORAGE_KEY } from "../config/api"
 
 export function getAccessToken() {
   return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)

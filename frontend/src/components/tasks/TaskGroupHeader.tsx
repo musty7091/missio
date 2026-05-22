@@ -1,4 +1,4 @@
-﻿import { CalendarCheck2, Sparkles } from "lucide-react"
+import { CalendarCheck2, Sparkles } from "lucide-react"
 
 type TaskGroupHeaderProps = {
   type: "routine" | "extra"

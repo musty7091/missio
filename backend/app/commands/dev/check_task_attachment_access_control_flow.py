@@ -22,7 +22,7 @@ from app.services.task_service import create_extra_task
 
 
 BUSINESS_SLUG = "missio-demo-market"
-OWNER_USERNAME = "owner"
+OWNER_USERNAME = "patron"
 ASSIGNED_STAFF_USERNAME = "ahmet"
 OTHER_STAFF_USERNAME = "ali"
 

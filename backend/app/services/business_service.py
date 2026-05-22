@@ -34,7 +34,6 @@ class InvalidBusinessOwnerRoleError(BusinessServiceError):
 
 ALLOWED_OWNER_ROLES = {
     UserRole.BOSS.value,
-    UserRole.BUSINESS_OWNER.value,
 }
 
 

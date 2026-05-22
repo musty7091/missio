@@ -1,4 +1,4 @@
-﻿import {
+import {
   BarChart3,
   Bell,
   ClipboardCheck,
@@ -40,13 +40,7 @@ function isStaffRole(role: string) {
 }
 
 function isBossRole(role: string) {
-  return (
-    role === "boss" ||
-    role === "business_owner" ||
-    role === "owner" ||
-    role === "super_admin" ||
-    role === "admin"
-  )
+  return role === "boss"
 }
 
 function isNotificationsSeenToday() {

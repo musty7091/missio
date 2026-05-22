@@ -28,25 +28,21 @@ class BusinessUserManagementPermissionError(AccessControlError):
 
 BOSS_LEVEL_ROLES: set[UserRole] = {
     UserRole.BOSS,
-    UserRole.BUSINESS_OWNER,
 }
 
 BUSINESS_ADMIN_ROLES: set[UserRole] = {
     UserRole.SUPER_ADMIN,
     UserRole.BOSS,
-    UserRole.BUSINESS_OWNER,
 }
 
 BUSINESS_USER_MANAGER_ROLES: set[UserRole] = {
     UserRole.SUPER_ADMIN,
     UserRole.BOSS,
-    UserRole.BUSINESS_OWNER,
     UserRole.MANAGER,
 }
 
 BUSINESS_USER_ROLES: set[UserRole] = {
     UserRole.BOSS,
-    UserRole.BUSINESS_OWNER,
     UserRole.MANAGER,
     UserRole.STAFF,
 }
@@ -236,7 +232,7 @@ def ensure_can_create_business_user_role(
             return
 
         raise BusinessUserManagementPermissionError(
-            "Boss sadece manager veya staff kullanıcısı oluşturabilir."
+            "Patron sadece manager veya personel kullanıcısı oluşturabilir."
         )
 
     if is_manager_user(current_user):
@@ -244,7 +240,7 @@ def ensure_can_create_business_user_role(
             return
 
         raise BusinessUserManagementPermissionError(
-            "Manager sadece staff kullanıcısı oluşturabilir."
+            "Manager sadece personel kullanıcısı oluşturabilir."
         )
 
     raise BusinessUserManagementPermissionError(

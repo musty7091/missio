@@ -94,7 +94,7 @@ function getClosureStatusMessage(status: string) {
 }
 
 function canCurrentRoleViewClosureReports(role: string) {
-  return role === "boss" || role === "business_owner" || role === "super_admin"
+  return role === "boss" || role === "super_admin"
 }
 
 function getClosureIssueCount(closure: DailyOperationClosure) {
@@ -614,7 +614,7 @@ function DailyClosureDetailPanel({
 }
 
 function canCurrentRoleCloseDay(role: string) {
-  return role === "manager" || role === "boss" || role === "business_owner"
+  return role === "manager" || role === "boss"
 }
 
 function getLocalTodayDateKey() {
@@ -1307,7 +1307,7 @@ function ManagementReportPanel({
   const roleTitle =
     role === "boss"
       ? "Patron gün sonu raporu"
-      : role === "admin" || role === "super_admin"
+      : role === "super_admin"
         ? "Admin gün sonu raporu"
         : "Yönetici gün sonu raporu"
 

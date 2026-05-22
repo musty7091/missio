@@ -30,7 +30,7 @@ from app.services.task_service import (
 
 
 BUSINESS_SLUG = "missio-demo-market"
-OWNER_USERNAME = "owner"
+OWNER_USERNAME = "patron"
 STAFF_USERNAME = "ahmet"
 
 TASK_TITLE_APPROVE_FLOW = "LIFECYCLE DEMO - Onay akışı"

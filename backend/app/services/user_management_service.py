@@ -23,7 +23,6 @@ class InvalidBusinessUserRoleError(BusinessUserManagementError):
 
 ALLOWED_BUSINESS_USER_ROLES = {
     UserRole.BOSS.value,
-    UserRole.BUSINESS_OWNER.value,
     UserRole.MANAGER.value,
     UserRole.STAFF.value,
 }

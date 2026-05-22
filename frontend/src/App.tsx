@@ -571,7 +571,7 @@ export default function App() {
                 )}
             </section>
           </>
-          ) : currentUser.role === "boss" || currentUser.role === "business_owner" ? (
+          ) : currentUser.role === "boss" ? (
             <BossDashboardPanel
               businessId={currentUser.business_id}
               onOpenApprovals={() => setActiveTab("notifications")}
@@ -599,7 +599,7 @@ export default function App() {
             />
           )
         ) : activeTab === "reports" ? (
-          currentUser.role === "boss" || currentUser.role === "business_owner" ? (
+          currentUser.role === "boss" ? (
             <BossReportsPanel businessId={currentUser.business_id} />
           ) : (
             <ReportsPanel

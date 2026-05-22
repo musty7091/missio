@@ -7,7 +7,6 @@ from app.core.roles import UserRole
 
 ALLOWED_CREATE_BUSINESS_USER_ROLES = {
     UserRole.BOSS.value,
-    UserRole.BUSINESS_OWNER.value,
     UserRole.MANAGER.value,
     UserRole.STAFF.value,
 }

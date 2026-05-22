@@ -1,4 +1,4 @@
-﻿type TaskSectionHeaderProps = {
+type TaskSectionHeaderProps = {
   totalCount: number
   routineCount: number
   extraCount: number

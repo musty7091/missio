@@ -1,1 +1,1 @@
-﻿"""Utility package for Missio backend."""
+"""Utility package for Missio backend."""

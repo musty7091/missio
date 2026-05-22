@@ -15,7 +15,7 @@ from app.repositories.user_repository import normalize_username
 
 
 BUSINESS_SLUG = "missio-demo-market"
-OWNER_USERNAME = "owner"
+OWNER_USERNAME = "patron"
 STAFF_USERNAME = "ahmet"
 
 TASK_TITLE_APPROVE_FLOW = "LIFECYCLE DEMO - Onay akışı"

@@ -147,7 +147,7 @@ def main() -> None:
             full_name="Access Business Owner",
             username="access_business_owner",
             password=TEST_PASSWORD,
-            role="business_owner",
+            role="boss",
             business_id=business.id,
         )
         manager = create_user_with_password(
@@ -294,7 +294,7 @@ def main() -> None:
             "Staff kullanıcı yönetimi reddi başarılı.",
         )
 
-        for target_role in ["boss", "business_owner", "manager", "staff"]:
+        for target_role in ["boss", "manager", "staff"]:
             ensure_can_create_business_user_role(
                 super_admin,
                 target_business_id=business.id,

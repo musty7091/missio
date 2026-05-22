@@ -1,4 +1,4 @@
-﻿import {
+import {
   Camera,
   CheckCircle2,
   CircleDot,

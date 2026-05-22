@@ -120,8 +120,7 @@ def ensure_can_update_business_user(current_user: User, target_user: User) -> No
 
     if current_user.role in {
         UserRole.BOSS.value,
-        UserRole.BUSINESS_OWNER.value,
-    }:
+        }:
         if target_user.role in {
             UserRole.MANAGER.value,
             UserRole.STAFF.value,
@@ -139,7 +138,7 @@ def ensure_can_update_business_user(current_user: User, target_user: User) -> No
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Manager sadece staff kullanıcısını güncelleyebilir.",
+            detail="Manager sadece personel kullanıcısını güncelleyebilir.",
         )
 
     raise HTTPException(
@@ -159,8 +158,7 @@ def ensure_can_reset_business_user_password(
 
     if current_user.role in {
         UserRole.BOSS.value,
-        UserRole.BUSINESS_OWNER.value,
-    }:
+        }:
         if target_user.role in {
             UserRole.MANAGER.value,
             UserRole.STAFF.value,
@@ -178,7 +176,7 @@ def ensure_can_reset_business_user_password(
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Manager sadece staff kullanıcısının şifresini sıfırlayabilir.",
+            detail="Manager sadece personel kullanıcısının şifresini sıfırlayabilir.",
         )
 
     raise HTTPException(
@@ -222,8 +220,7 @@ def ensure_can_change_business_user_role(
 
     if current_user.role in {
         UserRole.BOSS.value,
-        UserRole.BUSINESS_OWNER.value,
-    }:
+        }:
         return
 
     raise HTTPException(

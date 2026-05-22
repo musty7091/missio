@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, CircleDot, Clock3 } from "lucide-react"
+import { CheckCircle2, CircleDot, Clock3 } from "lucide-react"
 
 type TodayOperationSummaryProps = {
   totalCount: number

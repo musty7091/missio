@@ -1,4 +1,4 @@
-﻿import type { LoginRequest, TokenResponse, UserMeResponse } from "../types/auth"
+import type { LoginRequest, TokenResponse, UserMeResponse } from "../types/auth"
 import { apiRequest } from "./httpClient"
 
 export async function loginUser(payload: LoginRequest) {

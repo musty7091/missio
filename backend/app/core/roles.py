@@ -9,7 +9,6 @@ class UserRole(StrEnum):
     SUPER_ADMIN = "super_admin"
     BOSS = "boss"
     MANAGER = "manager"
-    BUSINESS_OWNER = "business_owner"
     STAFF = "staff"
 
 
@@ -31,8 +30,7 @@ STAFF_VISIBLE_ROLES: set[UserRole] = {
 ROLE_LABELS: dict[UserRole, str] = {
     UserRole.SUPER_ADMIN: "Süper Admin",
     UserRole.BOSS: "Patron",
-    UserRole.MANAGER: "Yönetici",
-    UserRole.BUSINESS_OWNER: "İşletme Sahibi",
+    UserRole.MANAGER: "Manager",
     UserRole.STAFF: "Personel",
 }
 

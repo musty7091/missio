@@ -1,1 +1,1 @@
-﻿"""Route package for Missio backend."""
+"""Route package for Missio backend."""

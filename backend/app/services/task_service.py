@@ -111,13 +111,11 @@ TASK_ASSIGNABLE_ROLES = {
 TASK_MANAGER_ROLES = {
     UserRole.SUPER_ADMIN.value,
     UserRole.BOSS.value,
-    UserRole.BUSINESS_OWNER.value,
     UserRole.MANAGER.value,
 }
 
 BOSS_LEVEL_ROLES = {
     UserRole.BOSS.value,
-    UserRole.BUSINESS_OWNER.value,
 }
 
 
@@ -264,7 +262,7 @@ def ensure_can_assign_task_to_user(
         if target_user.role == UserRole.STAFF.value:
             return
 
-        raise TaskPermissionError("Manager sadece staff kullanıcısına görev atayabilir.")
+        raise TaskPermissionError("Manager sadece personel kullanıcısına görev atayabilir.")
 
     raise TaskPermissionError("Bu kullanıcı görev atayamaz.")
 

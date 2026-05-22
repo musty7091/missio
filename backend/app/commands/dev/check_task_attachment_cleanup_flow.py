@@ -30,7 +30,7 @@ from app.services.task_service import create_extra_task
 
 
 BUSINESS_SLUG = "missio-demo-market"
-OWNER_USERNAME = "owner"
+OWNER_USERNAME = "patron"
 STAFF_USERNAME = "ahmet"
 
 TASK_TITLE_APPROVED_CLEANUP = "CLEANUP DEMO - Approved eski fotoğraf"

@@ -67,13 +67,11 @@ DAILY_OPERATION_CLOSURE_FINAL_STATUSES = {
 DAILY_OPERATION_CLOSURE_CREATORS = {
     UserRole.MANAGER.value,
     UserRole.BOSS.value,
-    UserRole.BUSINESS_OWNER.value,
 }
 
 DAILY_OPERATION_CLOSURE_VIEWERS = {
     UserRole.MANAGER.value,
     UserRole.BOSS.value,
-    UserRole.BUSINESS_OWNER.value,
     UserRole.SUPER_ADMIN.value,
 }
 
@@ -93,7 +91,7 @@ def ensure_can_create_daily_operation_closure(current_user: User, *, business_id
 
     if current_user.role not in DAILY_OPERATION_CLOSURE_CREATORS:
         raise DailyOperationClosurePermissionError(
-            "Günü sadece manager, patron veya işletme sahibi kapatabilir."
+            "Günü sadece manager veya patron kapatabilir."
         )
 
 

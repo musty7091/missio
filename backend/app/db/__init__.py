@@ -1,1 +1,1 @@
-﻿"""Database package for Missio backend."""
+"""Database package for Missio backend."""

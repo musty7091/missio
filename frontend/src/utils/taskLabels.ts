@@ -1,4 +1,4 @@
-﻿import type { TaskPriority, TaskStatus } from "../types/task"
+import type { TaskPriority, TaskStatus } from "../types/task"
 
 export function getStatusLabel(status: TaskStatus) {
   if (status === "assigned") return "Bekliyor"

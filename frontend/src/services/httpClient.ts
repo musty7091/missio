@@ -1,4 +1,4 @@
-﻿import { API_BASE_URL } from "../config/api"
+import { API_BASE_URL } from "../config/api"
 import { getAccessToken } from "./authTokenStorage"
 
 type QueryValue = string | number | boolean | null | undefined
