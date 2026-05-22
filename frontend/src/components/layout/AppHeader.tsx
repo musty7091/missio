@@ -1,4 +1,4 @@
-﻿import { Bell, LogOut, Moon, Sun } from "lucide-react"
+﻿import { LogOut, Moon, Sun } from "lucide-react"
 import type { ThemeMode } from "../../types/task"
 
 type AppHeaderProps = {
@@ -72,16 +72,6 @@ export function AppHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            className="relative rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-[var(--missio-text-muted)] shadow-sm transition active:scale-95"
-            aria-label="Bildirimler"
-            title="Bildirimler"
-          >
-            <Bell size={19} />
-            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[var(--missio-danger)] ring-2 ring-[var(--missio-card-bg)]" />
-          </button>
-
           <button
             type="button"
             onClick={onToggleTheme}

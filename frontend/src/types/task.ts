@@ -21,6 +21,13 @@ export type TodayTask = {
   taskType: TaskType
   taskDate: string
   time: string
+  dueAtUtc: string | null
+  assignedAtUtc: string | null
+  startedAtUtc: string | null
+  completedAtUtc: string | null
+  approvedAtUtc: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
   requiresPhoto: boolean
   requiresLocation: boolean
   requiresManagerApproval: boolean

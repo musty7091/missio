@@ -8,6 +8,7 @@ import {
 } from "./components/common/AppStatePanel"
 import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
+import { NotificationPanel } from "./components/notifications/NotificationPanel"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
@@ -71,6 +72,44 @@ async function getLocationPayloadForTask(task: TodayTask): Promise<LocationPaylo
   return getCurrentLocationPayload()
 }
 
+function getBottomNotificationCount(tasks: TodayTask[]) {
+  let count = 0
+
+  if (tasks.some((task) => task.taskType === "routine" && task.status === "assigned")) {
+    count += 1
+  }
+
+  if (tasks.some((task) => task.taskType === "extra" && task.status === "assigned")) {
+    count += 1
+  }
+
+  if (tasks.some((task) => task.status === "in_progress")) {
+    count += 1
+  }
+
+  if (
+    tasks.some(
+      (task) =>
+        task.requiresPhoto &&
+        task.status !== "completed" &&
+        task.status !== "approved" &&
+        task.status !== "cancelled",
+    )
+  ) {
+    count += 1
+  }
+
+  if (
+    tasks.some(
+      (task) => task.status === "completed" && task.requiresManagerApproval,
+    )
+  ) {
+    count += 1
+  }
+
+  return count
+}
+
 function ComingSoonPanel({ tab }: ComingSoonPanelProps) {
   const panelInfo = {
     notifications: {
@@ -127,7 +166,20 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<UserMeResponse | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(() => Boolean(getAccessToken()))
-  const [activeTab, setActiveTab] = useState<AppTab>("tasks")
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    const savedTab = window.localStorage.getItem("missio-active-tab")
+
+    if (
+      savedTab === "tasks" ||
+      savedTab === "notifications" ||
+      savedTab === "reports" ||
+      savedTab === "profile"
+    ) {
+      return savedTab
+    }
+
+    return "tasks"
+  })
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
   const taskDetailHistoryTokenRef = useRef<string | null>(null)
   const [taskListFilter, setTaskListFilter] = useState<TaskListFilter>("all")
@@ -147,6 +199,10 @@ export default function App() {
 
     window.localStorage.setItem("missio-theme", theme)
   }, [theme])
+
+  useEffect(() => {
+    window.localStorage.setItem("missio-active-tab", activeTab)
+  }, [activeTab])
 
   useEffect(() => {
     const token = getAccessToken()
@@ -300,6 +356,9 @@ export default function App() {
     return filteredTasks.filter((task) => task.taskType === "extra")
   }, [filteredTasks])
 
+
+  const bottomNotificationCount = useMemo(() => getBottomNotificationCount(tasks), [tasks])
+
   function handleLogout() {
     clearAccessToken()
     setCurrentUser(null)
@@ -307,6 +366,7 @@ export default function App() {
     setSelectedTaskId(null)
     taskDetailHistoryTokenRef.current = null
     setTaskListFilter("all")
+    window.localStorage.setItem("missio-active-tab", "tasks")
     setActiveTab("tasks")
   }
 
@@ -489,6 +549,8 @@ export default function App() {
                 )}
             </section>
           </>
+        ) : activeTab === "notifications" ? (
+          <NotificationPanel tasks={tasks} onOpenTaskDetails={openTaskDetails} />
         ) : activeTab === "profile" ? (
           <ProfilePanel
             user={currentUser}
@@ -511,8 +573,18 @@ export default function App() {
           />
         )}
 
-        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <BottomNavigation
+          activeTab={activeTab}
+          notificationCount={bottomNotificationCount}
+          onTabChange={setActiveTab}
+        />
       </section>
     </main>
   )
 }
+
+
+
+
+
+
