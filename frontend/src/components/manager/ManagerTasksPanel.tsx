@@ -215,70 +215,157 @@ function StatTile({
 function StaffCard({
   user,
   metrics,
+  staffTasks,
+  busyTaskId,
+  onOpenTaskDetails,
 }: {
   user: BusinessUser
   metrics: StaffMetrics
+  staffTasks: TodayTask[]
+  busyTaskId: number | null
+  onOpenTaskDetails: (task: TodayTask) => void
 }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const hasTasks = staffTasks.length > 0
+
   return (
     <article className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-sm font-black text-cyan-800 dark:text-cyan-200">
-          {getInitials(user.full_name)}
+      <button
+        type="button"
+        onClick={() => {
+          if (hasTasks) {
+            setIsExpanded((value) => !value)
+          }
+        }}
+        className="w-full text-left"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-sm font-black text-cyan-800 dark:text-cyan-200">
+            {getInitials(user.full_name)}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-sm font-black text-[var(--missio-text-main)]">
+              {user.full_name}
+            </h3>
+            <p className="mt-0.5 truncate text-xs font-bold text-[var(--missio-text-muted)]">
+              @{user.username}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-center">
+            <p className="text-base font-black leading-none text-[var(--missio-text-main)]">
+              {metrics.total}
+            </p>
+            <p className="mt-1 text-[0.58rem] font-black text-[var(--missio-text-muted)]">
+              görev
+            </p>
+          </div>
         </div>
 
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-black text-[var(--missio-text-main)]">
-            {user.full_name}
-          </h3>
-          <p className="mt-0.5 truncate text-xs font-bold text-[var(--missio-text-muted)]">
-            @{user.username}
-          </p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2 text-center">
+            <p className="text-sm font-black text-[var(--missio-text-main)]">
+              {metrics.open}
+            </p>
+            <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
+              Açık
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2 text-center">
+            <p className="text-sm font-black text-[var(--missio-text-main)]">
+              {metrics.approvalPending}
+            </p>
+            <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
+              Onay
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2 text-center">
+            <p
+              className={
+                metrics.rejected > 0
+                  ? "text-sm font-black text-red-600 dark:text-red-300"
+                  : "text-sm font-black text-[var(--missio-text-main)]"
+              }
+            >
+              {metrics.rejected}
+            </p>
+            <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
+              Red
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-center">
-          <p className="text-base font-black leading-none text-[var(--missio-text-main)]">
-            {metrics.total}
-          </p>
-          <p className="mt-1 text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-            görev
-          </p>
+        <div className="mt-3 rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-center text-xs font-black text-[var(--missio-text-muted)]">
+          {hasTasks
+            ? isExpanded
+              ? "Görevleri gizle"
+              : "Görevleri göster"
+            : "Bugün görev yok"}
         </div>
-      </div>
+      </button>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2 text-center">
-          <p className="text-sm font-black text-[var(--missio-text-main)]">
-            {metrics.open}
-          </p>
-          <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-            Açık
-          </p>
-        </div>
+      {isExpanded && hasTasks && (
+        <div className="mt-3 space-y-2 border-t border-[var(--missio-border)] pt-3">
+          {staffTasks.map((task) => (
+            <button
+              key={task.id}
+              type="button"
+              onClick={() => onOpenTaskDetails(task)}
+              disabled={busyTaskId === task.id}
+              className="w-full rounded-[1.2rem] border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-left transition active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
+            >
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                <span className={getTaskStatusClass(task)}>
+                  {getReadableStatusLabel(task)}
+                </span>
 
-        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2 text-center">
-          <p className="text-sm font-black text-[var(--missio-text-main)]">
-            {metrics.approvalPending}
-          </p>
-          <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-            Onay
-          </p>
-        </div>
+                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200">
+                  {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+                </span>
 
-        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2 text-center">
-          <p
-            className={
-              metrics.rejected > 0
-                ? "text-sm font-black text-red-600 dark:text-red-300"
-                : "text-sm font-black text-[var(--missio-text-main)]"
-            }
-          >
-            {metrics.rejected}
-          </p>
-          <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-            Red
-          </p>
+                <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
+                  {getPriorityLabel(task.priority)}
+                </span>
+              </div>
+
+              <h4 className="truncate text-sm font-black text-[var(--missio-text-main)]">
+                {task.title}
+              </h4>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[0.68rem] font-bold text-[var(--missio-text-muted)]">
+                <span className="inline-flex items-center gap-1">
+                  <CalendarClock size={12} />
+                  {formatTaskTime(task.dueAtUtc)}
+                </span>
+
+                {task.requiresPhoto && (
+                  <span className="inline-flex items-center gap-1">
+                    <ImageIcon size={12} />
+                    Foto
+                  </span>
+                )}
+
+                {task.requiresLocation && (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin size={12} />
+                    Konum
+                  </span>
+                )}
+
+                {task.requiresManagerApproval && (
+                  <span className="inline-flex items-center gap-1">
+                    <FileCheck2 size={12} />
+                    Onay
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
         </div>
-      </div>
+      )}
     </article>
   )
 }
@@ -1003,13 +1090,22 @@ export function ManagerTasksPanel({
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2.5">
-            {staffUsers.map((user) => (
-              <StaffCard
-                key={user.id}
-                user={user}
-                metrics={getStaffMetrics(tasks, user.id)}
-              />
-            ))}
+            {staffUsers.map((user) => {
+              const staffTasks = tasks.filter(
+                (task) => task.assignedToUserId === user.id,
+              )
+
+              return (
+                <StaffCard
+                  key={user.id}
+                  user={user}
+                  metrics={getStaffMetrics(tasks, user.id)}
+                  staffTasks={staffTasks}
+                  busyTaskId={busyTaskId}
+                  onOpenTaskDetails={onOpenOwnTaskDetails}
+                />
+              )
+            })}
           </div>
         )}
       </div>
