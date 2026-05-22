@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, business_users, db_health, health, tasks
+from app.api.routes import auth, business_users, daily_closures, db_health, health, tasks
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
 api_router.include_router(db_health.router)
 api_router.include_router(auth.router)
 api_router.include_router(business_users.router)
+api_router.include_router(daily_closures.router)
 api_router.include_router(tasks.router)

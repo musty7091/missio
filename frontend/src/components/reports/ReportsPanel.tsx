@@ -14,6 +14,11 @@ import {
   XCircle,
 } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
+import {
+  createDailyOperationClosure,
+  listDailyOperationClosures,
+  type DailyOperationClosure,
+} from "../../services/dailyClosureService"
 import { listBusinessTasks } from "../../services/taskService"
 import type { TodayTask } from "../../types/task"
 import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
@@ -37,6 +42,58 @@ type StaffReportRow = {
   open: number
   approvalPending: number
   rejected: number
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Tarih yok"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "Tarih yok"
+  }
+
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function getClosureStatusLabel(status: string) {
+  if (status === "closed_clean") {
+    return "Temiz kapanış"
+  }
+
+  if (status === "closed_with_issues") {
+    return "Sorunlu kapanış"
+  }
+
+  if (status === "closed") {
+    return "Gün kapatıldı"
+  }
+
+  return "Kapanış kaydı"
+}
+
+function getClosureStatusMessage(status: string) {
+  if (status === "closed_clean") {
+    return "Bugün temiz kapanış olarak kapatıldı."
+  }
+
+  if (status === "closed_with_issues") {
+    return "Bugün sorunlu kapanış olarak kapatıldı."
+  }
+
+  return "Bugünün gün sonu raporu oluşturuldu."
+}
+
+function canCurrentRoleCloseDay(role: string) {
+  return role === "manager" || role === "boss" || role === "business_owner"
 }
 
 function getLocalTodayDateKey() {
@@ -555,8 +612,12 @@ function ManagementReportPanel({
   businessId: number | null
 }) {
   const [reportTasks, setReportTasks] = useState<TodayTask[]>([])
+  const [closures, setClosures] = useState<DailyOperationClosure[]>([])
+  const [closureNote, setClosureNote] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isClosingDay, setIsClosingDay] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const todayKey = getLocalTodayDateKey()
 
@@ -569,16 +630,25 @@ function ManagementReportPanel({
 
     setIsLoading(true)
     setErrorMessage(null)
+    setSuccessMessage(null)
 
     try {
-      const response = await listBusinessTasks({
-        businessId,
-        taskDate: todayKey,
-        limit: 500,
-        offset: 0,
-      })
+      const [taskResponse, closureResponse] = await Promise.all([
+        listBusinessTasks({
+          businessId,
+          taskDate: todayKey,
+          limit: 500,
+          offset: 0,
+        }),
+        listDailyOperationClosures({
+          businessId,
+          limit: 30,
+          offset: 0,
+        }),
+      ])
 
-      setReportTasks(response.tasks.map(mapApiTaskToTodayTask))
+      setReportTasks(taskResponse.tasks.map(mapApiTaskToTodayTask))
+      setClosures(closureResponse.closures)
     } catch (error) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
@@ -595,6 +665,11 @@ function ManagementReportPanel({
   useEffect(() => {
     void loadReportTasks()
   }, [businessId])
+
+  const todayClosure = useMemo(
+    () => closures.find((closure) => closure.closure_date === todayKey) ?? null,
+    [closures, todayKey],
+  )
 
   const totalCount = reportTasks.length
   const completedTasks = reportTasks.filter(isCompletedTask)
@@ -625,6 +700,64 @@ function ManagementReportPanel({
     openTasks.length === 0 &&
     approvalWaitingTasks.length === 0 &&
     rejectedTasks.length === 0
+
+  const hasTasksForClosure = totalCount > 0
+  const closureHasIssues = hasTasksForClosure && !canCloseDay
+  const canShowCloseButton = canCurrentRoleCloseDay(role)
+  const isDayAlreadyClosed = todayClosure !== null
+
+  async function handleCloseDay() {
+    if (!businessId) {
+      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      return
+    }
+
+    if (!canShowCloseButton) {
+      setErrorMessage("Bu kullanıcı günü kapatamaz.")
+      return
+    }
+
+    if (!hasTasksForClosure) {
+      setErrorMessage("Bugün kapatılacak görev bulunamadı.")
+      return
+    }
+
+    if (closureHasIssues && !closureNote.trim()) {
+      setErrorMessage("Sorunlu gün kapanışında kapanış notu zorunludur.")
+      return
+    }
+
+    setIsClosingDay(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    try {
+      const response = await createDailyOperationClosure(
+        {
+          closure_date: todayKey,
+          manager_note: closureNote.trim() || null,
+        },
+        {
+          businessId,
+        },
+      )
+
+      setClosures((currentClosures) => [
+        response.closure,
+        ...currentClosures.filter((closure) => closure.id !== response.closure.id),
+      ])
+      setClosureNote("")
+      setSuccessMessage(response.message)
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage("Gün kapatılamadı.")
+      }
+    } finally {
+      setIsClosingDay(false)
+    }
+  }
 
   const roleTitle =
     role === "boss"
@@ -680,15 +813,102 @@ function ManagementReportPanel({
           </div>
         </div>
 
-        <div className="mt-2 rounded-2xl bg-white/10 px-3 py-2">
-          <p className={canCloseDay ? "text-sm font-black text-emerald-200" : "text-sm font-black text-amber-200"}>
-            {canCloseDay ? "Gün kapanışı yapılabilir." : "Gün kapanışı için kontrol gereken işler var."}
-          </p>
-          <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
-            Kapanış uygunluğu: %{closureRate}
-          </p>
+        <div className="mt-2 space-y-3 rounded-2xl bg-white/10 px-3 py-3">
+          <div>
+            <p
+              className={
+                isDayAlreadyClosed && todayClosure?.status === "closed_with_issues"
+                  ? "text-sm font-black text-amber-200"
+                  : isDayAlreadyClosed
+                    ? "text-sm font-black text-emerald-200"
+                    : canCloseDay
+                      ? "text-sm font-black text-emerald-200"
+                      : hasTasksForClosure
+                        ? "text-sm font-black text-amber-200"
+                        : "text-sm font-black text-slate-300"
+              }
+            >
+              {isDayAlreadyClosed && todayClosure
+                ? getClosureStatusLabel(todayClosure.status)
+                : canCloseDay
+                  ? "Temiz kapanış yapılabilir."
+                  : hasTasksForClosure
+                    ? "Sorunlu kapanış yapılacak."
+                    : "Kapatılacak görev yok."}
+            </p>
+
+            <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
+              Kapanış uygunluğu: %{closureRate}
+            </p>
+          </div>
+
+          {isDayAlreadyClosed && todayClosure ? (
+            <div
+              className={
+                todayClosure.status === "closed_with_issues"
+                  ? "rounded-2xl bg-amber-50/95 p-3 text-sm font-bold leading-6 text-amber-900"
+                  : "rounded-2xl bg-emerald-50/95 p-3 text-sm font-bold leading-6 text-emerald-900"
+              }
+            >
+              <p>{getClosureStatusMessage(todayClosure.status)}</p>
+              <p className="mt-1 text-xs">
+                Kapatan: {todayClosure.closed_by_user_full_name} · {formatDateTime(todayClosure.closed_at_utc)}
+              </p>
+              {todayClosure.manager_note && (
+                <p className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs">
+                  {todayClosure.manager_note}
+                </p>
+              )}
+            </div>
+          ) : canShowCloseButton ? (
+            <div className="space-y-2">
+              <textarea
+                value={closureNote}
+                onChange={(event) => setClosureNote(event.target.value)}
+                placeholder={
+                  closureHasIssues
+                    ? "Sorunlu kapanış notu zorunlu. Örn: Personel eksikliği nedeniyle depo sayımı tamamlanamadı."
+                    : "Kapanış notu yaz... Örn: Gün sorunsuz tamamlandı."
+                }
+                maxLength={5000}
+                className="min-h-20 w-full resize-none rounded-2xl border border-white/20 bg-white/10 px-3 py-3 text-sm font-bold text-white outline-none placeholder:text-slate-300 focus:border-cyan-300"
+              />
+
+              <button
+                type="button"
+                onClick={() => void handleCloseDay()}
+                disabled={!hasTasksForClosure || isClosingDay}
+                className={
+                  hasTasksForClosure
+                    ? closureHasIssues
+                      ? "flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-amber-500/20 transition active:scale-95 disabled:cursor-wait disabled:opacity-60"
+                      : "flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition active:scale-95 disabled:cursor-wait disabled:opacity-60"
+                    : "flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-300 px-4 py-3 text-sm font-black text-slate-600 opacity-70"
+                }
+              >
+                {isClosingDay ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+                Günü Kapat
+              </button>
+
+              {closureHasIssues && (
+                <p className="rounded-2xl bg-amber-50/95 p-3 text-xs font-bold leading-5 text-amber-900">
+                  Bu gün sorunlu kapanış olarak kaydedilecek. Açık, reddedilmiş veya onay bekleyen görevler rapora yansıyacak. Kapanış notu zorunludur.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="rounded-2xl bg-white/10 p-3 text-xs font-bold leading-5 text-slate-300">
+              Bu kullanıcı günü kapatamaz.
+            </p>
+          )}
         </div>
       </div>
+
+      {successMessage && (
+        <div className="mb-3 rounded-[1.4rem] border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+          {successMessage}
+        </div>
+      )}
 
       {errorMessage && (
         <div className="mb-3 rounded-[1.4rem] border border-red-200 bg-red-50 p-3 text-sm font-black text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
