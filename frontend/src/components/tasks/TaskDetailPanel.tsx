@@ -1,4 +1,5 @@
-﻿import {
+import {
+  AlertCircle,
   ArrowLeft,
   Camera,
   CheckCircle2,
@@ -9,6 +10,7 @@
   ImageIcon,
   Loader2,
   MapPin,
+  MessageSquareText,
   PlayCircle,
   ShieldCheck,
   Trash2,
@@ -32,7 +34,7 @@ type TaskDetailPanelProps = {
   isBusy: boolean
   onClose: () => void
   onStartTask: (task: TodayTask) => Promise<void>
-  onCompleteTask: (task: TodayTask) => Promise<void>
+  onCompleteTask: (task: TodayTask, note?: string) => Promise<void>
   onUploadPhoto: (task: TodayTask, file: File) => Promise<void>
 }
 
@@ -177,9 +179,13 @@ export function TaskDetailPanel({
   const [attachmentPreviews, setAttachmentPreviews] = useState<AttachmentPreview[]>([])
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false)
   const [attachmentErrorMessage, setAttachmentErrorMessage] = useState<string | null>(null)
+  const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null)
+  const [shouldFlashPhotoButton, setShouldFlashPhotoButton] = useState(false)
+  const photoButtonFlashTimeoutRef = useRef<number | null>(null)
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null)
   const [selectedPreview, setSelectedPreview] = useState<AttachmentPreview | null>(null)
   const [timelineRefreshVersion, setTimelineRefreshVersion] = useState(0)
+  const [completionNote, setCompletionNote] = useState("")
 
   const canUseMainAction =
     task.status === "assigned" || task.status === "in_progress" || task.status === "rejected"
@@ -190,6 +196,22 @@ export function TaskDetailPanel({
     task.status === "cancelled"
 
   const canDeleteAttachments = !isClosedTask
+
+  const canWriteCompletionNote =
+    task.status === "in_progress" || task.status === "rejected"
+
+  function triggerPhotoButtonFlash() {
+    setShouldFlashPhotoButton(true)
+
+    if (photoButtonFlashTimeoutRef.current !== null) {
+      window.clearTimeout(photoButtonFlashTimeoutRef.current)
+    }
+
+    photoButtonFlashTimeoutRef.current = window.setTimeout(() => {
+      setShouldFlashPhotoButton(false)
+      photoButtonFlashTimeoutRef.current = null
+    }, 3000)
+  }
 
   async function loadAttachments() {
     if (!task.requiresPhoto) {
@@ -236,6 +258,15 @@ export function TaskDetailPanel({
   }
 
   useEffect(() => {
+    setCompletionNote("")
+    setActionErrorMessage(null)
+    setShouldFlashPhotoButton(false)
+
+    if (photoButtonFlashTimeoutRef.current !== null) {
+      window.clearTimeout(photoButtonFlashTimeoutRef.current)
+      photoButtonFlashTimeoutRef.current = null
+    }
+
     void loadAttachments()
 
     return () => {
@@ -302,15 +333,40 @@ export function TaskDetailPanel({
   }, [selectedPreview])
 
   async function handleMainAction() {
+    setActionErrorMessage(null)
+
     if (task.status === "assigned") {
-      await onStartTask(task)
-      setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
+      try {
+        await onStartTask(task)
+        setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
+      } catch (error) {
+        if (error instanceof Error) {
+          setActionErrorMessage(error.message)
+        } else {
+          setActionErrorMessage("Görev başlatılamadı.")
+        }
+      }
+
       return
     }
 
     if (task.status === "in_progress" || task.status === "rejected") {
-      await onCompleteTask(task)
-      setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
+      if (task.requiresPhoto && attachmentPreviews.length < 1) {
+        triggerPhotoButtonFlash()
+        return
+      }
+
+      try {
+        await onCompleteTask(task, completionNote.trim() || undefined)
+        setCompletionNote("")
+        setTimelineRefreshVersion((currentVersion) => currentVersion + 1)
+      } catch (error) {
+        if (error instanceof Error) {
+          setActionErrorMessage(error.message)
+        } else {
+          setActionErrorMessage("Görev tamamlanamadı.")
+        }
+      }
     }
   }
 
@@ -583,9 +639,54 @@ export function TaskDetailPanel({
             </div>
           )}
 
+          {canWriteCompletionNote && (
+            <div className="mb-4 rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4">
+              <div className="mb-3 flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+                  <MessageSquareText size={21} />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-black">Tamamlama notu</h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+                    Yaptığın işle ilgili kısa açıklama yazabilirsin. Bu not manager onay ekranında görünecek.
+                  </p>
+                </div>
+              </div>
+
+              <textarea
+                value={completionNote}
+                onChange={(event) => setCompletionNote(event.target.value)}
+                placeholder="Örn: Raf düzenlendi, eksik ürünler tamamlandı..."
+                maxLength={5000}
+                className="min-h-24 w-full resize-none rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
+              />
+
+              <div className="mt-2 text-right text-[0.65rem] font-bold text-[var(--missio-text-muted)]">
+                {completionNote.length}/5000
+              </div>
+            </div>
+          )}
+
           <TaskEventTimeline taskId={task.id} refreshVersion={timelineRefreshVersion} />
 
           <div className="sticky bottom-0 -mx-4 mt-5 border-t border-[var(--missio-border)] bg-[var(--missio-card-bg)]/95 px-4 pb-1 pt-4 backdrop-blur-xl">
+            {task.requiresPhoto && !isClosedTask && attachmentPreviews.length < 1 && (
+              <div className="mb-3 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
+                <AlertCircle className="mt-0.5 shrink-0" size={17} />
+                <span>
+                  Bu görev fotoğraf kanıtı istiyor. Tamamlamadan önce fotoğraf eklemelisin.
+                </span>
+              </div>
+            )}
+
+            {actionErrorMessage && (
+              <div className="mb-3 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-xs font-black leading-5 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                <AlertCircle className="mt-0.5 shrink-0" size={17} />
+                <span>{actionErrorMessage}</span>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={onClose}
@@ -616,7 +717,11 @@ export function TaskDetailPanel({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isBusy || isLoadingAttachments}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                      className={
+                        shouldFlashPhotoButton && attachmentPreviews.length < 1
+                          ? "flex flex-1 animate-pulse items-center justify-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 ring-4 ring-amber-300/70 shadow-lg shadow-amber-400/30 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-700/60"
+                          : "flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                      }
                     >
                       <Camera size={18} />
                       Fotoğraf ekle

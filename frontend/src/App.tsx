@@ -401,19 +401,25 @@ export default function App() {
     }
   }
 
-  async function handleCompleteTask(task: TodayTask) {
+  async function handleCompleteTask(task: TodayTask, note?: string) {
     setBusyTaskId(task.id)
     setTasksErrorMessage(null)
 
     try {
       const locationPayload = await getLocationPayloadForTask(task)
-      await completeTask(task.id, locationPayload)
+      await completeTask(task.id, {
+        ...locationPayload,
+        note: note?.trim() || null,
+      })
       await loadTodayTasks()
     } catch (error) {
       if (error instanceof Error) {
         setTasksErrorMessage(error.message)
+        throw error
       } else {
-        setTasksErrorMessage("Görev tamamlanamadı.")
+        const fallbackError = new Error("Görev tamamlanamadı.")
+        setTasksErrorMessage(fallbackError.message)
+        throw fallbackError
       }
     } finally {
       setBusyTaskId(null)

@@ -1,9 +1,15 @@
 ﻿import {
   AlertCircle,
+  Camera,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Clock3,
   FileCheck2,
+  ImageIcon,
+  Loader2,
+  MapPin,
+  MessageSquareText,
   RefreshCw,
   UserRound,
   UsersRound,
@@ -12,8 +18,13 @@
 import { useEffect, useMemo, useState } from "react"
 import {
   approveTask,
+  getTaskAttachmentFileBlob,
   listBusinessTasks,
+  listTaskAttachments,
+  listTaskEvents,
   rejectTask,
+  type TaskAttachment,
+  type TaskEvent,
 } from "../../services/taskService"
 import type { TodayTask } from "../../types/task"
 import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
@@ -30,6 +41,11 @@ type StaffApprovalGroup = {
   assigneeUsername: string | null
   initials: string
   tasks: TodayTask[]
+}
+
+type AttachmentPreview = {
+  attachment: TaskAttachment
+  url: string
 }
 
 function getLocalTodayDateKey() {
@@ -53,6 +69,26 @@ function formatTime(value: string | null) {
   }
 
   return date.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Tarih yok"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "Tarih yok"
+  }
+
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   })
@@ -122,6 +158,193 @@ function groupTasksByStaff(tasks: TodayTask[]): StaffApprovalGroup[] {
   )
 }
 
+function getCompletedEvent(events: TaskEvent[]) {
+  return [...events]
+    .reverse()
+    .find((event) => event.event_type === "task_completed")
+}
+
+function TaskEvidencePanel({ task }: { task: TodayTask }) {
+  const [events, setEvents] = useState<TaskEvent[]>([])
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([])
+  const [previews, setPreviews] = useState<AttachmentPreview[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const completedEvent = useMemo(() => getCompletedEvent(events), [events])
+  const completionNote = completedEvent?.note?.trim()
+  const hasLocation =
+    completedEvent?.latitude !== null &&
+    completedEvent?.latitude !== undefined &&
+    completedEvent?.longitude !== null &&
+    completedEvent?.longitude !== undefined
+
+  useEffect(() => {
+    let isMounted = true
+    let objectUrls: string[] = []
+
+    async function loadEvidence() {
+      setIsLoading(true)
+      setErrorMessage(null)
+
+      try {
+        const [attachmentResponse, eventResponse] = await Promise.all([
+          listTaskAttachments(task.id),
+          listTaskEvents(task.id),
+        ])
+
+        if (!isMounted) {
+          return
+        }
+
+        setAttachments(attachmentResponse.attachments)
+        setEvents(eventResponse.events)
+
+        const loadedPreviews: AttachmentPreview[] = []
+
+        for (const attachment of attachmentResponse.attachments) {
+          const blob = await getTaskAttachmentFileBlob(task.id, attachment.id)
+          const url = URL.createObjectURL(blob)
+          objectUrls.push(url)
+
+          loadedPreviews.push({
+            attachment,
+            url,
+          })
+        }
+
+        if (isMounted) {
+          setPreviews(loadedPreviews)
+        }
+      } catch (error) {
+        if (isMounted) {
+          if (error instanceof Error) {
+            setErrorMessage(error.message)
+          } else {
+            setErrorMessage("Kanıt bilgileri alınamadı.")
+          }
+
+          setAttachments([])
+          setEvents([])
+          setPreviews([])
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadEvidence()
+
+    return () => {
+      isMounted = false
+
+      for (const url of objectUrls) {
+        URL.revokeObjectURL(url)
+      }
+    }
+  }, [task.id])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl bg-[var(--missio-page-bg)] p-3 text-xs font-black text-[var(--missio-text-muted)]">
+        <Loader2 className="animate-spin" size={16} />
+        Kanıt bilgileri yükleniyor...
+      </div>
+    )
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-xs font-black leading-5 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+        {errorMessage}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--missio-text-muted)]">
+          <MessageSquareText size={14} />
+          Tamamlama notu
+        </div>
+
+        <p className="text-sm font-bold leading-6 text-[var(--missio-text-main)]">
+          {completionNote || "Personel tamamlama notu yazmamış."}
+        </p>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 text-[0.7rem] font-bold text-[var(--missio-text-muted)]">
+          <div className="rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
+            <div className="mb-1 flex items-center gap-1">
+              <Clock3 size={12} />
+              Tamamlanma
+            </div>
+            <p className="text-[var(--missio-text-main)]">
+              {formatDateTime(task.completedAtUtc)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
+            <div className="mb-1 flex items-center gap-1">
+              <MapPin size={12} />
+              Konum
+            </div>
+            <p className="text-[var(--missio-text-main)]">
+              {hasLocation ? "Alındı" : "Yok"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--missio-text-muted)]">
+            <Camera size={14} />
+            Fotoğraf kanıtı
+          </div>
+
+          <span className="rounded-full bg-[var(--missio-card-bg)] px-2.5 py-1 text-[0.65rem] font-black text-[var(--missio-text-muted)]">
+            {attachments.length}
+          </span>
+        </div>
+
+        {attachments.length === 0 ? (
+          task.requiresPhoto ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-xs font-black leading-5 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+              Bu görev fotoğraf kanıtı gerektiriyor; ancak fotoğraf bulunamadı.
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[var(--missio-card-bg)] p-3 text-xs font-bold text-[var(--missio-text-muted)]">
+              Bu görev için fotoğraf şartı yok.
+            </div>
+          )
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {previews.map((preview) => (
+              <div
+                key={preview.attachment.id}
+                className="overflow-hidden rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)]"
+              >
+                <img
+                  src={preview.url}
+                  alt={`Görev kanıtı ${preview.attachment.id}`}
+                  className="h-36 w-full object-cover"
+                />
+
+                <div className="px-3 py-2 text-[0.65rem] font-bold text-[var(--missio-text-muted)]">
+                  {formatDateTime(preview.attachment.created_at_utc)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ApprovalTaskCard({
   task,
   isExpanded,
@@ -149,6 +372,10 @@ function ApprovalTaskCard({
         className="w-full p-3 text-left active:scale-[0.995]"
       >
         <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+            <FileCheck2 size={22} />
+          </div>
+
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap gap-1.5">
               <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[0.6rem] font-black text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
@@ -162,6 +389,13 @@ function ApprovalTaskCard({
               <span className="rounded-full bg-[var(--missio-page-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
                 {getPriorityLabel(task.priority)}
               </span>
+
+              {task.requiresPhoto && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[0.6rem] font-black text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                  <ImageIcon size={11} />
+                  Foto
+                </span>
+              )}
             </div>
 
             <h3 className="truncate text-base font-black text-[var(--missio-text-main)]">
@@ -209,15 +443,11 @@ function ApprovalTaskCard({
             </p>
 
             <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-main)]">
-              {task.description}
+              {task.description || "Açıklama yok."}
             </p>
           </div>
 
-          {task.requiresPhoto && (
-            <div className="rounded-2xl bg-amber-50 p-3 text-xs font-black leading-5 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              Bu görev fotoğraf kanıtı gerektiriyor. Fotoğraf önizleme alanını bir sonraki adımda bağlayacağız.
-            </div>
-          )}
+          <TaskEvidencePanel task={task} />
 
           <textarea
             value={rejectNote}
@@ -233,7 +463,7 @@ function ApprovalTaskCard({
               disabled={isBusy}
               className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-black text-red-700 transition active:scale-95 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
             >
-              <XCircle size={18} />
+              {isBusy ? <Loader2 className="animate-spin" size={18} /> : <XCircle size={18} />}
               Reddet
             </button>
 
@@ -243,7 +473,7 @@ function ApprovalTaskCard({
               disabled={isBusy}
               className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition active:scale-95 disabled:opacity-60"
             >
-              <CheckCircle2 size={18} />
+              {isBusy ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
               Onayla
             </button>
           </div>
@@ -445,11 +675,11 @@ export function ApprovalsPanel({ onChanged }: ApprovalsPanelProps) {
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              Personel bazlı onaylar
+              Kanıtlı onay ekranı
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Onay bekleyen işler personel gruplarına ayrıldı.
+              Personelin tamamladığı işleri not, fotoğraf ve durum bilgisiyle kontrol et.
             </p>
           </div>
 
