@@ -6,6 +6,7 @@
   FileCheck2,
   MapPin,
   PlayCircle,
+  XCircle,
 } from "lucide-react"
 import type { TodayTask } from "../../types/task"
 import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
@@ -17,6 +18,10 @@ type TaskCardProps = {
 }
 
 function getStatusIcon(task: TodayTask) {
+  if (task.status === "rejected") {
+    return <XCircle size={20} />
+  }
+
   if (task.status === "completed" || task.status === "approved") {
     return <CheckCircle2 size={20} />
   }
@@ -28,22 +33,58 @@ function getStatusIcon(task: TodayTask) {
   return <Clock3 size={20} />
 }
 
+function getCardClass(task: TodayTask) {
+  if (task.status === "rejected") {
+    return "w-full rounded-[1.35rem] border border-red-200 bg-red-50/80 p-3 text-left shadow-sm transition active:scale-[0.99] disabled:cursor-wait disabled:opacity-70 dark:border-red-900 dark:bg-red-950/25"
+  }
+
+  return "w-full rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 text-left shadow-sm transition active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
+}
+
+function getIconBoxClass(task: TodayTask) {
+  if (task.status === "rejected") {
+    return "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200"
+  }
+
+  if (task.status === "approved" || task.status === "completed") {
+    return "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
+  }
+
+  return "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200"
+}
+
+function getStatusBadgeClass(task: TodayTask) {
+  if (task.status === "rejected") {
+    return "rounded-full bg-red-100 px-2.5 py-1 text-[0.65rem] font-black text-red-700 dark:bg-red-950 dark:text-red-200"
+  }
+
+  if (task.status === "approved") {
+    return "rounded-full bg-emerald-100 px-2.5 py-1 text-[0.65rem] font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
+  }
+
+  if (task.status === "completed") {
+    return "rounded-full bg-cyan-100 px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200"
+  }
+
+  return "rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200"
+}
+
 export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
   return (
     <button
       type="button"
       onClick={() => onOpenDetails(task)}
       disabled={isBusy}
-      className="w-full rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 text-left shadow-sm transition active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
+      className={getCardClass(task)}
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+        <div className={getIconBoxClass(task)}>
           {getStatusIcon(task)}
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
+            <span className={getStatusBadgeClass(task)}>
               {getStatusLabel(task.status)}
             </span>
 
@@ -67,6 +108,13 @@ export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
               <Clock3 size={12} />
               {task.time}
             </span>
+
+            {task.status === "rejected" && (
+              <span className="inline-flex items-center gap-1 font-black text-red-700 dark:text-red-200">
+                <XCircle size={12} />
+                Tekrar gönderilmeli
+              </span>
+            )}
 
             {task.requiresPhoto && (
               <span className="inline-flex items-center gap-1">

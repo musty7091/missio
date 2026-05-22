@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import date
 
@@ -256,8 +256,18 @@ def resolve_business_for_current_user(
     return get_business_or_404(db=db, business_id=current_user.business_id)
 
 
-def build_task_response(task: Task) -> TaskResponse:
+def build_task_response(task: Task, *, db: Session | None = None) -> TaskResponse:
     """Build safe task response."""
+
+    assigned_to_user_full_name = None
+    assigned_to_username = None
+
+    if db is not None and task.assigned_to_user_id is not None:
+        assigned_to_user = db.get(User, task.assigned_to_user_id)
+
+        if assigned_to_user is not None:
+            assigned_to_user_full_name = assigned_to_user.full_name
+            assigned_to_username = assigned_to_user.username
 
     return TaskResponse(
         id=task.id,
@@ -267,6 +277,8 @@ def build_task_response(task: Task) -> TaskResponse:
         description=task.description,
         category_id=task.category_id,
         assigned_to_user_id=task.assigned_to_user_id,
+        assigned_to_user_full_name=assigned_to_user_full_name,
+        assigned_to_username=assigned_to_username,
         created_by_user_id=task.created_by_user_id,
         task_type=task.task_type,
         task_date=task.task_date,
@@ -284,7 +296,6 @@ def build_task_response(task: Task) -> TaskResponse:
         created_at_utc=task.created_at_utc,
         updated_at_utc=task.updated_at_utc,
     )
-
 
 def build_task_event_response(event: TaskEvent) -> TaskEventResponse:
     """Build safe task event response."""
@@ -600,7 +611,7 @@ def create_extra_task_endpoint(
         db.refresh(task)
 
         return TaskCreatedResponse(
-            task=build_task_response(task),
+            task=build_task_response(task, db=db),
             message="Ekstra görev oluşturuldu.",
         )
     except HTTPException:
@@ -650,7 +661,7 @@ def generate_daily_routine_tasks_endpoint(
             task_date=result.task_date,
             created_count=result.created_count,
             skipped_count=result.skipped_count,
-            tasks=[build_task_response(task) for task in result.tasks],
+            tasks=[build_task_response(task, db=db) for task in result.tasks],
             message="Günlük rutin görevler üretildi.",
         )
     except HTTPException:
@@ -703,8 +714,8 @@ def get_my_today_tasks_endpoint(
 
         return MyTodayTasksResponse(
             task_date=result.task_date,
-            routine_tasks=[build_task_response(task) for task in result.routine_tasks],
-            extra_tasks=[build_task_response(task) for task in result.extra_tasks],
+            routine_tasks=[build_task_response(task, db=db) for task in result.routine_tasks],
+            extra_tasks=[build_task_response(task, db=db) for task in result.extra_tasks],
         )
     except HTTPException:
         db.rollback()
@@ -751,7 +762,7 @@ def list_business_tasks_endpoint(
         )
 
         return BusinessTaskListResponse(
-            tasks=[build_task_response(task) for task in result.tasks],
+            tasks=[build_task_response(task, db=db) for task in result.tasks],
             total_count=result.total_count,
         )
     except HTTPException:
@@ -793,7 +804,7 @@ def list_incomplete_tasks_for_report_endpoint(
         )
 
         return BusinessTaskListResponse(
-            tasks=[build_task_response(task) for task in result.tasks],
+            tasks=[build_task_response(task, db=db) for task in result.tasks],
             total_count=result.total_count,
         )
     except HTTPException:
@@ -1012,7 +1023,7 @@ def get_task_detail_endpoint(
             task_id=task_id,
         )
 
-        return build_task_response(task)
+        return build_task_response(task, db=db)
     except Exception as exc:
         raise map_task_service_error(exc) from exc
 
@@ -1069,7 +1080,7 @@ def update_task_endpoint(
         db.refresh(updated_task)
 
         return TaskUpdatedResponse(
-            task=build_task_response(updated_task),
+            task=build_task_response(updated_task, db=db),
             message="Görev güncellendi.",
         )
     except HTTPException:
@@ -1112,7 +1123,7 @@ def start_task_endpoint(
         db.refresh(started_task)
 
         return TaskStatusChangedResponse(
-            task=build_task_response(started_task),
+            task=build_task_response(started_task, db=db),
             message="Görev başlatıldı.",
         )
     except Exception as exc:
@@ -1152,7 +1163,7 @@ def complete_task_endpoint(
         db.refresh(completed_task)
 
         return TaskStatusChangedResponse(
-            task=build_task_response(completed_task),
+            task=build_task_response(completed_task, db=db),
             message="Görev tamamlandı.",
         )
     except Exception as exc:
@@ -1189,7 +1200,7 @@ def approve_task_endpoint(
         db.refresh(approved_task)
 
         return TaskStatusChangedResponse(
-            task=build_task_response(approved_task),
+            task=build_task_response(approved_task, db=db),
             message="Görev onaylandı.",
         )
     except Exception as exc:
@@ -1226,7 +1237,7 @@ def reject_task_endpoint(
         db.refresh(rejected_task)
 
         return TaskStatusChangedResponse(
-            task=build_task_response(rejected_task),
+            task=build_task_response(rejected_task, db=db),
             message="Görev reddedildi.",
         )
     except Exception as exc:
@@ -1263,7 +1274,7 @@ def cancel_task_endpoint(
         db.refresh(cancelled_task)
 
         return TaskStatusChangedResponse(
-            task=build_task_response(cancelled_task),
+            task=build_task_response(cancelled_task, db=db),
             message="Görev iptal edildi.",
         )
     except Exception as exc:
@@ -1300,7 +1311,7 @@ def delete_task_endpoint(
         db.refresh(deleted_task)
 
         return TaskStatusChangedResponse(
-            task=build_task_response(deleted_task),
+            task=build_task_response(deleted_task, db=db),
             message="Görev silindi.",
         )
     except Exception as exc:

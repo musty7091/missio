@@ -19,6 +19,10 @@ export function TaskFilterTabs({
   tasks,
   onFilterChange,
 }: TaskFilterTabsProps) {
+  const waitingCount = tasks.filter(
+    (task) => task.status === "assigned" || task.status === "rejected",
+  ).length
+
   const completedCount = tasks.filter(
     (task) => task.status === "completed" || task.status === "approved",
   ).length
@@ -31,8 +35,8 @@ export function TaskFilterTabs({
     },
     {
       key: "waiting",
-      label: "Bekleyen",
-      count: tasks.filter((task) => task.status === "assigned").length,
+      label: "Yapılacak",
+      count: waitingCount,
     },
     {
       key: "active",

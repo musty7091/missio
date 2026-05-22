@@ -5,20 +5,33 @@ type TodayOperationSummaryProps = {
   completedCount: number
   activeCount: number
   waitingCount: number
+  rejectedCount: number
   remainingCount: number
 }
 
 function SummaryMiniItem({
   label,
   value,
+  tone = "default",
 }: {
   label: string
   value: number
+  tone?: "default" | "danger"
 }) {
+  const className =
+    tone === "danger"
+      ? "min-w-0 rounded-2xl bg-red-500/20 px-3 py-2 ring-1 ring-red-400/30"
+      : "min-w-0 rounded-2xl bg-white/10 px-3 py-2"
+
+  const valueClassName =
+    tone === "danger"
+      ? "text-lg font-black leading-none text-red-100"
+      : "text-lg font-black leading-none text-white"
+
   return (
-    <div className="min-w-0 rounded-2xl bg-white/10 px-3 py-2">
-      <p className="text-lg font-black leading-none text-white">{value}</p>
-      <p className="mt-1 truncate text-[0.68rem] font-bold text-slate-300">{label}</p>
+    <div className={className}>
+      <p className={valueClassName}>{value}</p>
+      <p className="mt-1 truncate text-[0.62rem] font-bold text-slate-300">{label}</p>
     </div>
   )
 }
@@ -28,6 +41,7 @@ export function TodayOperationSummary({
   completedCount,
   activeCount,
   waitingCount,
+  rejectedCount,
   remainingCount,
 }: TodayOperationSummaryProps) {
   const completionRate =
@@ -68,11 +82,18 @@ export function TodayOperationSummary({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <SummaryMiniItem label="Tamamlanan" value={completedCount} />
+      <div className="grid grid-cols-4 gap-2">
+        <SummaryMiniItem label="Biten" value={completedCount} />
         <SummaryMiniItem label="Devam" value={activeCount} />
-        <SummaryMiniItem label="Bekleyen" value={waitingCount} />
+        <SummaryMiniItem label="Yapılacak" value={waitingCount} />
+        <SummaryMiniItem label="Red" value={rejectedCount} tone="danger" />
       </div>
+
+      {rejectedCount > 0 && (
+        <div className="mt-3 rounded-2xl bg-red-500/15 px-3 py-2 text-[0.72rem] font-bold leading-5 text-red-100 ring-1 ring-red-400/20">
+          Reddedilen görevler tamamlanmış sayılmaz. Personel göreve tekrar girip düzeltme sonrası yeniden göndermelidir.
+        </div>
+      )}
 
       <div className="mt-3 flex items-center gap-2 text-[0.72rem] font-bold text-slate-400">
         <CheckCircle2 size={14} />

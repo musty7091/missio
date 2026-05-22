@@ -424,6 +424,24 @@ function TaskComposerSheet({
   onRequiresManagerApprovalChange: () => void
   onCreate: () => void
 }) {
+  const selectedStaffForPreview = staffUsers.find(
+    (user) => String(user.id) === selectedUserId,
+  )
+  const selectedStaffName = selectedStaffForPreview
+    ? selectedStaffForPreview.full_name
+    : "Personel seçilmedi"
+  const selectedTaskKindLabel =
+    taskKind === "routine" ? "Rutin görev" : "Ekstra görev"
+  const selectedDueTimeLabel = dueTime ? dueTime : "Saat belirtilmedi"
+  const requirementSummary =
+    [
+      requiresPhoto ? "Fotoğraf" : null,
+      requiresLocation ? "Konum" : null,
+      requiresManagerApproval ? "Yönetici onayı" : null,
+    ]
+      .filter(Boolean)
+      .join(" + ") || "Ek şart yok"
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/45 px-3 pb-3 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-md overflow-hidden rounded-[2rem] bg-[var(--missio-card-bg)] shadow-2xl">
@@ -487,8 +505,8 @@ function TaskComposerSheet({
 
             <p className="mt-2 text-[0.7rem] font-bold leading-5 text-[var(--missio-text-muted)]">
               {taskKind === "routine"
-                ? "Rutin görev her gün tekrar eden görev şablonu olarak kaydedilir."
-                : "Ekstra görev bugüne özel tek seferlik görev olarak atanır."}
+                ? "Rutin görev bu işletmeye özel günlük tekrar şablonu olarak kaydedilir ve bugünün görevlerine de işlenir."
+                : "Ekstra görev bugüne özel tek seferlik iş olarak atanır."}
             </p>
 
             <div className="mt-2 rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-xs font-black text-[var(--missio-text-main)]">
@@ -551,7 +569,7 @@ function TaskComposerSheet({
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1.5 block text-xs font-black text-[var(--missio-text-muted)]">
-                Saat
+                {taskKind === "routine" ? "Her gün saat" : "Bugün saat"}
               </span>
               <input
                 type="time"
@@ -604,6 +622,47 @@ function TaskComposerSheet({
                 isActive={requiresManagerApproval}
                 onToggle={onRequiresManagerApprovalChange}
               />
+            </div>
+          </div>
+
+          <div className="rounded-[1.4rem] border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-black text-[var(--missio-text-muted)]">
+                Kaydetmeden önce
+              </p>
+
+              <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
+                {selectedTaskKindLabel}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[0.72rem] font-bold text-[var(--missio-text-muted)]">
+              <div className="rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
+                <p className="text-[0.6rem] font-black uppercase tracking-wide opacity-70">
+                  Personel
+                </p>
+                <p className="mt-1 truncate text-[var(--missio-text-main)]">
+                  {selectedStaffName}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
+                <p className="text-[0.6rem] font-black uppercase tracking-wide opacity-70">
+                  Saat
+                </p>
+                <p className="mt-1 truncate text-[var(--missio-text-main)]">
+                  {selectedDueTimeLabel}
+                </p>
+              </div>
+
+              <div className="col-span-2 rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
+                <p className="text-[0.6rem] font-black uppercase tracking-wide opacity-70">
+                  Şartlar
+                </p>
+                <p className="mt-1 truncate text-[var(--missio-text-main)]">
+                  {requirementSummary}
+                </p>
+              </div>
             </div>
           </div>
 

@@ -18,6 +18,8 @@ export type ApiTask = {
   description: string | null
   category_id: number | null
   assigned_to_user_id: number | null
+  assigned_to_user_full_name: string | null
+  assigned_to_username: string | null
   created_by_user_id: number | null
   task_type: ApiTaskType
   task_date: string
@@ -41,3 +43,4 @@ export type MyTodayTasksResponse = {
   routine_tasks: ApiTask[]
   extra_tasks: ApiTask[]
 }
+

@@ -21,6 +21,9 @@ function formatTaskTime(task: ApiTask) {
 export function mapApiTaskToTodayTask(task: ApiTask): TodayTask {
   return {
     id: task.id,
+    assignedToUserId: task.assigned_to_user_id,
+    assignedToUserFullName: task.assigned_to_user_full_name,
+    assignedToUsername: task.assigned_to_username,
     title: task.title,
     description: task.description || "Açıklama eklenmemiş.",
     status: task.status,
@@ -47,3 +50,4 @@ export function mapMyTodayTasksResponseToTodayTasks(response: {
 }) {
   return [...response.routine_tasks, ...response.extra_tasks].map(mapApiTaskToTodayTask)
 }
+

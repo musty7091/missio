@@ -1,12 +1,21 @@
-﻿import { BarChart3, Bell, ClipboardCheck, ShieldCheck, UserRound } from "lucide-react"
+﻿import {
+  BarChart3,
+  Bell,
+  ClipboardCheck,
+  FileCheck2,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react"
 import { useEffect, useState } from "react"
 
 export type AppTab = "tasks" | "notifications" | "reports" | "profile"
 
 type NavigationItem = {
   id: AppTab
-  label: string
-  icon: typeof ClipboardCheck
+  staffLabel: string
+  managerLabel: string
+  staffIcon: typeof ClipboardCheck
+  managerIcon: typeof ClipboardCheck
 }
 
 type BottomNavigationProps = {
@@ -21,23 +30,31 @@ const NOTIFICATION_SEEN_DATE_STORAGE_KEY = "missio-notifications-seen-date"
 const navigationItems: NavigationItem[] = [
   {
     id: "tasks",
-    label: "Görev",
-    icon: ClipboardCheck,
+    staffLabel: "Görev",
+    managerLabel: "Görev",
+    staffIcon: ClipboardCheck,
+    managerIcon: ClipboardCheck,
   },
   {
     id: "notifications",
-    label: "Bildirim",
-    icon: Bell,
+    staffLabel: "Bildirim",
+    managerLabel: "Onay",
+    staffIcon: Bell,
+    managerIcon: FileCheck2,
   },
   {
     id: "reports",
-    label: "Rapor",
-    icon: BarChart3,
+    staffLabel: "Kontrol",
+    managerLabel: "Rapor",
+    staffIcon: ShieldCheck,
+    managerIcon: BarChart3,
   },
   {
     id: "profile",
-    label: "Profil",
-    icon: UserRound,
+    staffLabel: "Profil",
+    managerLabel: "Profil",
+    staffIcon: UserRound,
+    managerIcon: UserRound,
   },
 ]
 
@@ -48,6 +65,10 @@ function getLocalTodayDateKey() {
   const day = String(now.getDate()).padStart(2, "0")
 
   return `${year}-${month}-${day}`
+}
+
+function isManagerRole(role: string) {
+  return role === "manager" || role === "boss" || role === "owner" || role === "admin" || role === "super_admin"
 }
 
 function isNotificationsSeenToday() {
@@ -65,19 +86,19 @@ function markNotificationsSeenToday() {
 }
 
 function getNavigationLabel(item: NavigationItem, role: string) {
-  if (item.id === "reports" && role === "staff") {
-    return "Kontrol"
+  if (isManagerRole(role)) {
+    return item.managerLabel
   }
 
-  return item.label
+  return item.staffLabel
 }
 
 function getNavigationIcon(item: NavigationItem, role: string) {
-  if (item.id === "reports" && role === "staff") {
-    return ShieldCheck
+  if (isManagerRole(role)) {
+    return item.managerIcon
   }
 
-  return item.icon
+  return item.staffIcon
 }
 
 export function BottomNavigation({
@@ -109,6 +130,7 @@ export function BottomNavigation({
   const visibleNotificationCount = hasSeenNotificationsToday ? 0 : notificationCount
   const notificationLabel =
     visibleNotificationCount > 9 ? "9+" : String(visibleNotificationCount)
+  const shouldUseBadge = !isManagerRole(role)
 
   return (
     <nav
@@ -120,7 +142,9 @@ export function BottomNavigation({
           const Icon = getNavigationIcon(item, role)
           const isActive = item.id === activeTab
           const shouldShowBadge =
-            item.id === "notifications" && visibleNotificationCount > 0
+            shouldUseBadge &&
+            item.id === "notifications" &&
+            visibleNotificationCount > 0
 
           return (
             <button

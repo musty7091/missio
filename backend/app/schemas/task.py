@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import date, datetime, time
 
@@ -403,6 +403,8 @@ class TaskResponse(BaseModel):
     description: str | None
     category_id: int | None
     assigned_to_user_id: int | None
+    assigned_to_user_full_name: str | None = None
+    assigned_to_username: str | None = None
     created_by_user_id: int | None
     task_type: str
     task_date: date

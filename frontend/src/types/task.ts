@@ -14,6 +14,9 @@ export type TaskType = "routine" | "extra"
 
 export type TodayTask = {
   id: number
+  assignedToUserId: number | null
+  assignedToUserFullName: string | null
+  assignedToUsername: string | null
   title: string
   description: string
   status: TaskStatus
@@ -32,3 +35,4 @@ export type TodayTask = {
   requiresLocation: boolean
   requiresManagerApproval: boolean
 }
+

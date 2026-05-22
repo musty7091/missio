@@ -10,7 +10,7 @@ type AppHeaderProps = {
 }
 
 function getRoleLabel(role: string) {
-  if (role === "owner") {
+  if (role === "owner" || role === "boss") {
     return "Patron"
   }
 
@@ -96,3 +96,4 @@ export function AppHeader({
     </header>
   )
 }
+

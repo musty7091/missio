@@ -1,11 +1,9 @@
 ﻿import {
   AlertTriangle,
-  BarChart3,
   Camera,
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
-  Clock3,
   FileCheck2,
   PlayCircle,
   ShieldAlert,
@@ -407,7 +405,7 @@ function StaffControlPanel({
 
 function ManagementReportPlaceholder({ role }: { role: string }) {
   const roleTitle =
-    role === "owner"
+    role === "boss"
       ? "Patron raporları"
       : role === "admin"
         ? "Admin raporları"
@@ -485,3 +483,5 @@ export function ReportsPanel({
 
   return <ManagementReportPlaceholder role={role} />
 }
+
+
