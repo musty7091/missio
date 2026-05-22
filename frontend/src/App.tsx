@@ -10,6 +10,7 @@ import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
 import { NotificationPanel } from "./components/notifications/NotificationPanel"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
+import { ReportsPanel } from "./components/reports/ReportsPanel"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
 import { TaskFilterTabs, type TaskListFilter } from "./components/tasks/TaskFilterTabs"
@@ -551,6 +552,12 @@ export default function App() {
           </>
         ) : activeTab === "notifications" ? (
           <NotificationPanel tasks={tasks} onOpenTaskDetails={openTaskDetails} />
+        ) : activeTab === "reports" ? (
+          <ReportsPanel
+            tasks={tasks}
+            role={currentUser.role}
+            onOpenTaskDetails={openTaskDetails}
+          />
         ) : activeTab === "profile" ? (
           <ProfilePanel
             user={currentUser}
@@ -576,12 +583,15 @@ export default function App() {
         <BottomNavigation
           activeTab={activeTab}
           notificationCount={bottomNotificationCount}
+          role={currentUser.role}
           onTabChange={setActiveTab}
         />
       </section>
     </main>
   )
 }
+
+
 
 
 

@@ -1,4 +1,4 @@
-﻿import { BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
+﻿import { BarChart3, Bell, ClipboardCheck, ShieldCheck, UserRound } from "lucide-react"
 import { useEffect, useState } from "react"
 
 export type AppTab = "tasks" | "notifications" | "reports" | "profile"
@@ -6,13 +6,13 @@ export type AppTab = "tasks" | "notifications" | "reports" | "profile"
 type NavigationItem = {
   id: AppTab
   label: string
-  shortLabel: string
   icon: typeof ClipboardCheck
 }
 
 type BottomNavigationProps = {
   activeTab: AppTab
   notificationCount: number
+  role: string
   onTabChange: (tab: AppTab) => void
 }
 
@@ -21,26 +21,22 @@ const NOTIFICATION_SEEN_DATE_STORAGE_KEY = "missio-notifications-seen-date"
 const navigationItems: NavigationItem[] = [
   {
     id: "tasks",
-    label: "Görevler",
-    shortLabel: "Görev",
+    label: "Görev",
     icon: ClipboardCheck,
   },
   {
     id: "notifications",
-    label: "Bildirimler",
-    shortLabel: "Bildirim",
+    label: "Bildirim",
     icon: Bell,
   },
   {
     id: "reports",
-    label: "Raporlar",
-    shortLabel: "Rapor",
+    label: "Rapor",
     icon: BarChart3,
   },
   {
     id: "profile",
     label: "Profil",
-    shortLabel: "Profil",
     icon: UserRound,
   },
 ]
@@ -68,9 +64,26 @@ function markNotificationsSeenToday() {
   )
 }
 
+function getNavigationLabel(item: NavigationItem, role: string) {
+  if (item.id === "reports" && role === "staff") {
+    return "Kontrol"
+  }
+
+  return item.label
+}
+
+function getNavigationIcon(item: NavigationItem, role: string) {
+  if (item.id === "reports" && role === "staff") {
+    return ShieldCheck
+  }
+
+  return item.icon
+}
+
 export function BottomNavigation({
   activeTab,
   notificationCount,
+  role,
   onTabChange,
 }: BottomNavigationProps) {
   const [hasSeenNotificationsToday, setHasSeenNotificationsToday] = useState(() =>
@@ -104,7 +117,7 @@ export function BottomNavigation({
     >
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
-          const Icon = item.icon
+          const Icon = getNavigationIcon(item, role)
           const isActive = item.id === activeTab
           const shouldShowBadge =
             item.id === "notifications" && visibleNotificationCount > 0
@@ -131,7 +144,7 @@ export function BottomNavigation({
                 )}
               </span>
 
-              <span className="leading-none">{item.shortLabel}</span>
+              <span className="leading-none">{getNavigationLabel(item, role)}</span>
             </button>
           )
         })}
