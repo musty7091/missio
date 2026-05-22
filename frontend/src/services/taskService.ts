@@ -183,3 +183,72 @@ export function listTaskEvents(taskId: number) {
 export function getTaskAttachmentFileBlob(taskId: number, attachmentId: number) {
   return apiFileRequest(`/tasks/${taskId}/attachments/${attachmentId}/file`)
 }
+
+export type BusinessTaskListResponse = {
+  tasks: ApiTask[]
+  total_count: number
+}
+
+type ListBusinessTasksParams = {
+  businessId?: number
+  taskDate?: string
+  taskType?: string
+  status?: string
+  assignedToUserId?: number
+  limit?: number
+  offset?: number
+}
+
+export function listBusinessTasks(params: ListBusinessTasksParams = {}) {
+  return apiRequest<BusinessTaskListResponse>("/tasks", {
+    method: "GET",
+    query: {
+      business_id: params.businessId,
+      task_date: params.taskDate,
+      task_type: params.taskType,
+      status: params.status,
+      assigned_to_user_id: params.assignedToUserId,
+      limit: params.limit,
+      offset: params.offset,
+    },
+  })
+}
+
+export function approveTask(taskId: number, payload: ChangeTaskPayload = {}) {
+  return apiRequest<TaskStatusChangedResponse>(`/tasks/${taskId}/approve`, {
+    method: "POST",
+    body: payload,
+  })
+}
+
+export function rejectTask(taskId: number, payload: { note: string }) {
+  return apiRequest<TaskStatusChangedResponse>(`/tasks/${taskId}/reject`, {
+    method: "POST",
+    body: payload,
+  })
+}
+
+
+export type CreateExtraTaskPayload = {
+  assigned_to_user_id: number
+  title: string
+  description?: string | null
+  category_id?: number | null
+  priority: "low" | "normal" | "high" | "urgent"
+  due_at_utc?: string | null
+  requires_photo: boolean
+  requires_location: boolean
+  requires_manager_approval: boolean
+}
+
+type TaskCreatedResponse = {
+  task: ApiTask
+  message: string
+}
+
+export function createExtraTask(payload: CreateExtraTaskPayload) {
+  return apiRequest<TaskCreatedResponse>("/tasks/extra", {
+    method: "POST",
+    body: payload,
+  })
+}

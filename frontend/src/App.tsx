@@ -1,5 +1,6 @@
-﻿import { AlertCircle, BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
+import { AlertCircle, BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { ApprovalsPanel } from "./components/approvals/ApprovalsPanel"
 import { LoginScreen } from "./components/auth/LoginScreen"
 import {
   AppStatePanel,
@@ -8,6 +9,7 @@ import {
 } from "./components/common/AppStatePanel"
 import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
+import { ManagerTasksPanel } from "./components/manager/ManagerTasksPanel"
 import { NotificationPanel } from "./components/notifications/NotificationPanel"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
 import { ReportsPanel } from "./components/reports/ReportsPanel"
@@ -320,12 +322,19 @@ export default function App() {
   }, [selectedTaskId])
 
   const taskStats = useMemo(() => {
+    const completedCount = tasks.filter(
+      (task) => task.status === "completed" || task.status === "approved",
+    ).length
+
+    const rejectedCount = tasks.filter((task) => task.status === "rejected").length
+
     return {
       totalCount: tasks.length,
-      completedCount: tasks.filter(
-        (task) => task.status === "completed" || task.status === "approved",
+      completedCount,
+      rejectedCount,
+      waitingCount: tasks.filter(
+        (task) => task.status === "assigned" || task.status === "rejected",
       ).length,
-      waitingCount: tasks.filter((task) => task.status === "assigned").length,
       activeCount: tasks.filter((task) => task.status === "in_progress").length,
       remainingCount: tasks.filter(
         (task) => task.status !== "completed" && task.status !== "approved",
@@ -335,7 +344,9 @@ export default function App() {
 
   const filteredTasks = useMemo(() => {
     if (taskListFilter === "waiting") {
-      return tasks.filter((task) => task.status === "assigned")
+      return tasks.filter(
+        (task) => task.status === "assigned" || task.status === "rejected",
+      )
     }
 
     if (taskListFilter === "active") {
@@ -462,12 +473,14 @@ export default function App() {
         />
 
         {activeTab === "tasks" ? (
-          <>
+          currentUser.role === "staff" ? (
+            <>
             <TodayOperationSummary
               totalCount={taskStats.totalCount}
               completedCount={taskStats.completedCount}
               activeCount={taskStats.activeCount}
               waitingCount={taskStats.waitingCount}
+              rejectedCount={taskStats.rejectedCount}
               remainingCount={taskStats.remainingCount}
             />
 
@@ -550,8 +563,24 @@ export default function App() {
                 )}
             </section>
           </>
+          ) : (
+            <ManagerTasksPanel
+              businessId={currentUser.business_id}
+              currentUserId={currentUser.id}
+              busyTaskId={busyTaskId}
+              onOpenOwnTaskDetails={openTaskDetails}
+              onChanged={() => void loadTodayTasks()}
+            />
+          )
         ) : activeTab === "notifications" ? (
-          <NotificationPanel tasks={tasks} onOpenTaskDetails={openTaskDetails} />
+          currentUser.role === "staff" ? (
+            <NotificationPanel
+              tasks={tasks}
+              onOpenTaskDetails={openTaskDetails}
+            />
+          ) : (
+            <ApprovalsPanel onChanged={() => void loadTodayTasks()} />
+          )
         ) : activeTab === "reports" ? (
           <ReportsPanel
             tasks={tasks}
@@ -590,6 +619,10 @@ export default function App() {
     </main>
   )
 }
+
+
+
+
 
 
 
