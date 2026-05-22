@@ -3,19 +3,18 @@
   Bell,
   ClipboardCheck,
   FileCheck2,
+  Home,
   ShieldCheck,
   UserRound,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 export type AppTab = "tasks" | "notifications" | "reports" | "profile"
 
 type NavigationItem = {
   id: AppTab
-  staffLabel: string
-  managerLabel: string
-  staffIcon: typeof ClipboardCheck
-  managerIcon: typeof ClipboardCheck
+  label: string
+  icon: typeof ClipboardCheck
 }
 
 type BottomNavigationProps = {
@@ -27,37 +26,6 @@ type BottomNavigationProps = {
 
 const NOTIFICATION_SEEN_DATE_STORAGE_KEY = "missio-notifications-seen-date"
 
-const navigationItems: NavigationItem[] = [
-  {
-    id: "tasks",
-    staffLabel: "Görev",
-    managerLabel: "Görev",
-    staffIcon: ClipboardCheck,
-    managerIcon: ClipboardCheck,
-  },
-  {
-    id: "notifications",
-    staffLabel: "Bildirim",
-    managerLabel: "Onay",
-    staffIcon: Bell,
-    managerIcon: FileCheck2,
-  },
-  {
-    id: "reports",
-    staffLabel: "Kontrol",
-    managerLabel: "Rapor",
-    staffIcon: ShieldCheck,
-    managerIcon: BarChart3,
-  },
-  {
-    id: "profile",
-    staffLabel: "Profil",
-    managerLabel: "Profil",
-    staffIcon: UserRound,
-    managerIcon: UserRound,
-  },
-]
-
 function getLocalTodayDateKey() {
   const now = new Date()
   const year = now.getFullYear()
@@ -67,8 +35,18 @@ function getLocalTodayDateKey() {
   return `${year}-${month}-${day}`
 }
 
-function isManagerRole(role: string) {
-  return role === "manager" || role === "boss" || role === "owner" || role === "admin" || role === "super_admin"
+function isStaffRole(role: string) {
+  return role === "staff"
+}
+
+function isBossRole(role: string) {
+  return (
+    role === "boss" ||
+    role === "business_owner" ||
+    role === "owner" ||
+    role === "super_admin" ||
+    role === "admin"
+  )
 }
 
 function isNotificationsSeenToday() {
@@ -85,20 +63,79 @@ function markNotificationsSeenToday() {
   )
 }
 
-function getNavigationLabel(item: NavigationItem, role: string) {
-  if (isManagerRole(role)) {
-    return item.managerLabel
+function getNavigationItems(role: string): NavigationItem[] {
+  if (isStaffRole(role)) {
+    return [
+      {
+        id: "tasks",
+        label: "Görev",
+        icon: ClipboardCheck,
+      },
+      {
+        id: "notifications",
+        label: "Bildirim",
+        icon: Bell,
+      },
+      {
+        id: "reports",
+        label: "Kontrol",
+        icon: ShieldCheck,
+      },
+      {
+        id: "profile",
+        label: "Profil",
+        icon: UserRound,
+      },
+    ]
   }
 
-  return item.staffLabel
-}
-
-function getNavigationIcon(item: NavigationItem, role: string) {
-  if (isManagerRole(role)) {
-    return item.managerIcon
+  if (isBossRole(role)) {
+    return [
+      {
+        id: "tasks",
+        label: "Özet",
+        icon: Home,
+      },
+      {
+        id: "reports",
+        label: "Rapor",
+        icon: BarChart3,
+      },
+      {
+        id: "notifications",
+        label: "Onay",
+        icon: FileCheck2,
+      },
+      {
+        id: "profile",
+        label: "Profil",
+        icon: UserRound,
+      },
+    ]
   }
 
-  return item.staffIcon
+  return [
+    {
+      id: "tasks",
+      label: "Operasyon",
+      icon: ClipboardCheck,
+    },
+    {
+      id: "notifications",
+      label: "Onay",
+      icon: FileCheck2,
+    },
+    {
+      id: "reports",
+      label: "Gün Kapat",
+      icon: ShieldCheck,
+    },
+    {
+      id: "profile",
+      label: "Profil",
+      icon: UserRound,
+    },
+  ]
 }
 
 export function BottomNavigation({
@@ -127,10 +164,11 @@ export function BottomNavigation({
     onTabChange(tab)
   }
 
+  const navigationItems = useMemo(() => getNavigationItems(role), [role])
   const visibleNotificationCount = hasSeenNotificationsToday ? 0 : notificationCount
   const notificationLabel =
     visibleNotificationCount > 9 ? "9+" : String(visibleNotificationCount)
-  const shouldUseBadge = !isManagerRole(role)
+  const shouldUseBadge = isStaffRole(role)
 
   return (
     <nav
@@ -139,7 +177,7 @@ export function BottomNavigation({
     >
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
-          const Icon = getNavigationIcon(item, role)
+          const Icon = item.icon
           const isActive = item.id === activeTab
           const shouldShowBadge =
             shouldUseBadge &&
@@ -168,7 +206,7 @@ export function BottomNavigation({
                 )}
               </span>
 
-              <span className="leading-none">{getNavigationLabel(item, role)}</span>
+              <span className="leading-none">{item.label}</span>
             </button>
           )
         })}

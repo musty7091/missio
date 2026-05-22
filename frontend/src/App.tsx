@@ -9,6 +9,8 @@ import {
 } from "./components/common/AppStatePanel"
 import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
+import { BossDashboardPanel } from "./components/boss/BossDashboardPanel"
+import { BossReportsPanel } from "./components/boss/BossReportsPanel"
 import { ManagerTasksPanel } from "./components/manager/ManagerTasksPanel"
 import { NotificationPanel } from "./components/notifications/NotificationPanel"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
@@ -569,6 +571,12 @@ export default function App() {
                 )}
             </section>
           </>
+          ) : currentUser.role === "boss" || currentUser.role === "business_owner" ? (
+            <BossDashboardPanel
+              businessId={currentUser.business_id}
+              onOpenApprovals={() => setActiveTab("notifications")}
+              onOpenReports={() => setActiveTab("reports")}
+            />
           ) : (
             <ManagerTasksPanel
               businessId={currentUser.business_id}
@@ -591,12 +599,16 @@ export default function App() {
             />
           )
         ) : activeTab === "reports" ? (
-          <ReportsPanel
-            tasks={tasks}
-            role={currentUser.role}
-            businessId={currentUser.business_id}
-            onOpenTaskDetails={openTaskDetails}
-          />
+          currentUser.role === "boss" || currentUser.role === "business_owner" ? (
+            <BossReportsPanel businessId={currentUser.business_id} />
+          ) : (
+            <ReportsPanel
+              tasks={tasks}
+              role={currentUser.role}
+              businessId={currentUser.business_id}
+              onOpenTaskDetails={openTaskDetails}
+            />
+          )
         ) : activeTab === "profile" ? (
           <ProfilePanel
             user={currentUser}
