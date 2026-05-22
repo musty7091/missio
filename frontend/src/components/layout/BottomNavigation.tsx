@@ -1,4 +1,5 @@
 ﻿import { BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export type AppTab = "tasks" | "notifications" | "reports" | "profile"
 
@@ -14,6 +15,8 @@ type BottomNavigationProps = {
   notificationCount: number
   onTabChange: (tab: AppTab) => void
 }
+
+const NOTIFICATION_SEEN_DATE_STORAGE_KEY = "missio-notifications-seen-date"
 
 const navigationItems: NavigationItem[] = [
   {
@@ -42,12 +45,57 @@ const navigationItems: NavigationItem[] = [
   },
 ]
 
+function getLocalTodayDateKey() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
+function isNotificationsSeenToday() {
+  return (
+    window.localStorage.getItem(NOTIFICATION_SEEN_DATE_STORAGE_KEY) ===
+    getLocalTodayDateKey()
+  )
+}
+
+function markNotificationsSeenToday() {
+  window.localStorage.setItem(
+    NOTIFICATION_SEEN_DATE_STORAGE_KEY,
+    getLocalTodayDateKey(),
+  )
+}
+
 export function BottomNavigation({
   activeTab,
   notificationCount,
   onTabChange,
 }: BottomNavigationProps) {
-  const notificationLabel = notificationCount > 9 ? "9+" : String(notificationCount)
+  const [hasSeenNotificationsToday, setHasSeenNotificationsToday] = useState(() =>
+    isNotificationsSeenToday(),
+  )
+
+  useEffect(() => {
+    if (activeTab === "notifications") {
+      markNotificationsSeenToday()
+      setHasSeenNotificationsToday(true)
+    }
+  }, [activeTab])
+
+  function handleTabChange(tab: AppTab) {
+    if (tab === "notifications") {
+      markNotificationsSeenToday()
+      setHasSeenNotificationsToday(true)
+    }
+
+    onTabChange(tab)
+  }
+
+  const visibleNotificationCount = hasSeenNotificationsToday ? 0 : notificationCount
+  const notificationLabel =
+    visibleNotificationCount > 9 ? "9+" : String(visibleNotificationCount)
 
   return (
     <nav
@@ -58,13 +106,14 @@ export function BottomNavigation({
         {navigationItems.map((item) => {
           const Icon = item.icon
           const isActive = item.id === activeTab
-          const shouldShowBadge = item.id === "notifications" && notificationCount > 0
+          const shouldShowBadge =
+            item.id === "notifications" && visibleNotificationCount > 0
 
           return (
             <button
               key={item.id}
               type="button"
-              onClick={() => onTabChange(item.id)}
+              onClick={() => handleTabChange(item.id)}
               aria-current={isActive ? "page" : undefined}
               className={
                 isActive

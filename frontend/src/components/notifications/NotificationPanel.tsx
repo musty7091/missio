@@ -376,7 +376,6 @@ export function NotificationPanel({
   const assignmentNotifications = buildAssignmentNotifications(tasks)
   const attentionNotifications = buildAttentionNotifications(tasks)
   const notifications = [...assignmentNotifications, ...attentionNotifications]
-  const unreadCount = notifications.filter((notification) => notification.isUnread).length
 
   function toggleNotification(notificationId: string) {
     setExpandedNotificationId((currentId) =>
@@ -401,11 +400,6 @@ export function NotificationPanel({
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
               Bildirime dokunarak ilgili görevleri görüntüleyebilirsin.
             </p>
-          </div>
-
-          <div className="shrink-0 rounded-2xl bg-cyan-300 px-3 py-2 text-center text-slate-950">
-            <p className="text-lg font-black leading-none">{unreadCount}</p>
-            <p className="mt-1 text-[0.62rem] font-black">yeni</p>
           </div>
         </div>
       </div>
@@ -496,3 +490,5 @@ export function NotificationPanel({
     </section>
   )
 }
+
+
