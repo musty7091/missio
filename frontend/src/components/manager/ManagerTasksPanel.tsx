@@ -1,4 +1,4 @@
-import {
+﻿import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
@@ -6,27 +6,20 @@ import {
   ClipboardList,
   FileCheck2,
   ImageIcon,
-  Loader2,
   MapPin,
   Plus,
   RefreshCw,
-  Send,
   UserRound,
   UsersRound,
-  X,
 } from "lucide-react"
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   listBusinessUsers,
   type BusinessUser,
 } from "../../services/businessUserService"
-import {
-  createExtraTask,
-  createRoutineTaskTemplate,
-  generateDailyRoutineTasks,
-  listBusinessTasks,
-} from "../../services/taskService"
+import { listBusinessTasks } from "../../services/taskService"
 import { TaskCard } from "../tasks/TaskCard"
+import { TaskAssignSheet } from "../tasks/TaskAssignSheet"
 import type { TodayTask } from "../../types/task"
 import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
 import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
@@ -38,10 +31,6 @@ type ManagerTasksPanelProps = {
   onOpenOwnTaskDetails: (task: TodayTask) => void
   onChanged: () => void
 }
-
-type PriorityValue = "low" | "normal" | "high" | "urgent"
-
-type TaskKind = "extra" | "routine"
 
 type StaffMetrics = {
   total: number
@@ -60,32 +49,6 @@ function getLocalTodayDateKey() {
   return `${year}-${month}-${day}`
 }
 
-function buildDueAtUtcFromLocalTime(timeValue: string) {
-  if (!timeValue) {
-    return null
-  }
-
-  const [hourText, minuteText] = timeValue.split(":")
-  const hour = Number(hourText)
-  const minute = Number(minuteText)
-
-  if (Number.isNaN(hour) || Number.isNaN(minute)) {
-    return null
-  }
-
-  const now = new Date()
-  const dueDate = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    hour,
-    minute,
-    0,
-    0,
-  )
-
-  return dueDate.toISOString()
-}
 
 function formatTaskTime(value: string | null) {
   if (!value) {
@@ -139,7 +102,7 @@ function getStaffName(task: TodayTask) {
 
 function getReadableStatusLabel(task: TodayTask) {
   if (task.status === "completed" && !task.requiresManagerApproval) {
-    return "Tamamlandı"
+    return "TamamlandÄ±"
   }
 
   return getStatusLabel(task.status)
@@ -258,7 +221,7 @@ function StaffCard({
               {metrics.total}
             </p>
             <p className="mt-1 text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              görev
+              gÃ¶rev
             </p>
           </div>
         </div>
@@ -269,7 +232,7 @@ function StaffCard({
               {metrics.open}
             </p>
             <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              Açık
+              AÃ§Ä±k
             </p>
           </div>
 
@@ -301,9 +264,9 @@ function StaffCard({
         <div className="mt-3 rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-center text-xs font-black text-[var(--missio-text-muted)]">
           {hasTasks
             ? isExpanded
-              ? "Görevleri gizle"
-              : "Görevleri göster"
-            : "Bugün görev yok"}
+              ? "GÃ¶revleri gizle"
+              : "GÃ¶revleri gÃ¶ster"
+            : "BugÃ¼n gÃ¶rev yok"}
         </div>
       </button>
 
@@ -437,336 +400,6 @@ function ManagerTaskRow({ task }: { task: TodayTask }) {
   )
 }
 
-function RequirementToggle({
-  label,
-  icon,
-  isActive,
-  onToggle,
-}: {
-  label: string
-  icon: ReactNode
-  isActive: boolean
-  onToggle: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={
-        isActive
-          ? "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-cyan-500 px-2 py-3 text-xs font-black text-white shadow-lg shadow-cyan-500/20"
-          : "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-2 py-3 text-xs font-black text-[var(--missio-text-muted)]"
-      }
-    >
-      {icon}
-      {label}
-    </button>
-  )
-}
-
-function TaskComposerSheet({
-  staffUsers,
-  taskKind,
-  selectedUserId,
-  title,
-  description,
-  dueTime,
-  priority,
-  requiresPhoto,
-  requiresLocation,
-  requiresManagerApproval,
-  isSaving,
-  onClose,
-  onTaskKindChange,
-  onSelectedUserIdChange,
-  onTitleChange,
-  onDescriptionChange,
-  onDueTimeChange,
-  onPriorityChange,
-  onRequiresPhotoChange,
-  onRequiresLocationChange,
-  onRequiresManagerApprovalChange,
-  onCreate,
-}: {
-  staffUsers: BusinessUser[]
-  taskKind: TaskKind
-  selectedUserId: string
-  title: string
-  description: string
-  dueTime: string
-  priority: PriorityValue
-  requiresPhoto: boolean
-  requiresLocation: boolean
-  requiresManagerApproval: boolean
-  isSaving: boolean
-  onClose: () => void
-  onTaskKindChange: (value: TaskKind) => void
-  onSelectedUserIdChange: (value: string) => void
-  onTitleChange: (value: string) => void
-  onDescriptionChange: (value: string) => void
-  onDueTimeChange: (value: string) => void
-  onPriorityChange: (value: PriorityValue) => void
-  onRequiresPhotoChange: () => void
-  onRequiresLocationChange: () => void
-  onRequiresManagerApprovalChange: () => void
-  onCreate: () => void
-}) {
-  const selectedStaffForPreview = staffUsers.find(
-    (user) => String(user.id) === selectedUserId,
-  )
-  const selectedStaffName = selectedStaffForPreview
-    ? selectedStaffForPreview.full_name
-    : "Personel seçilmedi"
-  const selectedTaskKindLabel =
-    taskKind === "routine" ? "Rutin görev" : "Ekstra görev"
-  const selectedDueTimeLabel = dueTime ? dueTime : "Saat belirtilmedi"
-  const requirementSummary =
-    [
-      requiresPhoto ? "Fotoğraf" : null,
-      requiresLocation ? "Konum" : null,
-      requiresManagerApproval ? "Yönetici onayı" : null,
-    ]
-      .filter(Boolean)
-      .join(" + ") || "Ek şart yok"
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/45 px-3 pb-3 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-md overflow-hidden rounded-[2rem] bg-[var(--missio-card-bg)] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[var(--missio-border)] px-4 py-3">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
-              Yeni görev
-            </p>
-            <h3 className="text-lg font-black text-[var(--missio-text-main)]">
-              {taskKind === "routine" ? "Rutin görev oluştur" : "Ekstra görev ata"}
-            </h3>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] text-[var(--missio-text-muted)]"
-            aria-label="Kapat"
-          >
-            <X size={19} />
-          </button>
-        </div>
-
-        <div className="max-h-[calc(92vh-76px)] space-y-3 overflow-y-auto px-4 py-4">
-          <div>
-            <span className="mb-2 block text-xs font-black text-[var(--missio-text-muted)]">
-              Görev tipi
-            </span>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault()
-                  onTaskKindChange("extra")
-                }}
-                className={
-                  taskKind === "extra"
-                    ? "rounded-2xl bg-cyan-500 px-3 py-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20"
-                    : "rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 py-3 text-sm font-black text-[var(--missio-text-muted)]"
-                }
-              >
-                Ekstra
-              </button>
-
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault()
-                  onTaskKindChange("routine")
-                }}
-                className={
-                  taskKind === "routine"
-                    ? "rounded-2xl bg-cyan-500 px-3 py-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20"
-                    : "rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 py-3 text-sm font-black text-[var(--missio-text-muted)]"
-                }
-              >
-                Rutin
-              </button>
-            </div>
-
-            <p className="mt-2 text-[0.7rem] font-bold leading-5 text-[var(--missio-text-muted)]">
-              {taskKind === "routine"
-                ? "Rutin görev bu işletmeye özel günlük tekrar şablonu olarak kaydedilir ve bugünün görevlerine de işlenir."
-                : "Ekstra görev bugüne özel tek seferlik iş olarak atanır."}
-            </p>
-
-            <div className="mt-2 rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-xs font-black text-[var(--missio-text-main)]">
-              Seçili görev tipi: {taskKind === "routine" ? "Rutin görev" : "Ekstra görev"}
-            </div>
-          </div>
-
-          <label className="block">
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <span className="block text-xs font-black text-[var(--missio-text-muted)]">
-                Personel
-              </span>
-
-              <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
-                {staffUsers.length} aktif
-              </span>
-            </div>
-
-            <select
-              value={selectedUserId}
-              onChange={(event) => onSelectedUserIdChange(event.target.value)}
-              className="h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
-            >
-              {staffUsers.length === 0 ? (
-                <option value="">Aktif personel yok</option>
-              ) : (
-                staffUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name} (@{user.username})
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-black text-[var(--missio-text-muted)]">
-              Görev başlığı
-            </span>
-            <input
-              value={title}
-              onChange={(event) => onTitleChange(event.target.value)}
-              placeholder="Örn: Raf düzeni kontrol edilsin"
-              className="h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-black text-[var(--missio-text-muted)]">
-              Açıklama
-            </span>
-            <textarea
-              value={description}
-              onChange={(event) => onDescriptionChange(event.target.value)}
-              placeholder="Personelin görevi nasıl yapacağını açıkla..."
-              className="min-h-24 w-full resize-none rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
-            />
-          </label>
-
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-black text-[var(--missio-text-muted)]">
-                {taskKind === "routine" ? "Her gün saat" : "Bugün saat"}
-              </span>
-              <input
-                type="time"
-                value={dueTime}
-                onChange={(event) => onDueTimeChange(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-black text-[var(--missio-text-muted)]">
-                Öncelik
-              </span>
-              <select
-                value={priority}
-                onChange={(event) => onPriorityChange(event.target.value as PriorityValue)}
-                className="h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
-              >
-                <option value="low">Düşük</option>
-                <option value="normal">Normal</option>
-                <option value="high">Yüksek</option>
-                <option value="urgent">Acil</option>
-              </select>
-            </label>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-black text-[var(--missio-text-muted)]">
-              Görev şartları
-            </p>
-
-            <div className="grid grid-cols-3 gap-2">
-              <RequirementToggle
-                label="Fotoğraf"
-                icon={<ImageIcon size={18} />}
-                isActive={requiresPhoto}
-                onToggle={onRequiresPhotoChange}
-              />
-
-              <RequirementToggle
-                label="Konum"
-                icon={<MapPin size={18} />}
-                isActive={requiresLocation}
-                onToggle={onRequiresLocationChange}
-              />
-
-              <RequirementToggle
-                label="Onay"
-                icon={<FileCheck2 size={18} />}
-                isActive={requiresManagerApproval}
-                onToggle={onRequiresManagerApprovalChange}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[1.4rem] border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-black text-[var(--missio-text-muted)]">
-                Kaydetmeden önce
-              </p>
-
-              <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
-                {selectedTaskKindLabel}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-[0.72rem] font-bold text-[var(--missio-text-muted)]">
-              <div className="rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
-                <p className="text-[0.6rem] font-black uppercase tracking-wide opacity-70">
-                  Personel
-                </p>
-                <p className="mt-1 truncate text-[var(--missio-text-main)]">
-                  {selectedStaffName}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
-                <p className="text-[0.6rem] font-black uppercase tracking-wide opacity-70">
-                  Saat
-                </p>
-                <p className="mt-1 truncate text-[var(--missio-text-main)]">
-                  {selectedDueTimeLabel}
-                </p>
-              </div>
-
-              <div className="col-span-2 rounded-2xl bg-[var(--missio-card-bg)] px-3 py-2">
-                <p className="text-[0.6rem] font-black uppercase tracking-wide opacity-70">
-                  Şartlar
-                </p>
-                <p className="mt-1 truncate text-[var(--missio-text-main)]">
-                  {requirementSummary}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onCreate}
-            disabled={isSaving || staffUsers.length === 0}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-wait disabled:opacity-60"
-          >
-            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-            {taskKind === "routine" ? "Rutin görevi kaydet" : "Ekstra görevi ata"}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function ManagerTasksPanel({
   businessId,
@@ -778,17 +411,7 @@ export function ManagerTasksPanel({
   const [users, setUsers] = useState<BusinessUser[]>([])
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isComposerOpen, setIsComposerOpen] = useState(false)
-  const [selectedUserId, setSelectedUserId] = useState("")
-  const [taskKind, setTaskKind] = useState<TaskKind>("extra")
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [dueTime, setDueTime] = useState("")
-  const [priority, setPriority] = useState<PriorityValue>("normal")
-  const [requiresPhoto, setRequiresPhoto] = useState(false)
-  const [requiresLocation, setRequiresLocation] = useState(false)
-  const [requiresManagerApproval, setRequiresManagerApproval] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -830,24 +453,10 @@ export function ManagerTasksPanel({
     [tasks, currentUserId],
   )
 
-  useEffect(() => {
-    if (staffUsers.length === 0) {
-      setSelectedUserId("")
-      return
-    }
-
-    const selectedUserExists = staffUsers.some(
-      (user) => String(user.id) === selectedUserId,
-    )
-
-    if (!selectedUserExists) {
-      setSelectedUserId(String(staffUsers[0].id))
-    }
-  }, [staffUsers, selectedUserId])
 
   async function loadManagerData() {
     if (businessId === null) {
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage("Bu kullanÄ±cÄ± iÃ§in iÅŸletme bilgisi bulunamadÄ±.")
       return
     }
 
@@ -871,7 +480,7 @@ export function ManagerTasksPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Manager görev verileri alınamadı.")
+        setErrorMessage("Manager gÃ¶rev verileri alÄ±namadÄ±.")
       }
     } finally {
       setIsLoading(false)
@@ -882,93 +491,10 @@ export function ManagerTasksPanel({
     void loadManagerData()
   }, [businessId])
 
-  function clearForm() {
-    setTitle("")
-    setDescription("")
-    setDueTime("")
-    setPriority("normal")
-    setTaskKind("extra")
-    setRequiresPhoto(false)
-    setRequiresLocation(false)
-    setRequiresManagerApproval(true)
-  }
 
-  async function handleCreateExtraTask() {
-    if (businessId === null) {
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
-      return
-    }
-
-    const assignedUserId = Number(selectedUserId)
-    const trimmedTitle = title.trim()
-    const trimmedDescription = description.trim()
-
-    if (!assignedUserId) {
-      setErrorMessage("Lütfen görev atanacak personeli seç.")
-      return
-    }
-
-    if (trimmedTitle.length < 2) {
-      setErrorMessage("Görev başlığı en az 2 karakter olmalıdır.")
-      return
-    }
-
-    setIsSaving(true)
-    setErrorMessage(null)
-    setMessage(null)
-
-    try {
-      if (taskKind === "routine") {
-        await createRoutineTaskTemplate({
-          assigned_to_user_id: assignedUserId,
-          title: trimmedTitle,
-          description: trimmedDescription || null,
-          category_id: null,
-          recurrence_type: "daily",
-          default_priority: priority,
-          default_due_time_local: dueTime || null,
-          default_due_offset_minutes: null,
-          requires_photo: requiresPhoto,
-          requires_location: requiresLocation,
-          requires_manager_approval: requiresManagerApproval,
-        })
-
-        await generateDailyRoutineTasks({
-          task_date: getLocalTodayDateKey(),
-          assigned_to_user_id: assignedUserId,
-        })
-
-        setMessage("Rutin görev oluşturuldu ve bugünün görevlerine işlendi.")
-      } else {
-        await createExtraTask({
-          assigned_to_user_id: assignedUserId,
-          title: trimmedTitle,
-          description: trimmedDescription || null,
-          category_id: null,
-          priority,
-          due_at_utc: buildDueAtUtcFromLocalTime(dueTime),
-          requires_photo: requiresPhoto,
-          requires_location: requiresLocation,
-          requires_manager_approval: requiresManagerApproval,
-        })
-
-        setMessage("Ekstra görev personele atandı.")
-      }
-
-      clearForm()
-      setIsComposerOpen(false)
-
-      await loadManagerData()
-      onChanged()
-    } catch (error) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message)
-      } else {
-        setErrorMessage("Görev oluşturulamadı.")
-      }
-    } finally {
-      setIsSaving(false)
-    }
+  async function handleTaskCreated() {
+    await loadManagerData()
+    onChanged()
   }
 
   return (
@@ -982,11 +508,11 @@ export function ManagerTasksPanel({
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              Bugünün görevleri
+              BugÃ¼nÃ¼n gÃ¶revleri
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Personel işleri, açık görevler ve onay bekleyen işler tek ekranda.
+              Personel iÅŸleri, aÃ§Ä±k gÃ¶revler ve onay bekleyen iÅŸler tek ekranda.
             </p>
           </div>
 
@@ -1003,8 +529,8 @@ export function ManagerTasksPanel({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <StatTile label="Toplam görev" value={operationStats.total} />
-          <StatTile label="Açık iş" value={operationStats.open} tone="warning" />
+          <StatTile label="Toplam gÃ¶rev" value={operationStats.total} />
+          <StatTile label="AÃ§Ä±k iÅŸ" value={operationStats.open} tone="warning" />
           <StatTile label="Onay bekleyen" value={operationStats.approvalPending} />
           <StatTile label="Tamamlanan" value={operationStats.done} tone="success" />
         </div>
@@ -1028,10 +554,10 @@ export function ManagerTasksPanel({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-black text-[var(--missio-text-main)]">
-              Görevlerim
+              GÃ¶revlerim
             </h3>
             <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-              Manager olarak sana atanan işler
+              Manager olarak sana atanan iÅŸler
             </p>
           </div>
 
@@ -1042,7 +568,7 @@ export function ManagerTasksPanel({
 
         {myTasks.length === 0 ? (
           <div className="rounded-[1.4rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-4 text-center text-sm font-bold text-[var(--missio-text-muted)]">
-            Bugün sana atanmış görev yok.
+            BugÃ¼n sana atanmÄ±ÅŸ gÃ¶rev yok.
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -1064,7 +590,7 @@ export function ManagerTasksPanel({
         className="mb-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-[1.5rem] bg-[var(--missio-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95"
       >
         <Plus size={20} />
-        Yeni görev ata
+        Yeni gÃ¶rev ata
       </button>
 
       <div className="mb-4">
@@ -1074,7 +600,7 @@ export function ManagerTasksPanel({
               Personel durumu
             </h3>
             <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-              Bugünkü görev dağılımı
+              BugÃ¼nkÃ¼ gÃ¶rev daÄŸÄ±lÄ±mÄ±
             </p>
           </div>
 
@@ -1086,7 +612,7 @@ export function ManagerTasksPanel({
 
         {staffUsers.length === 0 ? (
           <div className="rounded-[1.6rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 text-center text-sm font-bold text-[var(--missio-text-muted)]">
-            Aktif personel bulunamadı.
+            Aktif personel bulunamadÄ±.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2.5">
@@ -1113,10 +639,10 @@ export function ManagerTasksPanel({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-black text-[var(--missio-text-main)]">
-            Son görevler
+            Son gÃ¶revler
           </h3>
           <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-            Bugün oluşturulan veya takip edilen işler
+            BugÃ¼n oluÅŸturulan veya takip edilen iÅŸler
           </p>
         </div>
 
@@ -1127,7 +653,7 @@ export function ManagerTasksPanel({
 
       {isLoading ? (
         <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
-          Manager görev ekranı yükleniyor...
+          Manager gÃ¶rev ekranÄ± yÃ¼kleniyor...
         </div>
       ) : tasks.length === 0 ? (
         <div className="rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">
@@ -1135,10 +661,10 @@ export function ManagerTasksPanel({
             <ClipboardList size={28} />
           </div>
 
-          <h3 className="mt-4 text-lg font-black">Bugün atanmış görev yok</h3>
+          <h3 className="mt-4 text-lg font-black">BugÃ¼n atanmÄ±ÅŸ gÃ¶rev yok</h3>
 
           <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-            Yeni görev ata butonuyla temiz veriden ilk görevi oluşturabilirsin.
+            Yeni gÃ¶rev ata butonuyla temiz veriden ilk gÃ¶revi oluÅŸturabilirsin.
           </p>
         </div>
       ) : (
@@ -1149,35 +675,18 @@ export function ManagerTasksPanel({
         </div>
       )}
 
-      {isComposerOpen && (
-        <TaskComposerSheet
-          staffUsers={staffUsers}
-          taskKind={taskKind}
-          selectedUserId={selectedUserId}
-          title={title}
-          description={description}
-          dueTime={dueTime}
-          priority={priority}
-          requiresPhoto={requiresPhoto}
-          requiresLocation={requiresLocation}
-          requiresManagerApproval={requiresManagerApproval}
-          isSaving={isSaving}
-          onClose={() => setIsComposerOpen(false)}
-          onTaskKindChange={(value) => setTaskKind(value)}
-          onSelectedUserIdChange={setSelectedUserId}
-          onTitleChange={setTitle}
-          onDescriptionChange={setDescription}
-          onDueTimeChange={setDueTime}
-          onPriorityChange={setPriority}
-          onRequiresPhotoChange={() => setRequiresPhoto((value) => !value)}
-          onRequiresLocationChange={() => setRequiresLocation((value) => !value)}
-          onRequiresManagerApprovalChange={() =>
-            setRequiresManagerApproval((value) => !value)
-          }
-          onCreate={() => void handleCreateExtraTask()}
-        />
-      )}
+      <TaskAssignSheet
+        businessId={businessId}
+        isOpen={isComposerOpen}
+        assignableRoles={["staff"]}
+        defaultRequiresManagerApproval
+        allowLocationRequirement
+        onClose={() => setIsComposerOpen(false)}
+        onCreated={handleTaskCreated}
+        onSuccess={setMessage}
+      />
     </section>
   )
 }
+
 
