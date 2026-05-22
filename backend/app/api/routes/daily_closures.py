@@ -22,6 +22,7 @@ from app.services.daily_operation_closure_service import (
     DailyOperationClosureNotReadyError,
     DailyOperationClosurePermissionError,
     DailyOperationClosureServiceError,
+    cleanup_old_daily_operation_closures,
     create_daily_operation_closure,
     get_daily_operation_closure_detail,
     list_daily_operation_closures,
@@ -192,6 +193,11 @@ def create_daily_operation_closure_endpoint(
             business_id=business_id,
         )
 
+        cleanup_old_daily_operation_closures(
+            db=db,
+            business_id=business.id,
+        )
+
         closure = create_daily_operation_closure(
             db=db,
             current_user=current_user,
@@ -246,6 +252,14 @@ def list_daily_operation_closures_endpoint(
             current_user=current_user,
             business_id=business_id,
         )
+
+        deleted_report_count = cleanup_old_daily_operation_closures(
+            db=db,
+            business_id=business.id,
+        )
+
+        if deleted_report_count > 0:
+            db.commit()
 
         result = list_daily_operation_closures(
             db=db,

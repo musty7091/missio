@@ -5,6 +5,8 @@ from app.models.business_feature import BusinessFeature
 from app.models.business_module import BusinessModule
 from app.models.consent_document import ConsentDocument
 from app.models.daily_report import DailyReport
+from app.models.daily_operation_closure import DailyOperationClosure
+from app.models.daily_operation_closure_item import DailyOperationClosureItem
 from app.models.license import License
 from app.models.login_attempt import LoginAttempt
 from app.models.module import Module
@@ -27,6 +29,8 @@ __all__ = [
     "BusinessModule",
     "ConsentDocument",
     "DailyReport",
+    "DailyOperationClosure",
+    "DailyOperationClosureItem",
     "License",
     "LoginAttempt",
     "Module",

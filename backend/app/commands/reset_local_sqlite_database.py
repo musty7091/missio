@@ -117,6 +117,8 @@ def create_fresh_database(database_path: Path) -> None:
         "task_categories",
         "task_events",
         "task_attachments",
+        "daily_operation_closures",
+        "daily_operation_closure_items",
         "alembic_version",
     }
 

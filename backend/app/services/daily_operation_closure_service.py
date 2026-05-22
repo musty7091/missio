@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.roles import UserRole
@@ -64,6 +64,8 @@ DAILY_OPERATION_CLOSURE_FINAL_STATUSES = {
     DAILY_OPERATION_CLOSURE_STATUS_LEGACY_CLOSED,
 }
 
+DAILY_OPERATION_CLOSURE_RETENTION_DAYS = 60
+
 DAILY_OPERATION_CLOSURE_CREATORS = {
     UserRole.MANAGER.value,
     UserRole.BOSS.value,
@@ -84,6 +86,81 @@ OPEN_OR_PROBLEM_STATUSES = {
 
 def get_utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def get_daily_operation_closure_retention_cutoff_date(
+    current_date: date | None = None,
+) -> date:
+    """Return the oldest closure date that is allowed to stay visible."""
+
+    source_date = current_date or get_utc_now().date()
+
+    return source_date - timedelta(days=DAILY_OPERATION_CLOSURE_RETENTION_DAYS)
+
+
+def is_daily_operation_closure_expired(
+    closure_date: date,
+    *,
+    current_date: date | None = None,
+) -> bool:
+    """Return whether the closure is older than the retention policy."""
+
+    retention_cutoff_date = get_daily_operation_closure_retention_cutoff_date(
+        current_date=current_date,
+    )
+
+    return closure_date < retention_cutoff_date
+
+
+def cleanup_old_daily_operation_closures(
+    db: Session,
+    *,
+    business_id: int | None = None,
+    current_date: date | None = None,
+) -> int:
+    """Delete closure snapshots older than the retention policy.
+
+    Items are deleted first because they reference the closure rows.
+    The function flushes changes but leaves commit control to the caller.
+    """
+
+    retention_cutoff_date = get_daily_operation_closure_retention_cutoff_date(
+        current_date=current_date,
+    )
+
+    filters = [
+        DailyOperationClosure.closure_date < retention_cutoff_date,
+    ]
+
+    if business_id is not None:
+        filters.append(DailyOperationClosure.business_id == business_id)
+
+    old_closure_ids = list(
+        db.execute(
+            select(DailyOperationClosure.id).where(*filters)
+        )
+        .scalars()
+        .all()
+    )
+
+    if not old_closure_ids:
+        return 0
+
+    db.execute(
+        delete(DailyOperationClosureItem).where(
+            DailyOperationClosureItem.closure_id.in_(old_closure_ids)
+        )
+    )
+
+    db.execute(
+        delete(DailyOperationClosure).where(
+            DailyOperationClosure.id.in_(old_closure_ids)
+        )
+    )
+
+    db.flush()
+
+    return len(old_closure_ids)
 
 
 def ensure_can_create_daily_operation_closure(current_user: User, *, business_id: int) -> None:
@@ -380,13 +457,16 @@ def list_daily_operation_closures(
 ) -> DailyOperationClosureListResult:
     ensure_can_view_daily_operation_closure(current_user, business_id=business.id)
 
-    count_query = select(func.count(DailyOperationClosure.id)).where(
-        DailyOperationClosure.business_id == business.id
-    )
+    retention_cutoff_date = get_daily_operation_closure_retention_cutoff_date()
 
-    query = select(DailyOperationClosure).where(
-        DailyOperationClosure.business_id == business.id
-    )
+    base_filters = [
+        DailyOperationClosure.business_id == business.id,
+        DailyOperationClosure.closure_date >= retention_cutoff_date,
+    ]
+
+    count_query = select(func.count(DailyOperationClosure.id)).where(*base_filters)
+
+    query = select(DailyOperationClosure).where(*base_filters)
 
     total_count = int(db.execute(count_query).scalar_one())
 
@@ -421,6 +501,11 @@ def get_daily_operation_closure_detail(
         current_user,
         business_id=closure.business_id,
     )
+
+    if is_daily_operation_closure_expired(closure.closure_date):
+        raise DailyOperationClosureNotFoundError(
+            "Gün sonu kapanış kaydı 60 günlük saklama süresi dışında."
+        )
 
     items = (
         db.execute(
