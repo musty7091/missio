@@ -22,6 +22,8 @@ import {
 } from "../../services/businessUserService"
 import {
   createExtraTask,
+  createRoutineTaskTemplate,
+  generateDailyRoutineTasks,
   listBusinessTasks,
 } from "../../services/taskService"
 import { TaskCard } from "../tasks/TaskCard"
@@ -38,6 +40,8 @@ type ManagerTasksPanelProps = {
 }
 
 type PriorityValue = "low" | "normal" | "high" | "urgent"
+
+type TaskKind = "extra" | "routine"
 
 type StaffMetrics = {
   total: number
@@ -375,6 +379,7 @@ function RequirementToggle({
 
 function TaskComposerSheet({
   staffUsers,
+  taskKind,
   selectedUserId,
   title,
   description,
@@ -385,6 +390,7 @@ function TaskComposerSheet({
   requiresManagerApproval,
   isSaving,
   onClose,
+  onTaskKindChange,
   onSelectedUserIdChange,
   onTitleChange,
   onDescriptionChange,
@@ -396,6 +402,7 @@ function TaskComposerSheet({
   onCreate,
 }: {
   staffUsers: BusinessUser[]
+  taskKind: TaskKind
   selectedUserId: string
   title: string
   description: string
@@ -406,6 +413,7 @@ function TaskComposerSheet({
   requiresManagerApproval: boolean
   isSaving: boolean
   onClose: () => void
+  onTaskKindChange: (value: TaskKind) => void
   onSelectedUserIdChange: (value: string) => void
   onTitleChange: (value: string) => void
   onDescriptionChange: (value: string) => void
@@ -425,7 +433,7 @@ function TaskComposerSheet({
               Yeni görev
             </p>
             <h3 className="text-lg font-black text-[var(--missio-text-main)]">
-              Ekstra görev ata
+              {taskKind === "routine" ? "Rutin görev oluştur" : "Ekstra görev ata"}
             </h3>
           </div>
 
@@ -440,10 +448,65 @@ function TaskComposerSheet({
         </div>
 
         <div className="max-h-[calc(92vh-76px)] space-y-3 overflow-y-auto px-4 py-4">
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-black text-[var(--missio-text-muted)]">
-              Personel
+          <div>
+            <span className="mb-2 block text-xs font-black text-[var(--missio-text-muted)]">
+              Görev tipi
             </span>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault()
+                  onTaskKindChange("extra")
+                }}
+                className={
+                  taskKind === "extra"
+                    ? "rounded-2xl bg-cyan-500 px-3 py-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20"
+                    : "rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 py-3 text-sm font-black text-[var(--missio-text-muted)]"
+                }
+              >
+                Ekstra
+              </button>
+
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault()
+                  onTaskKindChange("routine")
+                }}
+                className={
+                  taskKind === "routine"
+                    ? "rounded-2xl bg-cyan-500 px-3 py-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20"
+                    : "rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 py-3 text-sm font-black text-[var(--missio-text-muted)]"
+                }
+              >
+                Rutin
+              </button>
+            </div>
+
+            <p className="mt-2 text-[0.7rem] font-bold leading-5 text-[var(--missio-text-muted)]">
+              {taskKind === "routine"
+                ? "Rutin görev her gün tekrar eden görev şablonu olarak kaydedilir."
+                : "Ekstra görev bugüne özel tek seferlik görev olarak atanır."}
+            </p>
+
+            <div className="mt-2 rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-xs font-black text-[var(--missio-text-main)]">
+              Seçili görev tipi: {taskKind === "routine" ? "Rutin görev" : "Ekstra görev"}
+            </div>
+          </div>
+
+          <label className="block">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <span className="block text-xs font-black text-[var(--missio-text-muted)]">
+                Personel
+              </span>
+
+              <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
+                {staffUsers.length} aktif
+              </span>
+            </div>
+
             <select
               value={selectedUserId}
               onChange={(event) => onSelectedUserIdChange(event.target.value)}
@@ -551,7 +614,7 @@ function TaskComposerSheet({
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-wait disabled:opacity-60"
           >
             {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-            Görevi ata
+            {taskKind === "routine" ? "Rutin görevi kaydet" : "Ekstra görevi ata"}
           </button>
         </div>
       </div>
@@ -570,6 +633,7 @@ export function ManagerTasksPanel({
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isComposerOpen, setIsComposerOpen] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState("")
+  const [taskKind, setTaskKind] = useState<TaskKind>("extra")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [dueTime, setDueTime] = useState("")
@@ -677,6 +741,7 @@ export function ManagerTasksPanel({
     setDescription("")
     setDueTime("")
     setPriority("normal")
+    setTaskKind("extra")
     setRequiresPhoto(false)
     setRequiresLocation(false)
     setRequiresManagerApproval(true)
@@ -707,21 +772,45 @@ export function ManagerTasksPanel({
     setMessage(null)
 
     try {
-      await createExtraTask({
-        assigned_to_user_id: assignedUserId,
-        title: trimmedTitle,
-        description: trimmedDescription || null,
-        category_id: null,
-        priority,
-        due_at_utc: buildDueAtUtcFromLocalTime(dueTime),
-        requires_photo: requiresPhoto,
-        requires_location: requiresLocation,
-        requires_manager_approval: requiresManagerApproval,
-      })
+      if (taskKind === "routine") {
+        await createRoutineTaskTemplate({
+          assigned_to_user_id: assignedUserId,
+          title: trimmedTitle,
+          description: trimmedDescription || null,
+          category_id: null,
+          recurrence_type: "daily",
+          default_priority: priority,
+          default_due_time_local: dueTime || null,
+          default_due_offset_minutes: null,
+          requires_photo: requiresPhoto,
+          requires_location: requiresLocation,
+          requires_manager_approval: requiresManagerApproval,
+        })
+
+        await generateDailyRoutineTasks({
+          task_date: getLocalTodayDateKey(),
+          assigned_to_user_id: assignedUserId,
+        })
+
+        setMessage("Rutin görev oluşturuldu ve bugünün görevlerine işlendi.")
+      } else {
+        await createExtraTask({
+          assigned_to_user_id: assignedUserId,
+          title: trimmedTitle,
+          description: trimmedDescription || null,
+          category_id: null,
+          priority,
+          due_at_utc: buildDueAtUtcFromLocalTime(dueTime),
+          requires_photo: requiresPhoto,
+          requires_location: requiresLocation,
+          requires_manager_approval: requiresManagerApproval,
+        })
+
+        setMessage("Ekstra görev personele atandı.")
+      }
 
       clearForm()
       setIsComposerOpen(false)
-      setMessage("Ekstra görev personele atandı.")
 
       await loadManagerData()
       onChanged()
@@ -908,6 +997,7 @@ export function ManagerTasksPanel({
       {isComposerOpen && (
         <TaskComposerSheet
           staffUsers={staffUsers}
+          taskKind={taskKind}
           selectedUserId={selectedUserId}
           title={title}
           description={description}
@@ -918,6 +1008,7 @@ export function ManagerTasksPanel({
           requiresManagerApproval={requiresManagerApproval}
           isSaving={isSaving}
           onClose={() => setIsComposerOpen(false)}
+          onTaskKindChange={(value) => setTaskKind(value)}
           onSelectedUserIdChange={setSelectedUserId}
           onTitleChange={setTitle}
           onDescriptionChange={setDescription}

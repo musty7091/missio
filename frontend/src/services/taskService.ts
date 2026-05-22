@@ -1,4 +1,4 @@
-﻿import type { ApiTask, MyTodayTasksResponse } from "../types/apiTask"
+import type { ApiTask, MyTodayTasksResponse } from "../types/apiTask"
 import { API_BASE_URL } from "../config/api"
 import { getAccessToken } from "./authTokenStorage"
 import { apiRequest } from "./httpClient"
@@ -248,6 +248,73 @@ type TaskCreatedResponse = {
 
 export function createExtraTask(payload: CreateExtraTaskPayload) {
   return apiRequest<TaskCreatedResponse>("/tasks/extra", {
+    method: "POST",
+    body: payload,
+  })
+}
+
+
+export type CreateRoutineTaskTemplatePayload = {
+  assigned_to_user_id: number
+  title: string
+  description?: string | null
+  category_id?: number | null
+  recurrence_type: "daily"
+  default_priority: "low" | "normal" | "high" | "urgent"
+  default_due_time_local?: string | null
+  default_due_offset_minutes?: number | null
+  requires_photo: boolean
+  requires_location: boolean
+  requires_manager_approval: boolean
+}
+
+export type TaskTemplateResponse = {
+  id: number
+  business_id: number
+  assigned_to_user_id: number
+  created_by_user_id: number | null
+  title: string
+  description: string | null
+  category_id: number | null
+  recurrence_type: string
+  default_priority: string
+  default_due_time_local: string | null
+  default_due_offset_minutes: number | null
+  requires_photo: boolean
+  requires_location: boolean
+  requires_manager_approval: boolean
+  is_active: boolean
+  created_at_utc: string
+  updated_at_utc: string
+}
+
+type TaskTemplateCreatedResponse = {
+  template: TaskTemplateResponse
+  message: string
+}
+
+export function createRoutineTaskTemplate(payload: CreateRoutineTaskTemplatePayload) {
+  return apiRequest<TaskTemplateCreatedResponse>("/tasks/routine-templates", {
+    method: "POST",
+    body: payload,
+  })
+}
+
+export type GenerateDailyRoutineTasksPayload = {
+  task_date?: string | null
+  assigned_to_user_id?: number | null
+}
+
+type DailyRoutineTasksGeneratedResponse = {
+  task_date: string
+  created_count: number
+  skipped_count: number
+  tasks: ApiTask[]
+  message: string
+}
+
+export function generateDailyRoutineTasks(payload: GenerateDailyRoutineTasksPayload) {
+  return apiRequest<DailyRoutineTasksGeneratedResponse>("/tasks/generate-daily-routines", {
     method: "POST",
     body: payload,
   })
