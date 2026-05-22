@@ -121,6 +121,14 @@ function getDetailGuidance(task: TodayTask) {
   return "Görev detaylarını buradan takip edebilirsin."
 }
 
+function getDetailStatusLabel(task: TodayTask) {
+  if (task.status === "completed" && !task.requiresManagerApproval) {
+    return "Tamamlandı"
+  }
+
+  return getStatusLabel(task.status)
+}
+
 function getActionButtonLabel(task: TodayTask) {
   if (task.status === "assigned") {
     return "Görevi başlat"
@@ -456,7 +464,7 @@ export function TaskDetailPanel({
 
               <div className="relative mt-4 flex flex-wrap gap-2">
                 <span className="rounded-full bg-cyan-300 px-3 py-1.5 text-xs font-black text-slate-950">
-                  {getStatusLabel(task.status)}
+                  {getDetailStatusLabel(task)}
                 </span>
 
                 <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-slate-200">

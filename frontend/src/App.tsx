@@ -585,12 +585,16 @@ export default function App() {
               onOpenTaskDetails={openTaskDetails}
             />
           ) : (
-            <ApprovalsPanel onChanged={() => void loadTodayTasks()} />
+            <ApprovalsPanel
+              businessId={currentUser.business_id}
+              onChanged={() => void loadTodayTasks()}
+            />
           )
         ) : activeTab === "reports" ? (
           <ReportsPanel
             tasks={tasks}
             role={currentUser.role}
+            businessId={currentUser.business_id}
             onOpenTaskDetails={openTaskDetails}
           />
         ) : activeTab === "profile" ? (

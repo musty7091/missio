@@ -1,4 +1,4 @@
-﻿import {
+import {
   AlertCircle,
   Camera,
   CheckCircle2,
@@ -31,6 +31,7 @@ import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
 import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
 
 type ApprovalsPanelProps = {
+  businessId: number | null
   onChanged: () => void
 }
 
@@ -46,15 +47,6 @@ type StaffApprovalGroup = {
 type AttachmentPreview = {
   attachment: TaskAttachment
   url: string
-}
-
-function getLocalTodayDateKey() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-
-  return `${year}-${month}-${day}`
 }
 
 function formatTime(value: string | null) {
@@ -555,7 +547,7 @@ function StaffApprovalGroupCard({
   )
 }
 
-export function ApprovalsPanel({ onChanged }: ApprovalsPanelProps) {
+export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
   const [approvalTasks, setApprovalTasks] = useState<TodayTask[]>([])
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null)
   const [rejectNotes, setRejectNotes] = useState<Record<number, string>>({})
@@ -569,13 +561,18 @@ export function ApprovalsPanel({ onChanged }: ApprovalsPanelProps) {
   )
 
   async function loadApprovals() {
+    if (!businessId) {
+      setApprovalTasks([])
+      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      return
+    }
+
     setIsLoading(true)
     setErrorMessage(null)
 
     try {
       const response = await listBusinessTasks({
-        taskDate: getLocalTodayDateKey(),
-        status: "completed",
+        businessId,
         limit: 500,
         offset: 0,
       })
@@ -600,7 +597,7 @@ export function ApprovalsPanel({ onChanged }: ApprovalsPanelProps) {
 
   useEffect(() => {
     void loadApprovals()
-  }, [])
+  }, [businessId])
 
   async function handleApprove(task: TodayTask) {
     setBusyTaskId(task.id)

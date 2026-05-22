@@ -1,4 +1,4 @@
-﻿import {
+import {
   Camera,
   CheckCircle2,
   ChevronRight,
@@ -69,6 +69,14 @@ function getStatusBadgeClass(task: TodayTask) {
   return "rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200"
 }
 
+function getTaskCardStatusLabel(task: TodayTask) {
+  if (task.status === "completed" && !task.requiresManagerApproval) {
+    return "Tamamlandı"
+  }
+
+  return getStatusLabel(task.status)
+}
+
 export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
   return (
     <button
@@ -85,7 +93,7 @@ export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
             <span className={getStatusBadgeClass(task)}>
-              {getStatusLabel(task.status)}
+              {getTaskCardStatusLabel(task)}
             </span>
 
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.65rem] font-black text-slate-700 dark:bg-slate-800 dark:text-slate-200">

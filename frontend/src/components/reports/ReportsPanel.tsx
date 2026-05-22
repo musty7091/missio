@@ -1,37 +1,75 @@
-﻿import {
+import {
   AlertTriangle,
   Camera,
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   FileCheck2,
-  PlayCircle,
+  Loader2,
+  RefreshCw,
   ShieldAlert,
   ShieldCheck,
+  UserRound,
   UsersRound,
+  XCircle,
 } from "lucide-react"
-import type { ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { listBusinessTasks } from "../../services/taskService"
 import type { TodayTask } from "../../types/task"
+import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
 import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
 
 type ReportsPanelProps = {
   tasks: TodayTask[]
   role: string
+  businessId: number | null
   onOpenTaskDetails: (task: TodayTask) => void
 }
 
-type ControlCheckStatus = "success" | "warning" | "info"
+type ControlCheckStatus = "success" | "warning" | "info" | "danger"
+
+type StaffReportRow = {
+  key: string
+  name: string
+  username: string | null
+  total: number
+  completed: number
+  open: number
+  approvalPending: number
+  rejected: number
+}
+
+function getLocalTodayDateKey() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
 
 function isCompletedTask(task: TodayTask) {
   return task.status === "completed" || task.status === "approved"
 }
 
+function isApprovedOrClosed(task: TodayTask) {
+  return (
+    task.status === "approved" ||
+    task.status === "cancelled" ||
+    (task.status === "completed" && !task.requiresManagerApproval)
+  )
+}
+
 function isOpenTask(task: TodayTask) {
   return (
-    task.status !== "completed" &&
-    task.status !== "approved" &&
-    task.status !== "cancelled"
+    task.status === "assigned" ||
+    task.status === "in_progress" ||
+    task.status === "rejected"
   )
+}
+
+function isApprovalPendingTask(task: TodayTask) {
+  return task.status === "completed" && task.requiresManagerApproval
 }
 
 function getPercent(value: number, total: number) {
@@ -40,6 +78,68 @@ function getPercent(value: number, total: number) {
   }
 
   return Math.round((value / total) * 100)
+}
+
+function getAssigneeName(task: TodayTask) {
+  if (task.assignedToUserFullName) {
+    return task.assignedToUserFullName
+  }
+
+  if (task.assignedToUsername) {
+    return task.assignedToUsername
+  }
+
+  if (task.assignedToUserId) {
+    return `Personel ID #${task.assignedToUserId}`
+  }
+
+  return "Personel bilgisi yok"
+}
+
+function getStaffReportRows(tasks: TodayTask[]) {
+  const groups = new Map<string, StaffReportRow>()
+
+  for (const task of tasks) {
+    const name = getAssigneeName(task)
+    const key = task.assignedToUserId ? `user-${task.assignedToUserId}` : `name-${name}`
+
+    const row =
+      groups.get(key) ??
+      {
+        key,
+        name,
+        username: task.assignedToUsername,
+        total: 0,
+        completed: 0,
+        open: 0,
+        approvalPending: 0,
+        rejected: 0,
+      }
+
+    row.total += 1
+
+    if (isCompletedTask(task)) {
+      row.completed += 1
+    }
+
+    if (isOpenTask(task)) {
+      row.open += 1
+    }
+
+    if (isApprovalPendingTask(task)) {
+      row.approvalPending += 1
+    }
+
+    if (task.status === "rejected") {
+      row.rejected += 1
+    }
+
+    groups.set(key, row)
+  }
+
+  return Array.from(groups.values()).sort((firstRow, secondRow) =>
+    firstRow.name.localeCompare(secondRow.name, "tr-TR"),
+  )
 }
 
 function MetricCard({
@@ -85,6 +185,15 @@ function getCheckStyles(status: ControlCheckStatus) {
       icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200",
       text: "text-emerald-950 dark:text-emerald-100",
       muted: "text-emerald-800 dark:text-emerald-200",
+    }
+  }
+
+  if (status === "danger") {
+    return {
+      box: "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30",
+      icon: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200",
+      text: "text-red-950 dark:text-red-100",
+      muted: "text-red-800 dark:text-red-200",
     }
   }
 
@@ -144,14 +253,12 @@ function ControlTaskRow({
   onOpenTaskDetails,
 }: {
   task: TodayTask
-  onOpenTaskDetails: (task: TodayTask) => void
+  onOpenTaskDetails?: (task: TodayTask) => void
 }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onOpenTaskDetails(task)}
-      className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-left transition active:scale-[0.99]"
-    >
+  const clickable = Boolean(onOpenTaskDetails)
+
+  const content = (
+    <>
       <div className="min-w-0">
         <div className="mb-1.5 flex flex-wrap gap-1.5">
           <span
@@ -171,6 +278,12 @@ function ControlTaskRow({
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
             {getPriorityLabel(task.priority)}
           </span>
+
+          {task.requiresManagerApproval && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6rem] font-black text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+              Onay
+            </span>
+          )}
         </div>
 
         <p className="truncate text-sm font-black text-[var(--missio-text-main)]">
@@ -178,11 +291,29 @@ function ControlTaskRow({
         </p>
 
         <p className="mt-1 line-clamp-1 text-xs font-bold text-[var(--missio-text-muted)]">
-          {task.description}
+          {getAssigneeName(task)}
         </p>
       </div>
 
-      <ChevronRight className="shrink-0 text-[var(--missio-text-muted)]" size={18} />
+      {clickable && <ChevronRight className="shrink-0 text-[var(--missio-text-muted)]" size={18} />}
+    </>
+  )
+
+  if (!clickable) {
+    return (
+      <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-left">
+        {content}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenTaskDetails?.(task)}
+      className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-left transition active:scale-[0.99]"
+    >
+      {content}
     </button>
   )
 }
@@ -199,14 +330,14 @@ function StaffControlPanel({
   const openTasks = tasks.filter(isOpenTask)
   const waitingTasks = tasks.filter((task) => task.status === "assigned")
   const activeTasks = tasks.filter((task) => task.status === "in_progress")
+  const rejectedTasks = tasks.filter((task) => task.status === "rejected")
   const photoRequiredOpenTasks = tasks.filter(
     (task) => task.requiresPhoto && isOpenTask(task),
   )
-  const approvalWaitingTasks = tasks.filter(
-    (task) => task.status === "completed" && task.requiresManagerApproval,
-  )
+  const approvalWaitingTasks = tasks.filter(isApprovalPendingTask)
 
   const blockingTasks = [
+    ...rejectedTasks,
     ...activeTasks,
     ...photoRequiredOpenTasks,
     ...waitingTasks,
@@ -287,18 +418,8 @@ function StaffControlPanel({
           <div className="grid grid-cols-1 gap-2.5">
             <ControlCheckCard
               status={openTasks.length === 0 ? "success" : "warning"}
-              icon={
-                openTasks.length === 0 ? (
-                  <CheckCircle2 size={22} />
-                ) : (
-                  <AlertTriangle size={22} />
-                )
-              }
-              title={
-                openTasks.length === 0
-                  ? "Açık görev kalmadı"
-                  : `${openTasks.length} açık görev var`
-              }
+              icon={openTasks.length === 0 ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
+              title={openTasks.length === 0 ? "Açık görev kalmadı" : `${openTasks.length} açık görev var`}
               description={
                 openTasks.length === 0
                   ? "Bugünkü görevlerin tamamlanmış görünüyor."
@@ -307,49 +428,7 @@ function StaffControlPanel({
             />
 
             <ControlCheckCard
-              status={activeTasks.length === 0 ? "success" : "warning"}
-              icon={
-                activeTasks.length === 0 ? (
-                  <CheckCircle2 size={22} />
-                ) : (
-                  <PlayCircle size={22} />
-                )
-              }
-              title={
-                activeTasks.length === 0
-                  ? "Devam eden görev yok"
-                  : `${activeTasks.length} görev işlemde`
-              }
-              description={
-                activeTasks.length === 0
-                  ? "Yarım bırakılmış işlem görünmüyor."
-                  : "Başlatılmış ama tamamlanmamış görev var."
-              }
-            />
-
-            <ControlCheckCard
-              status={photoRequiredOpenTasks.length === 0 ? "success" : "warning"}
-              icon={
-                photoRequiredOpenTasks.length === 0 ? (
-                  <CheckCircle2 size={22} />
-                ) : (
-                  <Camera size={22} />
-                )
-              }
-              title={
-                photoRequiredOpenTasks.length === 0
-                  ? "Eksik fotoğraf kanıtı görünmüyor"
-                  : `${photoRequiredOpenTasks.length} görev fotoğraf kanıtı istiyor`
-              }
-              description={
-                photoRequiredOpenTasks.length === 0
-                  ? "Kanıt isteyen açık görev bulunmuyor."
-                  : "Bu görevlerde fotoğraf kanıtı kontrol edilmeli."
-              }
-            />
-
-            <ControlCheckCard
-              status={approvalWaitingTasks.length === 0 ? "info" : "info"}
+              status={approvalWaitingTasks.length === 0 ? "success" : "info"}
               icon={<FileCheck2 size={22} />}
               title={
                 approvalWaitingTasks.length === 0
@@ -403,71 +482,379 @@ function StaffControlPanel({
   )
 }
 
-function ManagementReportPlaceholder({ role }: { role: string }) {
+function StaffReportCard({ row }: { row: StaffReportRow }) {
+  const completionRate = getPercent(row.completed, row.total)
+
+  return (
+    <article className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-sm font-black text-cyan-800 dark:text-cyan-200">
+          <UserRound size={21} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-black text-[var(--missio-text-main)]">
+            {row.name}
+          </h3>
+
+          {row.username && (
+            <p className="mt-0.5 truncate text-xs font-bold text-[var(--missio-text-muted)]">
+              @{row.username}
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-center">
+          <p className="text-base font-black leading-none text-[var(--missio-text-main)]">
+            %{completionRate}
+          </p>
+          <p className="mt-1 text-[0.58rem] font-black text-[var(--missio-text-muted)]">
+            tamam
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2">
+          <p className="text-sm font-black text-[var(--missio-text-main)]">{row.total}</p>
+          <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">Toplam</p>
+        </div>
+
+        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2">
+          <p className="text-sm font-black text-emerald-600 dark:text-emerald-300">{row.completed}</p>
+          <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">Biten</p>
+        </div>
+
+        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2">
+          <p className="text-sm font-black text-amber-600 dark:text-amber-300">{row.open}</p>
+          <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">Açık</p>
+        </div>
+
+        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-2 py-2">
+          <p className={row.rejected > 0 ? "text-sm font-black text-red-600 dark:text-red-300" : "text-sm font-black text-[var(--missio-text-main)]"}>
+            {row.rejected}
+          </p>
+          <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">Red</p>
+        </div>
+      </div>
+
+      {row.approvalPending > 0 && (
+        <div className="mt-3 rounded-2xl bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
+          {row.approvalPending} görev yönetici onayı bekliyor.
+        </div>
+      )}
+    </article>
+  )
+}
+
+function ManagementReportPanel({
+  role,
+  businessId,
+}: {
+  role: string
+  businessId: number | null
+}) {
+  const [reportTasks, setReportTasks] = useState<TodayTask[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const todayKey = getLocalTodayDateKey()
+
+  async function loadReportTasks() {
+    if (!businessId) {
+      setReportTasks([])
+      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      return
+    }
+
+    setIsLoading(true)
+    setErrorMessage(null)
+
+    try {
+      const response = await listBusinessTasks({
+        businessId,
+        taskDate: todayKey,
+        limit: 500,
+        offset: 0,
+      })
+
+      setReportTasks(response.tasks.map(mapApiTaskToTodayTask))
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage("Gün sonu raporu alınamadı.")
+      }
+
+      setReportTasks([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadReportTasks()
+  }, [businessId])
+
+  const totalCount = reportTasks.length
+  const completedTasks = reportTasks.filter(isCompletedTask)
+  const approvedOrClosedTasks = reportTasks.filter(isApprovedOrClosed)
+  const openTasks = reportTasks.filter(isOpenTask)
+  const assignedTasks = reportTasks.filter((task) => task.status === "assigned")
+  const activeTasks = reportTasks.filter((task) => task.status === "in_progress")
+  const rejectedTasks = reportTasks.filter((task) => task.status === "rejected")
+  const approvalWaitingTasks = reportTasks.filter(isApprovalPendingTask)
+  const photoRequiredOpenTasks = reportTasks.filter(
+    (task) => task.requiresPhoto && isOpenTask(task),
+  )
+
+  const blockingTasks = [
+    ...rejectedTasks,
+    ...approvalWaitingTasks,
+    ...activeTasks,
+    ...photoRequiredOpenTasks,
+    ...assignedTasks,
+  ].filter((task, index, list) => list.findIndex((item) => item.id === task.id) === index)
+
+  const staffRows = useMemo(() => getStaffReportRows(reportTasks), [reportTasks])
+  const completionRate = getPercent(completedTasks.length, totalCount)
+  const closureRate = getPercent(approvedOrClosedTasks.length, totalCount)
+
+  const canCloseDay =
+    totalCount > 0 &&
+    openTasks.length === 0 &&
+    approvalWaitingTasks.length === 0 &&
+    rejectedTasks.length === 0
+
   const roleTitle =
     role === "boss"
-      ? "Patron raporları"
-      : role === "admin"
-        ? "Admin raporları"
-        : "Yönetici raporları"
+      ? "Patron gün sonu raporu"
+      : role === "admin" || role === "super_admin"
+        ? "Admin gün sonu raporu"
+        : "Yönetici gün sonu raporu"
 
   return (
     <section className="flex flex-1 flex-col pb-24">
-      <div className="mb-4 rounded-[1.7rem] bg-slate-950 p-4 text-white shadow-xl shadow-slate-950/15">
-        <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
-          <UsersRound size={14} />
-          Raporlar
+      <div
+        className={
+          canCloseDay
+            ? "mb-4 rounded-[1.7rem] bg-emerald-950 p-4 text-white shadow-xl shadow-emerald-950/15"
+            : "mb-4 rounded-[1.7rem] bg-slate-950 p-4 text-white shadow-xl shadow-slate-950/15"
+        }
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
+              <UsersRound size={14} />
+              Raporlar
+            </div>
+
+            <h2 className="mt-3 text-2xl font-black leading-tight">{roleTitle}</h2>
+
+            <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
+              Bugünkü görevleri personel, onay ve eksik iş durumuna göre kontrol et.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void loadReportTasks()}
+            disabled={isLoading}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-cyan-200 transition active:scale-95 disabled:opacity-60"
+            aria-label="Yenile"
+            title="Yenile"
+          >
+            {isLoading ? <Loader2 className="animate-spin" size={19} /> : <RefreshCw size={19} />}
+          </button>
         </div>
 
-        <h2 className="mt-3 text-2xl font-black leading-tight">{roleTitle}</h2>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-2xl bg-white/10 px-3 py-2">
+            <p className="text-xl font-black leading-none">{totalCount}</p>
+            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">Toplam görev</p>
+          </div>
 
-        <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-          Bu ekran tüm personel ve işletme performansını göstermek için ayrıldı.
-        </p>
-      </div>
+          <div className="rounded-2xl bg-white/10 px-3 py-2">
+            <p className="text-xl font-black leading-none">%{completionRate}</p>
+            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">Tamamlama</p>
+          </div>
+        </div>
 
-      <div className="space-y-3">
-        <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
-          <h3 className="text-base font-black text-[var(--missio-text-main)]">
-            Yönetim raporu için backend adımı gerekli
-          </h3>
-
-          <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-            Şu an frontend yalnızca giriş yapan kullanıcının bugünkü görevlerini alıyor.
-            Tüm personel raporu için ayrı rapor endpointleri ekleyeceğiz.
+        <div className="mt-2 rounded-2xl bg-white/10 px-3 py-2">
+          <p className={canCloseDay ? "text-sm font-black text-emerald-200" : "text-sm font-black text-amber-200"}>
+            {canCloseDay ? "Gün kapanışı yapılabilir." : "Gün kapanışı için kontrol gereken işler var."}
+          </p>
+          <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
+            Kapanış uygunluğu: %{closureRate}
           </p>
         </div>
-
-        <div className="grid grid-cols-2 gap-2.5">
-          <MetricCard
-            title="Personel"
-            value="Yakında"
-            description="Kişi bazlı performans"
-            icon={<UsersRound size={22} />}
-          />
-
-          <MetricCard
-            title="Kanıt"
-            value="Yakında"
-            description="Fotoğraf uyumluluğu"
-            icon={<Camera size={22} />}
-          />
-
-          <MetricCard
-            title="Onay"
-            value="Yakında"
-            description="Onay / ret akışı"
-            icon={<FileCheck2 size={22} />}
-          />
-
-          <MetricCard
-            title="Risk"
-            value="Yakında"
-            description="Geciken ve eksik işler"
-            icon={<AlertTriangle size={22} />}
-          />
-        </div>
       </div>
+
+      {errorMessage && (
+        <div className="mb-3 rounded-[1.4rem] border border-red-200 bg-red-50 p-3 text-sm font-black text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+          {errorMessage}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
+          Gün sonu raporu yükleniyor...
+        </div>
+      ) : totalCount === 0 ? (
+        <div className="flex flex-1 items-center justify-center rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">
+          <div>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+              <ClipboardCheck size={28} />
+            </div>
+
+            <h3 className="mt-4 text-lg font-black">Bugün raporlanacak görev yok</h3>
+
+            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
+              İşletmeye görev atandığında gün sonu raporu burada oluşacak.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2.5">
+            <MetricCard
+              title="Tamamlanan"
+              value={completedTasks.length}
+              description="Tamamlanan veya onaylanan"
+              icon={<CheckCircle2 size={22} />}
+            />
+
+            <MetricCard
+              title="Açık"
+              value={openTasks.length}
+              description="Bekleyen, işlemde veya red"
+              icon={<AlertTriangle size={22} />}
+            />
+
+            <MetricCard
+              title="Onay"
+              value={approvalWaitingTasks.length}
+              description="Yönetici onayı bekliyor"
+              icon={<FileCheck2 size={22} />}
+            />
+
+            <MetricCard
+              title="Red"
+              value={rejectedTasks.length}
+              description="Düzeltilmesi gereken"
+              icon={<XCircle size={22} />}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5">
+            <ControlCheckCard
+              status={openTasks.length === 0 ? "success" : "warning"}
+              icon={openTasks.length === 0 ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
+              title={openTasks.length === 0 ? "Açık görev kalmadı" : `${openTasks.length} açık görev var`}
+              description={
+                openTasks.length === 0
+                  ? "Bekleyen, işlemde veya reddedilmiş görev görünmüyor."
+                  : "Gün kapanışı öncesi bu görevler kontrol edilmeli."
+              }
+            />
+
+            <ControlCheckCard
+              status={approvalWaitingTasks.length === 0 ? "success" : "info"}
+              icon={<FileCheck2 size={22} />}
+              title={
+                approvalWaitingTasks.length === 0
+                  ? "Onay bekleyen görev yok"
+                  : `${approvalWaitingTasks.length} görev onay bekliyor`
+              }
+              description={
+                approvalWaitingTasks.length === 0
+                  ? "Yönetici onayı bekleyen görev görünmüyor."
+                  : "Onay sekmesinden bu görevler onaylanmalı veya reddedilmeli."
+              }
+            />
+
+            <ControlCheckCard
+              status={rejectedTasks.length === 0 ? "success" : "danger"}
+              icon={rejectedTasks.length === 0 ? <CheckCircle2 size={22} /> : <XCircle size={22} />}
+              title={rejectedTasks.length === 0 ? "Reddedilmiş görev yok" : `${rejectedTasks.length} görev reddedilmiş`}
+              description={
+                rejectedTasks.length === 0
+                  ? "Düzeltme bekleyen iş görünmüyor."
+                  : "Personelin düzeltip tekrar göndermesi gereken görevler var."
+              }
+            />
+
+            <ControlCheckCard
+              status={photoRequiredOpenTasks.length === 0 ? "success" : "warning"}
+              icon={photoRequiredOpenTasks.length === 0 ? <CheckCircle2 size={22} /> : <Camera size={22} />}
+              title={
+                photoRequiredOpenTasks.length === 0
+                  ? "Eksik fotoğraf kanıtı görünmüyor"
+                  : `${photoRequiredOpenTasks.length} açık görev fotoğraf istiyor`
+              }
+              description={
+                photoRequiredOpenTasks.length === 0
+                  ? "Fotoğraf isteyen açık görev bulunmuyor."
+                  : "Bu görevlerde fotoğraf kanıtı tamamlanmadan kapanış yapılmamalı."
+              }
+            />
+          </div>
+
+          <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+                  Kapanış engelleri
+                </p>
+
+                <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
+                  Günü kapatmadan önce bakılacak işler
+                </h3>
+              </div>
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                <ShieldAlert size={22} />
+              </div>
+            </div>
+
+            {blockingTasks.length === 0 ? (
+              <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
+                Kontrol gerektiren açık iş görünmüyor. Gün kapatılabilir.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {blockingTasks.map((task) => (
+                  <ControlTaskRow key={task.id} task={task} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+                  Personel özeti
+                </p>
+
+                <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
+                  Kişi bazlı durum
+                </h3>
+              </div>
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
+                <UsersRound size={22} />
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {staffRows.map((row) => (
+                <StaffReportCard key={row.key} row={row} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
@@ -475,13 +862,12 @@ function ManagementReportPlaceholder({ role }: { role: string }) {
 export function ReportsPanel({
   tasks,
   role,
+  businessId,
   onOpenTaskDetails,
 }: ReportsPanelProps) {
   if (role === "staff") {
     return <StaffControlPanel tasks={tasks} onOpenTaskDetails={onOpenTaskDetails} />
   }
 
-  return <ManagementReportPlaceholder role={role} />
+  return <ManagementReportPanel role={role} businessId={businessId} />
 }
-
-
