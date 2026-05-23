@@ -88,3 +88,5 @@ frontend/.env.*.local
 
 # Local cloud secrets
 .cloud-secrets/
+
+.firebase/
