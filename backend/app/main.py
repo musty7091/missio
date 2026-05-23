@@ -9,6 +9,20 @@ from app.core.rate_limit import add_rate_limit
 from app.core.security_config import is_production_environment
 
 
+def parse_cors_allowed_origins(value: str) -> list[str]:
+    """Parse comma-separated CORS origins from environment config."""
+
+    origins: list[str] = []
+
+    for item in value.split(","):
+        origin = item.strip().rstrip("/")
+
+        if origin:
+            origins.append(origin)
+
+    return origins
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
 
@@ -46,9 +60,11 @@ def create_app() -> FastAPI:
         r"):(5173|5174|5175)$"
     )
 
+    production_allowed_origins = parse_cors_allowed_origins(settings.cors_allowed_origins)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[] if is_production else local_development_origins,
+        allow_origins=production_allowed_origins if is_production else local_development_origins,
         allow_origin_regex=None if is_production else local_network_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],

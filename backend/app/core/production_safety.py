@@ -18,6 +18,7 @@ def validate_production_settings(settings: object) -> None:
     secret_key = str(getattr(settings, "secret_key", "") or "").strip()
     database_url = str(getattr(settings, "database_url", "") or "").strip().lower()
     default_timezone = str(getattr(settings, "default_timezone", "") or "").strip()
+    cors_allowed_origins = str(getattr(settings, "cors_allowed_origins", "") or "").strip()
 
     if debug:
         errors.append("MISSIO_DEBUG production ortamında false olmalıdır.")
@@ -36,6 +37,18 @@ def validate_production_settings(settings: object) -> None:
 
     if not default_timezone:
         errors.append("MISSIO_DEFAULT_TIMEZONE production ortamında boş olamaz.")
+
+    if cors_allowed_origins:
+        insecure_origins = [
+            origin.strip()
+            for origin in cors_allowed_origins.split(",")
+            if origin.strip().lower().startswith("http://")
+        ]
+
+        if insecure_origins:
+            errors.append(
+                "MISSIO_CORS_ALLOWED_ORIGINS production ortamında http:// içeremez; https:// kullanılmalıdır."
+            )
 
     if errors:
         message = "Production ayarları güvenli değil:"
