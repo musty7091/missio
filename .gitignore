@@ -78,3 +78,5 @@ tmp/
 
 # Local database backups
 backend/_db_backup/
+# Local database backups
+backend/_local_db_backups/
