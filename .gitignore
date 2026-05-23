@@ -85,3 +85,6 @@ backend/_local_db_backups/
 # Frontend local environment
 frontend/.env.local
 frontend/.env.*.local
+
+# Local cloud secrets
+.cloud-secrets/
