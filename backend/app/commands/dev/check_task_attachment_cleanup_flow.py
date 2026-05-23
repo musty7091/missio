@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -297,12 +297,12 @@ def assert_attachment_deleted(
     attachment = db.get(TaskAttachment, attachment_id)
 
     if attachment is not None:
-        raise RuntimeError(f"{label}: attachment kaydı hâlâ duruyor.")
+        raise RuntimeError(f"{label}: attachment kaydı hala duruyor.")
 
     path = Path(file_path)
 
     if path.exists():
-        raise RuntimeError(f"{label}: fiziksel dosya hâlâ duruyor. file_path={file_path}")
+        raise RuntimeError(f"{label}: fiziksel dosya hala duruyor. file_path={file_path}")
 
 
 def assert_cleanup_event_exists(

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
@@ -448,12 +448,12 @@ def assert_deleted_attachment_record(
     attachment = db.get(TaskAttachment, attachment_id)
 
     if attachment is not None:
-        raise RuntimeError("Silinen fotoğraf kaydı veritabanında hâlâ duruyor.")
+        raise RuntimeError("Silinen fotoğraf kaydı veritabanında hala duruyor.")
 
     physical_path = Path(previous_file_path)
 
     if physical_path.exists():
-        raise RuntimeError("Silinen fotoğraf fiziksel storage klasöründe hâlâ duruyor.")
+        raise RuntimeError("Silinen fotoğraf fiziksel storage klasöründe hala duruyor.")
 
     print("[OK] Fotoğraf veritabanı kaydı ve fiziksel dosya silindi.")
 

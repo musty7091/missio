@@ -1,4 +1,4 @@
-﻿import {
+import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
@@ -102,7 +102,7 @@ function getStaffName(task: TodayTask) {
 
 function getReadableStatusLabel(task: TodayTask) {
   if (task.status === "completed" && !task.requiresManagerApproval) {
-    return "TamamlandÄ±"
+    return "Tamamlandı"
   }
 
   return getStatusLabel(task.status)
@@ -221,7 +221,7 @@ function StaffCard({
               {metrics.total}
             </p>
             <p className="mt-1 text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              gÃ¶rev
+              görev
             </p>
           </div>
         </div>
@@ -232,7 +232,7 @@ function StaffCard({
               {metrics.open}
             </p>
             <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              AÃ§Ä±k
+              Açık
             </p>
           </div>
 
@@ -264,9 +264,9 @@ function StaffCard({
         <div className="mt-3 rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-center text-xs font-black text-[var(--missio-text-muted)]">
           {hasTasks
             ? isExpanded
-              ? "GÃ¶revleri gizle"
-              : "GÃ¶revleri gÃ¶ster"
-            : "BugÃ¼n gÃ¶rev yok"}
+              ? "Görevleri gizle"
+              : "Görevleri göster"
+            : "Bugün görev yok"}
         </div>
       </button>
 
@@ -456,7 +456,7 @@ export function ManagerTasksPanel({
 
   async function loadManagerData() {
     if (businessId === null) {
-      setErrorMessage("Bu kullanÄ±cÄ± iÃ§in iÅŸletme bilgisi bulunamadÄ±.")
+      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
       return
     }
 
@@ -480,7 +480,7 @@ export function ManagerTasksPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Manager gÃ¶rev verileri alÄ±namadÄ±.")
+        setErrorMessage("Manager görev verileri alınamadı.")
       }
     } finally {
       setIsLoading(false)
@@ -508,11 +508,11 @@ export function ManagerTasksPanel({
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              BugÃ¼nÃ¼n gÃ¶revleri
+              Bugünün görevleri
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Personel iÅŸleri, aÃ§Ä±k gÃ¶revler ve onay bekleyen iÅŸler tek ekranda.
+              Personel işleri, açık görevler ve onay bekleyen işler tek ekranda.
             </p>
           </div>
 
@@ -529,8 +529,8 @@ export function ManagerTasksPanel({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <StatTile label="Toplam gÃ¶rev" value={operationStats.total} />
-          <StatTile label="AÃ§Ä±k iÅŸ" value={operationStats.open} tone="warning" />
+          <StatTile label="Toplam görev" value={operationStats.total} />
+          <StatTile label="Açık iş" value={operationStats.open} tone="warning" />
           <StatTile label="Onay bekleyen" value={operationStats.approvalPending} />
           <StatTile label="Tamamlanan" value={operationStats.done} tone="success" />
         </div>
@@ -554,10 +554,10 @@ export function ManagerTasksPanel({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-black text-[var(--missio-text-main)]">
-              GÃ¶revlerim
+              Görevlerim
             </h3>
             <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-              Manager olarak sana atanan iÅŸler
+              Manager olarak sana atanan işler
             </p>
           </div>
 
@@ -568,7 +568,7 @@ export function ManagerTasksPanel({
 
         {myTasks.length === 0 ? (
           <div className="rounded-[1.4rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-4 text-center text-sm font-bold text-[var(--missio-text-muted)]">
-            BugÃ¼n sana atanmÄ±ÅŸ gÃ¶rev yok.
+            Bugün sana atanmış görev yok.
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -590,7 +590,7 @@ export function ManagerTasksPanel({
         className="mb-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-[1.5rem] bg-[var(--missio-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95"
       >
         <Plus size={20} />
-        Yeni gÃ¶rev ata
+        Yeni görev ata
       </button>
 
       <div className="mb-4">
@@ -600,7 +600,7 @@ export function ManagerTasksPanel({
               Personel durumu
             </h3>
             <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-              BugÃ¼nkÃ¼ gÃ¶rev daÄŸÄ±lÄ±mÄ±
+              Bugünkü görev dağılımı
             </p>
           </div>
 
@@ -612,7 +612,7 @@ export function ManagerTasksPanel({
 
         {staffUsers.length === 0 ? (
           <div className="rounded-[1.6rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 text-center text-sm font-bold text-[var(--missio-text-muted)]">
-            Aktif personel bulunamadÄ±.
+            Aktif personel bulunamadı.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2.5">
@@ -639,10 +639,10 @@ export function ManagerTasksPanel({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-black text-[var(--missio-text-main)]">
-            Son gÃ¶revler
+            Son görevler
           </h3>
           <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-            BugÃ¼n oluÅŸturulan veya takip edilen iÅŸler
+            Bugün oluşturulan veya takip edilen işler
           </p>
         </div>
 
@@ -653,7 +653,7 @@ export function ManagerTasksPanel({
 
       {isLoading ? (
         <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
-          Manager gÃ¶rev ekranÄ± yÃ¼kleniyor...
+          Manager görev ekranı yükleniyor...
         </div>
       ) : tasks.length === 0 ? (
         <div className="rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">
@@ -661,10 +661,10 @@ export function ManagerTasksPanel({
             <ClipboardList size={28} />
           </div>
 
-          <h3 className="mt-4 text-lg font-black">BugÃ¼n atanmÄ±ÅŸ gÃ¶rev yok</h3>
+          <h3 className="mt-4 text-lg font-black">Bugün atanmış görev yok</h3>
 
           <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-            Yeni gÃ¶rev ata butonuyla temiz veriden ilk gÃ¶revi oluÅŸturabilirsin.
+            Yeni görev ata butonuyla temiz veriden ilk görevi oluşturabilirsin.
           </p>
         </div>
       ) : (

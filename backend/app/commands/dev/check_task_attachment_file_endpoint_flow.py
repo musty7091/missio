@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
@@ -403,12 +403,12 @@ def assert_attachment_deleted(
     attachment = db.get(TaskAttachment, attachment_id)
 
     if attachment is not None:
-        raise RuntimeError("Silinen fotoğraf kaydı veritabanında hâlâ duruyor.")
+        raise RuntimeError("Silinen fotoğraf kaydı veritabanında hala duruyor.")
 
     path = Path(previous_file_path)
 
     if path.exists():
-        raise RuntimeError("Silinen fotoğraf dosyası storage klasöründe hâlâ duruyor.")
+        raise RuntimeError("Silinen fotoğraf dosyası storage klasöründe hala duruyor.")
 
     print("[OK] Test fotoğrafı veritabanı ve storage üzerinden temizlendi.")
 
