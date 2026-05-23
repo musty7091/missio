@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -27,6 +28,7 @@ from app.services.daily_operation_closure_service import (
     get_daily_operation_closure_detail,
     list_daily_operation_closures,
 )
+from app.services.daily_operation_closure_pdf_service import build_daily_operation_closure_pdf_bytes
 from app.core.roles import UserRole
 
 
@@ -275,6 +277,46 @@ def list_daily_operation_closures_endpoint(
                 for closure in result.closures
             ],
             total_count=result.total_count,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise map_daily_closure_error(exc) from exc
+
+
+@router.get(
+    "/{closure_id}/pdf",
+)
+def download_daily_operation_closure_pdf_endpoint(
+    closure_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Download one official end-of-day closure report as a generated PDF."""
+
+    try:
+        closure, items = get_daily_operation_closure_detail(
+            db=db,
+            current_user=current_user,
+            closure_id=closure_id,
+        )
+
+        business = get_business_or_404(db=db, business_id=closure.business_id)
+
+        pdf_bytes = build_daily_operation_closure_pdf_bytes(
+            closure=closure,
+            items=items,
+            business=business,
+        )
+
+        filename = f"missio-gun-sonu-raporu-{closure.closure_date.isoformat()}.pdf"
+
+        return StreamingResponse(
+            iter([pdf_bytes]),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
         )
     except HTTPException:
         raise

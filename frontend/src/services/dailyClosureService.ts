@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../config/api"
+import { getAccessToken } from "./authTokenStorage"
 import { apiRequest } from "./httpClient"
 
 export type DailyOperationClosureItem = {
@@ -63,6 +65,57 @@ export type CreateDailyOperationClosurePayload = {
   manager_note?: string | null
 }
 
+export type DownloadedDailyClosurePdf = {
+  blob: Blob
+  filename: string
+}
+
+function resolveApiBaseUrl() {
+  if (API_BASE_URL.startsWith("/")) {
+    return `${window.location.origin}${API_BASE_URL}`
+  }
+
+  return API_BASE_URL.replace(/\/+$/, "")
+}
+
+function buildPdfUrl(closureId: number) {
+  return `${resolveApiBaseUrl()}/daily-closures/${closureId}/pdf`
+}
+
+function getFilenameFromContentDisposition(value: string | null) {
+  if (!value) {
+    return null
+  }
+
+  const match = value.match(/filename="?([^"]+)"?/i)
+
+  if (!match || !match[1]) {
+    return null
+  }
+
+  return match[1]
+}
+
+async function getDownloadErrorMessage(response: Response) {
+  const contentType = response.headers.get("content-type") || ""
+
+  if (contentType.includes("application/json")) {
+    const data = await response.json().catch(() => null)
+
+    if (data && typeof data === "object" && "detail" in data) {
+      const detail = (data as { detail?: unknown }).detail
+
+      if (typeof detail === "string") {
+        return detail
+      }
+    }
+  }
+
+  const text = await response.text().catch(() => "")
+
+  return text || "PDF indirilemedi."
+}
+
 export function listDailyOperationClosures(params: {
   businessId?: number | null
   limit?: number
@@ -97,4 +150,34 @@ export function getDailyOperationClosure(closureId: number) {
   return apiRequest<DailyOperationClosure>(`/daily-closures/${closureId}`, {
     method: "GET",
   })
+}
+
+export async function downloadDailyOperationClosurePdf(
+  closureId: number,
+): Promise<DownloadedDailyClosurePdf> {
+  const token = getAccessToken()
+  const headers = new Headers()
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`)
+  }
+
+  const response = await fetch(buildPdfUrl(closureId), {
+    method: "GET",
+    headers,
+  })
+
+  if (!response.ok) {
+    throw new Error(await getDownloadErrorMessage(response))
+  }
+
+  const blob = await response.blob()
+  const filename =
+    getFilenameFromContentDisposition(response.headers.get("content-disposition")) ||
+    `missio-gun-sonu-raporu-${closureId}.pdf`
+
+  return {
+    blob,
+    filename,
+  }
 }

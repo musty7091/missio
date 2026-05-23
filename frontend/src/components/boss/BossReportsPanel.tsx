@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   AlertTriangle,
   CalendarDays,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 
 import {
+  downloadDailyOperationClosurePdf,
   getDailyOperationClosure,
   listDailyOperationClosures,
   type DailyOperationClosure,
@@ -174,20 +175,34 @@ function getAssignedPersonLabel(item: ClosureItem) {
   )
 }
 
-function PdfPlaceholderButton({ compact = false }: { compact?: boolean }) {
+function PdfDownloadButton({
+  closureId,
+  compact = false,
+  isDownloading,
+  onDownload,
+}: {
+  closureId: number
+  compact?: boolean
+  isDownloading: boolean
+  onDownload: (closureId: number) => void
+}) {
   return (
     <button
       type="button"
-      disabled
-      title="PDF indirme ADIM 7'de aktif edilecek."
+      onClick={() => onDownload(closureId)}
+      disabled={isDownloading}
       className={
         compact
-          ? "flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-black text-slate-400 opacity-80 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
-          : "flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-black text-slate-400 opacity-80 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
+          ? "flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-800 shadow-sm transition active:scale-95 disabled:cursor-wait disabled:opacity-60 dark:border-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-200"
+          : "flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-4 py-2 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition active:scale-95 disabled:cursor-wait disabled:opacity-60"
       }
     >
-      <Download size={compact ? 15 : 17} />
-      PDF yakında
+      {isDownloading ? (
+        <RefreshCw className="animate-spin" size={compact ? 15 : 17} />
+      ) : (
+        <Download size={compact ? 15 : 17} />
+      )}
+      {isDownloading ? "Hazırlanıyor" : "PDF indir"}
     </button>
   )
 }
@@ -278,11 +293,15 @@ function ReportTaskRow({ item }: { item: ClosureItem }) {
 function ReportsDetailModal({
   closure,
   isLoading,
+  isPdfDownloading,
   onClose,
+  onDownloadPdf,
 }: {
   closure: DailyOperationClosure
   isLoading: boolean
+  isPdfDownloading: boolean
   onClose: () => void
+  onDownloadPdf: (closureId: number) => void
 }) {
   const closureIssueCount = getClosureIssueCount(closure)
   const problemItems = closure.items.filter(isProblemItem)
@@ -458,7 +477,11 @@ function ReportsDetailModal({
           )}
         </section>
 
-        <PdfPlaceholderButton />
+        <PdfDownloadButton
+          closureId={closure.id}
+          isDownloading={isPdfDownloading}
+          onDownload={onDownloadPdf}
+        />
       </div>
     </div>
   )
@@ -470,6 +493,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
     useState<DailyOperationClosure | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [downloadingPdfClosureId, setDownloadingPdfClosureId] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   async function loadReports() {
@@ -517,6 +541,33 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
       }
     } finally {
       setIsDetailLoading(false)
+    }
+  }
+
+  async function handleDownloadPdf(closureId: number) {
+    setDownloadingPdfClosureId(closureId)
+    setErrorMessage(null)
+
+    try {
+      const file = await downloadDailyOperationClosurePdf(closureId)
+      const url = window.URL.createObjectURL(file.blob)
+      const link = document.createElement("a")
+
+      link.href = url
+      link.download = file.filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage("PDF indirilemedi.")
+      }
+    } finally {
+      setDownloadingPdfClosureId(null)
     }
   }
 
@@ -711,7 +762,12 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
                       Detay
                     </button>
 
-                    <PdfPlaceholderButton compact />
+                    <PdfDownloadButton
+                      compact
+                      closureId={closure.id}
+                      isDownloading={downloadingPdfClosureId === closure.id}
+                      onDownload={handleDownloadPdf}
+                    />
                   </div>
                 </article>
               )
@@ -724,7 +780,9 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
         <ReportsDetailModal
           closure={selectedClosure}
           isLoading={isDetailLoading}
+          isPdfDownloading={downloadingPdfClosureId === selectedClosure.id}
           onClose={() => setSelectedClosure(null)}
+          onDownloadPdf={handleDownloadPdf}
         />
       )}
     </div>
