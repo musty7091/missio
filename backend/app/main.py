@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.production_safety import validate_production_settings
 from app.core.http_security import add_security_headers
 from app.core.rate_limit import add_rate_limit
 from app.core.security_config import is_production_environment
@@ -12,6 +13,8 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
 
     is_production = is_production_environment(settings.environment)
+
+    validate_production_settings(settings)
 
     app = FastAPI(
         title=settings.app_name,
