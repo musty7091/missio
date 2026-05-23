@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -80,3 +80,8 @@ tmp/
 backend/_db_backup/
 # Local database backups
 backend/_local_db_backups/
+
+
+# Frontend local environment
+frontend/.env.local
+frontend/.env.*.local
