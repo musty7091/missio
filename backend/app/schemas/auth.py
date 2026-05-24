@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -62,6 +63,12 @@ class UserMeResponse(BaseModel):
     role: str
     is_active: bool
     theme_preference: str | None
+    subscription_access_status: str = "active"
+    subscription_status: str | None = None
+    subscription_ends_at_utc: datetime | None = None
+    subscription_remaining_days: int | None = None
+    subscription_is_expired: bool = False
+    subscription_lock_reason: str | None = None
 
 
 class UserSessionResponse(BaseModel):

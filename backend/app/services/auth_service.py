@@ -277,16 +277,23 @@ def ensure_authenticated_user_can_login(
             user_agent=user_agent,
         )
         raise InactiveUserError("Kullanıcı giriş yapamaz.") from exc
-    except BusinessSubscriptionExpiredError as exc:
-        record_subscription_login_block(
+    except BusinessSubscriptionExpiredError:
+        create_audit_log(
             db=db,
-            username=username,
-            user=user,
-            failure_reason="expired_business_subscription",
+            action="auth.login_allowed_expired_subscription",
+            business_id=user.business_id,
+            user_id=user.id,
+            entity_type="user",
+            entity_id=str(user.id),
+            detail={
+                "username": normalize_username(username),
+                "role": user.role,
+                "reason": "expired_business_subscription_read_only_access",
+            },
             ip_address=ip_address,
             user_agent=user_agent,
         )
-        raise InactiveUserError("Kullanıcı giriş yapamaz.") from exc
+        return
 
 
 def authenticate_user(

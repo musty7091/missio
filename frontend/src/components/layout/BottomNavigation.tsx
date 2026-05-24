@@ -72,7 +72,7 @@ function getNavigationItems(role: string): NavigationItem[] {
       },
       {
         id: "reports",
-        label: "Plan",
+        label: "Rapor",
         icon: BarChart3,
       },
       {

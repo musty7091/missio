@@ -1,3 +1,4 @@
+import { CreditCard } from "lucide-react"
 import {
   ArrowLeft,
   BarChart3,
@@ -19,6 +20,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { ApprovalsPanel } from "../approvals/ApprovalsPanel"
 import { BossDashboardPanel } from "../boss/BossDashboardPanel"
 import { BossReportsPanel } from "../boss/BossReportsPanel"
+import { SuperAdminPlanPanel } from "./SuperAdminPlanPanel"
 import { createBusinessWithOwner, listBusinesses } from "../../services/businessService"
 import { ApiError } from "../../services/httpClient"
 import type {
@@ -28,7 +30,7 @@ import type {
 } from "../../types/business"
 
 type PanelMode = "list" | "create" | "manage"
-type ManageTab = "summary" | "approvals" | "reports"
+type ManageTab = "summary" | "approvals" | "reports" | "plan"
 
 type CreateBusinessFormState = {
   businessName: string
@@ -136,6 +138,60 @@ function formatDateTime(value: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   })
+}
+
+
+function getSubscriptionStatusLabel(value: string | null) {
+  const labels: Record<string, string> = {
+    trialing: "Trial",
+    active: "Aktif",
+    suspended: "Askıda",
+    cancelled: "İptal",
+    expired: "Süresi doldu",
+  }
+
+  if (!value) {
+    return "Abonelik yok"
+  }
+
+  return labels[value] ?? value
+}
+
+function getBusinessRemainingDaysLabel(business: BusinessResponse) {
+  if (typeof business.subscription_remaining_days === "number") {
+    if (business.subscription_remaining_days < 0) {
+      return "Süresi geçmiş"
+    }
+
+    if (business.subscription_remaining_days === 0) {
+      return "Bugün bitiyor"
+    }
+
+    return `${business.subscription_remaining_days} gün kaldı`
+  }
+
+  if (!business.subscription_ends_at_utc) {
+    return "Bitiş tarihi yok"
+  }
+
+  const endDate = new Date(business.subscription_ends_at_utc)
+
+  if (Number.isNaN(endDate.getTime())) {
+    return "Bitiş tarihi okunamadı"
+  }
+
+  const now = new Date()
+  const remainingDays = Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000)
+
+  if (remainingDays < 0) {
+    return "Süresi geçmiş"
+  }
+
+  if (remainingDays === 0) {
+    return "Bugün bitiyor"
+  }
+
+  return `${remainingDays} gün kaldı`
 }
 
 function buildPayload(formState: CreateBusinessFormState): CreateBusinessWithOwnerRequest {
@@ -265,6 +321,21 @@ function BusinessCard({
         </span>
       </div>
 
+      <div className="mt-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 text-xs font-bold leading-5 text-cyan-900 dark:border-cyan-900 dark:bg-cyan-950/20 dark:text-cyan-100">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="font-black">
+            Plan: {business.subscription_plan_name ?? "Plan yok"}
+          </p>
+          <span className="rounded-full bg-white px-2 py-1 text-[0.64rem] font-black text-cyan-700 shadow-sm dark:bg-slate-900 dark:text-cyan-200">
+            {getSubscriptionStatusLabel(business.subscription_status)}
+          </span>
+        </div>
+
+        <p>Bitiş: {formatDateTime(business.subscription_ends_at_utc)}</p>
+        <p>Kalan: {getBusinessRemainingDaysLabel(business)}</p>
+        <p>Kullanıcı limiti: {business.subscription_max_users ?? "-"}</p>
+      </div>
+
       {(business.phone || business.email) && (
         <div className="mt-3 border-t border-[var(--missio-border)] pt-3 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
           {business.phone && <p>Telefon: {business.phone}</p>}
@@ -283,6 +354,7 @@ function BusinessCard({
     </div>
   )
 }
+
 
 function CreateBusinessPanel({
   onCancel,
@@ -588,6 +660,11 @@ function BusinessManagePanel({
       label: "Rapor",
       icon: <BarChart3 size={17} />,
     },
+    {
+      id: "plan",
+      label: "Plan",
+      icon: <CreditCard size={17} />,
+    },
   ]
 
   return (
@@ -626,22 +703,39 @@ function BusinessManagePanel({
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 rounded-3xl bg-[var(--missio-soft-bg)] p-1.5">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onTabChange(tab.id)}
-              className={
-                activeTab === tab.id
-                  ? "flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-[var(--missio-primary)] px-2 text-xs font-black text-white shadow-sm"
-                  : "flex min-h-11 items-center justify-center gap-1.5 rounded-2xl px-2 text-xs font-black text-[var(--missio-text-muted)]"
-              }
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+        <div className="mt-5 rounded-[1.7rem] border-2 border-cyan-200 bg-cyan-50/70 p-3 shadow-inner dark:border-cyan-900 dark:bg-cyan-950/20">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[0.66rem] font-black uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-200">
+                İşlem alanı
+              </p>
+              <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
+                Yönetmek istediğin bölümü seç
+              </p>
+            </div>
+
+            <span className="shrink-0 rounded-full bg-white px-3 py-1 text-[0.66rem] font-black text-cyan-700 shadow-sm ring-1 ring-cyan-100 dark:bg-slate-900 dark:text-cyan-200 dark:ring-cyan-900">
+              Seçili: {tabs.find((tab) => tab.id === activeTab)?.label ?? "Özet"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onTabChange(tab.id)}
+                className={
+                  activeTab === tab.id
+                    ? "flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-2xl bg-[var(--missio-primary)] px-2 text-xs font-black text-white shadow-lg shadow-teal-500/25 ring-2 ring-cyan-200 transition active:scale-95 dark:ring-cyan-900"
+                    : "flex min-h-14 flex-col items-center justify-center gap-1.5 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-2 text-xs font-black text-[var(--missio-text-muted)] shadow-sm transition active:scale-95"
+                }
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -656,8 +750,10 @@ function BusinessManagePanel({
           businessId={business.id}
           onChanged={() => undefined}
         />
-      ) : (
+      ) : activeTab === "reports" ? (
         <BossReportsPanel businessId={business.id} />
+      ) : (
+        <SuperAdminPlanPanel business={business} />
       )}
     </section>
   )

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime
 
@@ -125,6 +125,13 @@ class BusinessResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    subscription_status: str | None = None
+    subscription_billing_period: str | None = None
+    subscription_plan_code: str | None = None
+    subscription_plan_name: str | None = None
+    subscription_ends_at_utc: datetime | None = None
+    subscription_max_users: int | None = None
+    subscription_remaining_days: int | None = None
 
 
 class BusinessOwnerUserResponse(BaseModel):
@@ -163,3 +170,229 @@ class BusinessWithOwnerCreatedResponse(BaseModel):
     owner_user: BusinessOwnerUserResponse
     subscription: BusinessSubscriptionResponse | None
     message: str
+
+class SubscriptionPlanResponse(BaseModel):
+    """Safe subscription plan response."""
+
+    id: int
+    code: str
+    name: str
+    description: str | None
+    max_users: int
+    max_managers: int | None
+    max_daily_tasks: int | None
+    report_retention_days: int
+    price_monthly: str | None
+    price_yearly: str | None
+    currency: str
+    display_order: int
+    is_active: bool
+
+
+class ChangeBusinessSubscriptionPlanRequest(BaseModel):
+    """Request payload for changing a business subscription plan."""
+
+    plan_code: str = Field(min_length=1, max_length=50)
+    duration_days: int = Field(default=30, ge=1, le=3650)
+    billing_period: str = Field(default="manual", min_length=3, max_length=30)
+    status: str = Field(default="active", min_length=3, max_length=30)
+    change_mode: str = Field(default="extend", min_length=3, max_length=30)
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("plan_code", "billing_period", "status", "change_mode", mode="before")
+    @classmethod
+    def normalize_required_text(cls, value: object) -> object:
+        """Trim and lowercase required text fields."""
+
+        if isinstance(value, str):
+            return value.strip().lower()
+
+        return value
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def normalize_optional_notes(cls, value: object) -> object:
+        """Trim optional notes and convert empty string to None."""
+
+        if value is None:
+            return None
+
+        if not isinstance(value, str):
+            return value
+
+        normalized_value = value.strip()
+
+        if not normalized_value:
+            return None
+
+        return normalized_value
+
+    @field_validator("billing_period")
+    @classmethod
+    def validate_billing_period(cls, value: str) -> str:
+        """Validate supported billing period."""
+
+        allowed_values = {"manual", "trial", "monthly", "yearly", "custom"}
+
+        if value not in allowed_values:
+            raise ValueError("Abonelik ödeme periyodu geçersiz.")
+
+        return value
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        """Validate supported subscription status."""
+
+        allowed_values = {"trialing", "active", "suspended", "cancelled", "expired"}
+
+        if value not in allowed_values:
+            raise ValueError("Abonelik durumu geçersiz.")
+
+        return value
+
+    @field_validator("change_mode")
+    @classmethod
+    def validate_change_mode(cls, value: str) -> str:
+        """Validate supported subscription change mode."""
+
+        allowed_values = {"replace", "extend"}
+
+        if value not in allowed_values:
+            raise ValueError("Abonelik güncelleme türü geçersiz.")
+
+        return value
+
+
+class BusinessSubscriptionPlanChangedResponse(BaseModel):
+    """Response returned after changing a business subscription plan."""
+
+    subscription: BusinessSubscriptionResponse
+    message: str
+
+class BusinessSubscriptionOverviewResponse(BaseModel):
+    """Detailed subscription overview for super admin business management."""
+
+    business: BusinessResponse
+    current_subscription: BusinessSubscriptionResponse | None
+    current_plan: SubscriptionPlanResponse | None
+    active_user_count: int
+    remaining_days: int | None
+    is_expired: bool
+    available_plans: list[SubscriptionPlanResponse]
+
+
+class ExtendBusinessSubscriptionRequest(BaseModel):
+    """Request payload for extending current business subscription."""
+
+    duration_days: int = Field(default=30, ge=1, le=3650)
+    billing_period: str = Field(default="monthly", min_length=3, max_length=30)
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("billing_period", mode="before")
+    @classmethod
+    def normalize_billing_period(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().lower()
+
+        return value
+
+    @field_validator("billing_period")
+    @classmethod
+    def validate_billing_period(cls, value: str) -> str:
+        allowed_values = {"manual", "trial", "monthly", "yearly", "custom"}
+
+        if value not in allowed_values:
+            raise ValueError("Abonelik ödeme periyodu geçersiz.")
+
+        return value
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def normalize_optional_notes(cls, value: object) -> object:
+        if value is None:
+            return None
+
+        if not isinstance(value, str):
+            return value
+
+        normalized_value = value.strip()
+
+        if not normalized_value:
+            return None
+
+        return normalized_value
+
+
+class ChangeBusinessPlanRequest(BaseModel):
+    """Request payload for upgrading or downgrading a business plan."""
+
+    plan_code: str = Field(min_length=1, max_length=50)
+    preserve_remaining_time: bool = True
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("plan_code", mode="before")
+    @classmethod
+    def normalize_plan_code(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().lower()
+
+        return value
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def normalize_optional_notes(cls, value: object) -> object:
+        if value is None:
+            return None
+
+        if not isinstance(value, str):
+            return value
+
+        normalized_value = value.strip()
+
+        if not normalized_value:
+            return None
+
+        return normalized_value
+
+
+class UpdateBusinessSubscriptionStatusRequest(BaseModel):
+    """Request payload for suspending or reactivating a business subscription."""
+
+    status: str = Field(min_length=3, max_length=30)
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().lower()
+
+        return value
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        allowed_values = {"active", "suspended", "cancelled"}
+
+        if value not in allowed_values:
+            raise ValueError("Abonelik durumu geçersiz.")
+
+        return value
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def normalize_optional_notes(cls, value: object) -> object:
+        if value is None:
+            return None
+
+        if not isinstance(value, str):
+            return value
+
+        normalized_value = value.strip()
+
+        if not normalized_value:
+            return None
+
+        return normalized_value
+
