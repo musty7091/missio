@@ -22,10 +22,6 @@ import { ApiError } from "../../services/httpClient"
 import type { UserMeResponse } from "../../types/auth"
 import type { ThemeMode } from "../../types/task"
 
-const IS_DEVELOPMENT_MODE = import.meta.env.DEV
-const DEVELOPMENT_BUSINESS_SLUG = "missio-demo-market"
-const DEVELOPMENT_USERNAME = "ahmet"
-
 type LoginScreenProps = {
   theme: ThemeMode
   onToggleTheme: () => void
@@ -131,12 +127,8 @@ function getReadableLoginErrorMessage(error: unknown) {
 }
 
 export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScreenProps) {
-  const [businessSlug, setBusinessSlug] = useState(() =>
-    IS_DEVELOPMENT_MODE ? DEVELOPMENT_BUSINESS_SLUG : "",
-  )
-  const [username, setUsername] = useState(() =>
-    IS_DEVELOPMENT_MODE ? DEVELOPMENT_USERNAME : "",
-  )
+  const [businessSlug, setBusinessSlug] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -169,11 +161,6 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
     const cleanBusinessSlug = businessSlug.trim().toLowerCase()
     const cleanUsername = username.trim()
 
-    if (!cleanBusinessSlug) {
-      setErrorMessage("İşletme kodu gerekli.")
-      return
-    }
-
     if (!cleanUsername) {
       setErrorMessage("Kullanıcı adı gerekli.")
       return
@@ -189,7 +176,7 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
 
     try {
       const tokenResponse = await loginUser({
-        business_slug: cleanBusinessSlug,
+        business_slug: cleanBusinessSlug || undefined,
         username: cleanUsername,
         password,
       })
@@ -295,7 +282,7 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
               label="İşletme kodu"
               value={businessSlug}
               onChange={handleBusinessSlugChange}
-              placeholder="missio-demo-market"
+              placeholder="işletme-kodu"
               autoComplete="organization"
               autoCapitalize="none"
               spellCheck={false}

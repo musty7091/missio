@@ -15,6 +15,7 @@ import { ManagerTasksPanel } from "./components/manager/ManagerTasksPanel"
 import { NotificationPanel } from "./components/notifications/NotificationPanel"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
 import { ReportsPanel } from "./components/reports/ReportsPanel"
+import { SuperAdminBusinessesPanel } from "./components/super-admin/SuperAdminBusinessesPanel"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
 import { TaskFilterTabs, type TaskListFilter } from "./components/tasks/TaskFilterTabs"
@@ -257,6 +258,12 @@ export default function App() {
       return
     }
 
+    if (currentUser.role === "super_admin") {
+      setTasks([])
+      setTasksErrorMessage(null)
+      return
+    }
+
     void loadTodayTasks()
   }, [currentUser])
 
@@ -481,7 +488,9 @@ export default function App() {
         />
 
         {activeTab === "tasks" ? (
-          currentUser.role === "staff" ? (
+          currentUser.role === "super_admin" ? (
+            <SuperAdminBusinessesPanel />
+          ) : currentUser.role === "staff" ? (
             <>
             <TodayOperationSummary
               totalCount={taskStats.totalCount}
@@ -587,7 +596,9 @@ export default function App() {
             />
           )
         ) : activeTab === "notifications" ? (
-          currentUser.role === "staff" ? (
+          currentUser.role === "super_admin" ? (
+            <ComingSoonPanel tab="notifications" />
+          ) : currentUser.role === "staff" ? (
             <NotificationPanel
               tasks={tasks}
               onOpenTaskDetails={openTaskDetails}
@@ -599,7 +610,9 @@ export default function App() {
             />
           )
         ) : activeTab === "reports" ? (
-          currentUser.role === "boss" ? (
+          currentUser.role === "super_admin" ? (
+            <ComingSoonPanel tab="reports" />
+          ) : currentUser.role === "boss" ? (
             <BossReportsPanel businessId={currentUser.business_id} />
           ) : (
             <ReportsPanel

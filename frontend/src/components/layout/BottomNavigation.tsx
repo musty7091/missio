@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Bell,
+  Building2,
   ClipboardCheck,
   FileCheck2,
   Home,
@@ -35,6 +36,10 @@ function getLocalTodayDateKey() {
   return `${year}-${month}-${day}`
 }
 
+function isSuperAdminRole(role: string) {
+  return role === "super_admin"
+}
+
 function isStaffRole(role: string) {
   return role === "staff"
 }
@@ -58,6 +63,31 @@ function markNotificationsSeenToday() {
 }
 
 function getNavigationItems(role: string): NavigationItem[] {
+  if (isSuperAdminRole(role)) {
+    return [
+      {
+        id: "tasks",
+        label: "İşletme",
+        icon: Building2,
+      },
+      {
+        id: "reports",
+        label: "Plan",
+        icon: BarChart3,
+      },
+      {
+        id: "notifications",
+        label: "Sistem",
+        icon: ShieldCheck,
+      },
+      {
+        id: "profile",
+        label: "Profil",
+        icon: UserRound,
+      },
+    ]
+  }
+
   if (isStaffRole(role)) {
     return [
       {
