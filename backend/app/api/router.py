@@ -7,6 +7,7 @@ from app.api.routes import (
     daily_closures,
     db_health,
     health,
+    push_notifications,
     tasks,
 )
 
@@ -14,6 +15,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
 api_router.include_router(db_health.router)
 api_router.include_router(auth.router)
+api_router.include_router(push_notifications.router)
 api_router.include_router(businesses.router)
 api_router.include_router(business_users.router)
 api_router.include_router(daily_closures.router)

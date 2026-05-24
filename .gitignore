@@ -90,3 +90,5 @@ frontend/.env.*.local
 .cloud-secrets/
 
 .firebase/
+backend/secrets/
+backend/secrets/*.json

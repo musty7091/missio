@@ -13,6 +13,8 @@ from app.models.login_attempt import LoginAttempt
 from app.models.module import Module
 from app.models.notification import Notification
 from app.models.package import Package
+from app.models.push_notification_log import PushNotificationLog
+from app.models.push_notification_token import PushNotificationToken
 from app.models.setup_state import SetupState
 from app.models.subscription_plan import SubscriptionPlan
 from app.models.task import Task
@@ -39,6 +41,8 @@ __all__ = [
     "Module",
     "Notification",
     "Package",
+    "PushNotificationLog",
+    "PushNotificationToken",
     "SetupState",
     "SubscriptionPlan",
     "Task",

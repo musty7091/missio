@@ -38,6 +38,14 @@ import {
   type BusinessUser,
   type BusinessUserRole,
 } from "../../services/businessUserService"
+import {
+  getNotificationPermissionStatus,
+  requestMissioPushPermissionAndToken,
+} from "../../services/firebaseMessagingService"
+import {
+  deactivateCurrentDevicePushToken,
+  registerCurrentDevicePushToken,
+} from "../../services/pushNotificationService"
 import type { UserMeResponse } from "../../types/auth"
 import type { ThemeMode } from "../../types/task"
 
@@ -963,6 +971,89 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
 export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePanelProps) {
   const emailValue = user.email && user.email.trim() ? user.email : "E-posta tanımlı değil"
   const initials = getInitials(user.full_name)
+  const [isRequestingPushPermission, setIsRequestingPushPermission] = useState(false)
+  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null)
+  const [pushErrorMessage, setPushErrorMessage] = useState<string | null>(null)
+  const [isPushEnabled, setIsPushEnabled] = useState(
+    () =>
+      getNotificationPermissionStatus() === "granted" &&
+      localStorage.getItem("missio-push-notifications-disabled") !== "true",
+  )
+
+  function rememberPushEnabledState(enabled: boolean) {
+    localStorage.setItem(
+      "missio-push-notifications-disabled",
+      enabled ? "false" : "true",
+    )
+  }
+
+  async function handleEnablePushNotifications() {
+    setIsRequestingPushPermission(true)
+    setPushStatusMessage(null)
+    setPushErrorMessage(null)
+
+    try {
+      const result = await requestMissioPushPermissionAndToken()
+
+      if (!result.ok || !result.token) {
+        setIsPushEnabled(false)
+        setPushErrorMessage(result.message)
+        return
+      }
+
+      await registerCurrentDevicePushToken(result.token)
+
+      rememberPushEnabledState(true)
+      setIsPushEnabled(true)
+      setPushStatusMessage("Bu cihaz için bildirimler açık.")
+    } catch (error) {
+      setIsPushEnabled(false)
+
+      if (error instanceof Error) {
+        setPushErrorMessage(error.message)
+      } else {
+        setPushErrorMessage("Bildirimler açılamadı.")
+      }
+    } finally {
+      setIsRequestingPushPermission(false)
+    }
+  }
+
+  async function handleDisablePushNotifications() {
+    setIsRequestingPushPermission(true)
+    setPushStatusMessage(null)
+    setPushErrorMessage(null)
+
+    try {
+      const result = await requestMissioPushPermissionAndToken()
+
+      if (result.token) {
+        await deactivateCurrentDevicePushToken(result.token)
+      }
+
+      rememberPushEnabledState(false)
+      setIsPushEnabled(false)
+      setPushStatusMessage("Bu cihaz için bildirimler kapalı.")
+    } catch (error) {
+      if (error instanceof Error) {
+        setPushErrorMessage(error.message)
+      } else {
+        setPushErrorMessage("Bildirimler kapatılamadı.")
+      }
+    } finally {
+      setIsRequestingPushPermission(false)
+    }
+  }
+
+  async function handleTogglePushNotifications() {
+    if (isPushEnabled) {
+      await handleDisablePushNotifications()
+      return
+    }
+
+    await handleEnablePushNotifications()
+  }
+
 
   return (
     <section className="flex flex-1 flex-col gap-4 pb-24">
@@ -1046,6 +1137,78 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
             description="Şifre değişince diğer cihazlardaki oturumları kapatma seçeneği ileride eklenecek."
           />
         </div>
+      </div>
+
+      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+              <Smartphone size={22} />
+            </div>
+
+            <div className="min-w-0">
+              <h3 className="text-lg font-black tracking-tight">Push bildirimleri</h3>
+              <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
+                Kritik görev ve operasyon uyarılarını uygulama kapalıyken de al.
+              </p>
+            </div>
+          </div>
+
+          <span
+            className={
+              isPushEnabled
+                ? "shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
+                : "shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-900 dark:text-slate-300"
+            }
+          >
+            {isPushEnabled ? "Açık" : "Kapalı"}
+          </span>
+        </div>
+
+        {pushStatusMessage && (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+            {pushStatusMessage}
+          </div>
+        )}
+
+        {pushErrorMessage && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+            {pushErrorMessage}
+          </div>
+        )}
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isPushEnabled}
+          onClick={() => void handleTogglePushNotifications()}
+          disabled={isRequestingPushPermission}
+          className="mt-4 flex min-h-14 w-full items-center justify-between gap-4 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span>
+            {isRequestingPushPermission
+              ? "Bildirimler hazırlanıyor..."
+              : isPushEnabled
+                ? "Bildirimleri kapat"
+                : "Bildirimleri aç"}
+          </span>
+
+          <span
+            className={
+              isPushEnabled
+                ? "relative h-7 w-12 rounded-full bg-[var(--missio-primary)] shadow-inner"
+                : "relative h-7 w-12 rounded-full bg-slate-300 shadow-inner dark:bg-slate-700"
+            }
+          >
+            <span
+              className={
+                isPushEnabled
+                  ? "absolute right-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-all"
+                  : "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-all"
+              }
+            />
+          </span>
+        </button>
       </div>
 
       <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">

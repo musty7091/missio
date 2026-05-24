@@ -1,4 +1,4 @@
-﻿from functools import lru_cache
+from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = Field(
         default="",
         alias="MISSIO_CORS_ALLOWED_ORIGINS",
+    )
+    firebase_service_account_file: str = Field(
+        default="",
+        alias="MISSIO_FIREBASE_SERVICE_ACCOUNT_FILE",
     )
 
     rate_limit_enabled: bool = Field(
