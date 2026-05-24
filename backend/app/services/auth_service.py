@@ -29,6 +29,12 @@ from app.services.login_attempt_service import (
     record_failed_login_attempt,
     record_successful_login_attempt,
 )
+from app.services.subscription_service import (
+    BusinessSubscriptionExpiredError,
+    BusinessSubscriptionInactiveError,
+    BusinessSubscriptionNotFoundError,
+    ensure_business_subscription_is_usable_for_login,
+)
 
 
 class AuthServiceError(ValueError):
@@ -44,7 +50,7 @@ class InvalidCredentialsError(AuthServiceError):
 
 
 class InactiveUserError(AuthServiceError):
-    """Raised when user exists but is inactive."""
+    """Raised when user exists but is inactive or cannot login safely."""
 
 
 class InvalidRoleError(AuthServiceError):
@@ -201,6 +207,88 @@ def record_login_failure(
         )
 
 
+def record_subscription_login_block(
+    db: Session,
+    *,
+    username: str,
+    user: User,
+    failure_reason: str,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> None:
+    """
+    Record login block caused by tenant subscription state.
+
+    This is intentionally not counted as a password failure because the user may
+    know the correct password while the business subscription is not usable.
+    """
+
+    normalized_username = normalize_username(username)
+
+    create_audit_log(
+        db=db,
+        action="auth.login_blocked_subscription",
+        business_id=user.business_id,
+        user_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+        detail={
+            "username": normalized_username,
+            "role": user.role,
+            "failure_reason": failure_reason,
+        },
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+
+def ensure_authenticated_user_can_login(
+    db: Session,
+    *,
+    username: str,
+    user: User,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> None:
+    """Validate post-password login rules before token creation."""
+
+    try:
+        ensure_business_subscription_is_usable_for_login(
+            db=db,
+            business_id=user.business_id,
+        )
+    except BusinessSubscriptionNotFoundError as exc:
+        record_subscription_login_block(
+            db=db,
+            username=username,
+            user=user,
+            failure_reason="missing_business_subscription",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        raise InactiveUserError("Kullanıcı giriş yapamaz.") from exc
+    except BusinessSubscriptionInactiveError as exc:
+        record_subscription_login_block(
+            db=db,
+            username=username,
+            user=user,
+            failure_reason="inactive_business_subscription",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        raise InactiveUserError("Kullanıcı giriş yapamaz.") from exc
+    except BusinessSubscriptionExpiredError as exc:
+        record_subscription_login_block(
+            db=db,
+            username=username,
+            user=user,
+            failure_reason="expired_business_subscription",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        raise InactiveUserError("Kullanıcı giriş yapamaz.") from exc
+
+
 def authenticate_user(
     db: Session,
     *,
@@ -278,6 +366,14 @@ def authenticate_user(
             user_agent=user_agent,
         )
         raise InvalidCredentialsError("Kullanıcı adı veya şifre hatalı.")
+
+    ensure_authenticated_user_can_login(
+        db=db,
+        username=normalized_username,
+        user=user,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
 
     user.last_login_at = get_utc_now()
     user.updated_at = get_utc_now()

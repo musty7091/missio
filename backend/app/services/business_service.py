@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.core.roles import UserRole
 from app.models.business import Business
+from app.models.business_subscription import BusinessSubscription
 from app.models.user import User
 from app.repositories.business_repository import add_business, is_business_slug_taken
 from app.services.access_control_service import require_roles
 from app.services.audit_log_service import create_audit_log
 from app.services.auth_service import create_user_with_password
+from app.services.subscription_service import create_trial_subscription_for_business
 
 
 class BusinessServiceError(ValueError):
@@ -39,10 +41,11 @@ ALLOWED_OWNER_ROLES = {
 
 @dataclass(frozen=True)
 class BusinessWithOwner:
-    """Created business and its first owner user."""
+    """Created business, its first owner user, and its first subscription."""
 
     business: Business
     owner_user: User
+    subscription: BusinessSubscription | None = None
 
 
 def get_utc_now() -> datetime:
@@ -76,6 +79,7 @@ def normalize_business_slug(value: str) -> str:
     normalized = normalized.strip("-")
 
     return normalized
+
 
 def validate_business_slug(slug: str) -> None:
     """Validate normalized business slug."""
@@ -231,7 +235,7 @@ def create_business_with_owner(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> BusinessWithOwner:
-    """Create business and first owner user in one transaction scope."""
+    """Create business, first owner user, and default trial subscription."""
 
     business = create_business(
         db=db,
@@ -261,4 +265,17 @@ def create_business_with_owner(
         user_agent=user_agent,
     )
 
-    return BusinessWithOwner(business=business, owner_user=owner_user)
+    subscription = create_trial_subscription_for_business(
+        db=db,
+        current_user=current_user,
+        business_id=business.id,
+        trial_days=14,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    return BusinessWithOwner(
+        business=business,
+        owner_user=owner_user,
+        subscription=subscription,
+    )
