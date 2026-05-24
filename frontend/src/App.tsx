@@ -1,4 +1,13 @@
-import { AlertCircle, BarChart3, Bell, ClipboardCheck, UserRound } from "lucide-react"
+import {
+  AlertCircle,
+  BarChart3,
+  Bell,
+  CalendarClock,
+  ClipboardCheck,
+  LockKeyhole,
+  PhoneCall,
+  UserRound,
+} from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ApprovalsPanel } from "./components/approvals/ApprovalsPanel"
 import { LoginScreen } from "./components/auth/LoginScreen"
@@ -15,6 +24,7 @@ import { ManagerTasksPanel } from "./components/manager/ManagerTasksPanel"
 import { NotificationPanel } from "./components/notifications/NotificationPanel"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
 import { ReportsPanel } from "./components/reports/ReportsPanel"
+import { SuperAdminBusinessesPanel } from "./components/super-admin/SuperAdminBusinessesPanel"
 import { TaskCard } from "./components/tasks/TaskCard"
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
 import { TaskFilterTabs, type TaskListFilter } from "./components/tasks/TaskFilterTabs"
@@ -154,6 +164,154 @@ function ComingSoonPanel({ tab }: ComingSoonPanelProps) {
   )
 }
 
+
+const SUPPORT_PHONE_DISPLAY = "0533 880 11 43"
+const SUPPORT_PHONE_HREF = "tel:+905338801143"
+
+
+function formatSubscriptionLockDate(value: string | null) {
+  if (!value) {
+    return "Bitiş tarihi bulunamadı"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "Bitiş tarihi okunamadı"
+  }
+
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function isBossSubscriptionLockView(user: UserMeResponse) {
+  return user.role === "boss"
+}
+
+function getSubscriptionLockTitle(user: UserMeResponse) {
+  if (!isBossSubscriptionLockView(user)) {
+    return "Sistem geçici olarak kullanıma kapalı"
+  }
+
+  if (user.subscription_access_status === "expired_locked") {
+    return "Abonelik süresi doldu"
+  }
+
+  if (user.subscription_lock_reason === "subscription_suspended") {
+    return "Abonelik askıya alındı"
+  }
+
+  if (user.subscription_lock_reason === "subscription_cancelled") {
+    return "Abonelik iptal edildi"
+  }
+
+  return "Abonelik erişimi kısıtlandı"
+}
+
+function getSubscriptionLockDescription(user: UserMeResponse) {
+  if (!isBossSubscriptionLockView(user)) {
+    return "Şu anda işletme hesabı geçici olarak kullanıma kapalıdır. Lütfen işletme yöneticinizle iletişime geçin."
+  }
+
+  if (user.subscription_access_status === "expired_locked") {
+    return "Uygulamaya giriş yaptın ancak abonelik süresi dolduğu için görev, onay ve rapor işlemleri geçici olarak kapatıldı."
+  }
+
+  return "Bu işletmenin abonelik durumu aktif olmadığı için operasyon işlemleri geçici olarak kapatıldı."
+}
+
+function SubscriptionLockedPanel({
+  user,
+  onLogout,
+}: {
+  user: UserMeResponse
+  onLogout: () => void
+}) {
+  const showBossSubscriptionDetails = isBossSubscriptionLockView(user)
+
+  return (
+    <section className="flex flex-1 flex-col pb-24">
+      <div className="rounded-[1.8rem] border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900 dark:bg-amber-950/30">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-100">
+            <LockKeyhole size={25} />
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+              {showBossSubscriptionDetails ? "Abonelik uyarısı" : "Sistem uyarısı"}
+            </p>
+            <h1 className="mt-1 text-2xl font-black text-amber-950 dark:text-amber-50">
+              {getSubscriptionLockTitle(user)}
+            </h1>
+            <p className="mt-2 text-sm font-bold leading-6 text-amber-800 dark:text-amber-100">
+              {getSubscriptionLockDescription(user)}
+            </p>
+          </div>
+        </div>
+
+        {showBossSubscriptionDetails ? (
+          <>
+            <div className="rounded-[1.35rem] border border-amber-200 bg-white/70 p-4 text-sm font-bold leading-6 text-amber-950 dark:border-amber-900 dark:bg-slate-950/40 dark:text-amber-100">
+              <div className="mb-2 flex items-center gap-2">
+                <CalendarClock size={18} />
+                <p className="font-black">Abonelik bilgisi</p>
+              </div>
+
+              <p>Durum: {user.subscription_status ?? "Bilinmiyor"}</p>
+              <p>Bitiş: {formatSubscriptionLockDate(user.subscription_ends_at_utc)}</p>
+              <p>
+                Kalan gün:{" "}
+                {user.subscription_is_expired
+                  ? "Süre doldu"
+                  : user.subscription_remaining_days ?? "-"}
+              </p>
+            </div>
+
+            <a
+              href={SUPPORT_PHONE_HREF}
+              className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white shadow-sm"
+            >
+              <PhoneCall size={18} />
+              Destek için ara: {SUPPORT_PHONE_DISPLAY}
+            </a>
+
+            <div className="mt-4 rounded-[1.35rem] border border-amber-200 bg-white/70 p-4 text-sm font-bold leading-6 text-amber-950 dark:border-amber-900 dark:bg-slate-950/40 dark:text-amber-100">
+              <p className="font-black">Kapatılan işlemler</p>
+              <p className="mt-1">Görev oluşturma, görev tamamlama, fotoğraf yükleme, onay ve rapor işlemleri çalışmaz.</p>
+              <p className="mt-1">Abonelik yenilendiğinde sistem tekrar normal kullanıma açılır.</p>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-[1.35rem] border border-amber-200 bg-white/70 p-4 text-sm font-bold leading-6 text-amber-950 dark:border-amber-900 dark:bg-slate-950/40 dark:text-amber-100">
+            <p className="font-black">Bilgilendirme</p>
+            <p className="mt-1">
+              Görev ve operasyon ekranları geçici olarak kullanılamıyor.
+            </p>
+            <p className="mt-1">
+              Bu durumla ilgili işletme sahibi veya yetkili yöneticinizle iletişime geçin.
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onLogout}
+          className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl bg-amber-600 px-4 text-sm font-black text-white shadow-sm"
+        >
+          Çıkış yap
+        </button>
+      </div>
+    </section>
+  )
+}
+
+
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const savedTheme = window.localStorage.getItem("missio-theme")
@@ -252,6 +410,18 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) {
+      setTasks([])
+      setTasksErrorMessage(null)
+      return
+    }
+
+    if (currentUser.role === "super_admin") {
+      setTasks([])
+      setTasksErrorMessage(null)
+      return
+    }
+
+    if (currentUser.subscription_access_status !== "active") {
       setTasks([])
       setTasksErrorMessage(null)
       return
@@ -469,6 +639,11 @@ export default function App() {
     )
   }
 
+  const isTenantSubscriptionLocked =
+    currentUser.business_id !== null &&
+    currentUser.role !== "super_admin" &&
+    currentUser.subscription_access_status !== "active"
+
   return (
     <main className="min-h-screen bg-[var(--missio-page-bg)] px-4 py-5 text-[var(--missio-text-main)] transition-colors duration-300">
       <section className="mx-auto flex min-h-[calc(100vh-40px)] w-full max-w-md flex-col">
@@ -480,8 +655,15 @@ export default function App() {
           onLogout={handleLogout}
         />
 
-        {activeTab === "tasks" ? (
-          currentUser.role === "staff" ? (
+        {isTenantSubscriptionLocked ? (
+          <SubscriptionLockedPanel
+            user={currentUser}
+            onLogout={handleLogout}
+          />
+        ) : activeTab === "tasks" ? (
+          currentUser.role === "super_admin" ? (
+            <SuperAdminBusinessesPanel />
+          ) : currentUser.role === "staff" ? (
             <>
             <TodayOperationSummary
               totalCount={taskStats.totalCount}
@@ -587,7 +769,9 @@ export default function App() {
             />
           )
         ) : activeTab === "notifications" ? (
-          currentUser.role === "staff" ? (
+          currentUser.role === "super_admin" ? (
+            <ComingSoonPanel tab="notifications" />
+          ) : currentUser.role === "staff" ? (
             <NotificationPanel
               tasks={tasks}
               onOpenTaskDetails={openTaskDetails}
@@ -599,7 +783,9 @@ export default function App() {
             />
           )
         ) : activeTab === "reports" ? (
-          currentUser.role === "boss" ? (
+          currentUser.role === "super_admin" ? (
+            <ComingSoonPanel tab="reports" />
+          ) : currentUser.role === "boss" ? (
             <BossReportsPanel businessId={currentUser.business_id} />
           ) : (
             <ReportsPanel
@@ -620,7 +806,7 @@ export default function App() {
           <ComingSoonPanel tab={activeTab} />
         )}
 
-        {selectedTask && (
+        {!isTenantSubscriptionLocked && selectedTask && (
           <TaskDetailPanel
             task={selectedTask}
             isBusy={busyTaskId === selectedTask.id}
@@ -631,12 +817,14 @@ export default function App() {
           />
         )}
 
-        <BottomNavigation
-          activeTab={activeTab}
-          notificationCount={bottomNotificationCount}
-          role={currentUser.role}
-          onTabChange={setActiveTab}
-        />
+        {!isTenantSubscriptionLocked && (
+          <BottomNavigation
+            activeTab={activeTab}
+            notificationCount={bottomNotificationCount}
+            role={currentUser.role}
+            onTabChange={setActiveTab}
+          />
+        )}
       </section>
     </main>
   )

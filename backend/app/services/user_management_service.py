@@ -11,6 +11,11 @@ from app.models.user import User
 from app.services.access_control_service import ensure_can_create_business_user_role
 from app.services.audit_log_service import create_audit_log
 from app.services.auth_service import create_user_with_password
+from app.services.subscription_service import (
+    BusinessSubscriptionNotFoundError,
+    BusinessUserLimitExceededError,
+    ensure_business_active_user_limit_available,
+)
 
 
 class BusinessUserManagementError(ValueError):
@@ -49,6 +54,29 @@ def validate_business_user_role(role: str) -> None:
         raise InvalidBusinessUserRoleError("İşletme kullanıcısı rolü geçersiz.")
 
 
+def ensure_business_can_add_active_user(
+    db: Session,
+    *,
+    business: Business,
+) -> None:
+    """Ensure business subscription allows creating one more active user."""
+
+    try:
+        ensure_business_active_user_limit_available(
+            db=db,
+            business_id=business.id,
+            extra_user_count=1,
+        )
+    except BusinessSubscriptionNotFoundError as exc:
+        raise BusinessUserManagementError(
+            "İşletmenin aktif aboneliği bulunamadığı için kullanıcı oluşturulamaz."
+        ) from exc
+    except BusinessUserLimitExceededError as exc:
+        raise BusinessUserManagementError(
+            "İşletmenin aktif kullanıcı limiti dolmuştur."
+        ) from exc
+
+
 def create_business_user(
     db: Session,
     *,
@@ -74,6 +102,11 @@ def create_business_user(
         current_user,
         target_business_id=business.id,
         target_role=role,
+    )
+
+    ensure_business_can_add_active_user(
+        db=db,
+        business=business,
     )
 
     user = create_user_with_password(

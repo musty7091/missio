@@ -26,6 +26,15 @@ class Settings(BaseSettings):
         default=60,
         alias="MISSIO_ACCESS_TOKEN_EXPIRE_MINUTES",
     )
+    cors_allowed_origins: str = Field(
+        default="",
+        alias="MISSIO_CORS_ALLOWED_ORIGINS",
+    )
+    firebase_service_account_file: str = Field(
+        default="",
+        alias="MISSIO_FIREBASE_SERVICE_ACCOUNT_FILE",
+    )
+
     rate_limit_enabled: bool = Field(
         default=True,
         alias="MISSIO_RATE_LIMIT_ENABLED",
@@ -54,3 +63,4 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.repositories.business_repository import get_business_by_slug
 from app.schemas.auth import LoginRequest, TokenResponse, UserMeResponse
+from app.services.subscription_service import get_current_business_subscription
 from app.services.auth_service import (
     AccountTemporarilyLockedError,
     AuthServiceError,
@@ -99,6 +101,99 @@ def resolve_login_business_id(
     return business.id
 
 
+def get_utc_now_for_auth_route() -> datetime:
+    """Return current UTC datetime for auth route calculations."""
+
+    return datetime.now(timezone.utc)
+
+
+def as_utc_aware_for_auth_route(value: datetime | None) -> datetime | None:
+    """Normalize datetime value for auth route comparisons."""
+
+    if value is None:
+        return None
+
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
+
+
+def calculate_subscription_remaining_days_for_auth(value: datetime | None) -> int | None:
+    """Calculate remaining whole days for auth/me response."""
+
+    normalized_value = as_utc_aware_for_auth_route(value)
+
+    if normalized_value is None:
+        return None
+
+    now = get_utc_now_for_auth_route()
+    seconds = (normalized_value - now).total_seconds()
+
+    if seconds < 0:
+        return 0
+
+    return int((seconds + 86_399) // 86_400)
+
+
+def build_subscription_access_info(
+    db: Session,
+    *,
+    current_user: User,
+) -> dict[str, object]:
+    """Build subscription access info for frontend routing."""
+
+    if current_user.business_id is None:
+        return {
+            "subscription_access_status": "active",
+            "subscription_status": None,
+            "subscription_ends_at_utc": None,
+            "subscription_remaining_days": None,
+            "subscription_is_expired": False,
+            "subscription_lock_reason": None,
+        }
+
+    subscription = get_current_business_subscription(
+        db=db,
+        business_id=current_user.business_id,
+    )
+
+    if subscription is None:
+        return {
+            "subscription_access_status": "locked",
+            "subscription_status": None,
+            "subscription_ends_at_utc": None,
+            "subscription_remaining_days": None,
+            "subscription_is_expired": False,
+            "subscription_lock_reason": "missing_subscription",
+        }
+
+    ends_at_utc = as_utc_aware_for_auth_route(subscription.ends_at_utc)
+    now = get_utc_now_for_auth_route()
+    is_expired = ends_at_utc is not None and ends_at_utc < now
+
+    if is_expired:
+        access_status = "expired_locked"
+        lock_reason = "subscription_expired"
+    elif subscription.status not in {"trialing", "active"}:
+        access_status = "locked"
+        lock_reason = f"subscription_{subscription.status}"
+    else:
+        access_status = "active"
+        lock_reason = None
+
+    return {
+        "subscription_access_status": access_status,
+        "subscription_status": subscription.status,
+        "subscription_ends_at_utc": subscription.ends_at_utc,
+        "subscription_remaining_days": calculate_subscription_remaining_days_for_auth(
+            subscription.ends_at_utc,
+        ),
+        "subscription_is_expired": is_expired,
+        "subscription_lock_reason": lock_reason,
+    }
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(
     payload: LoginRequest,
@@ -163,8 +258,16 @@ def login(
 
 
 @router.get("/me", response_model=UserMeResponse)
-def me(current_user: User = Depends(get_current_user)) -> UserMeResponse:
+def me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserMeResponse:
     """Return safe current user profile for the authenticated session."""
+
+    subscription_access_info = build_subscription_access_info(
+        db=db,
+        current_user=current_user,
+    )
 
     return UserMeResponse(
         id=current_user.id,
@@ -175,4 +278,5 @@ def me(current_user: User = Depends(get_current_user)) -> UserMeResponse:
         role=current_user.role,
         is_active=current_user.is_active,
         theme_preference=current_user.theme_preference,
+        **subscription_access_info,
     )

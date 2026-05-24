@@ -1,17 +1,34 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.production_safety import validate_production_settings
 from app.core.http_security import add_security_headers
 from app.core.rate_limit import add_rate_limit
 from app.core.security_config import is_production_environment
+
+
+def parse_cors_allowed_origins(value: str) -> list[str]:
+    """Parse comma-separated CORS origins from environment config."""
+
+    origins: list[str] = []
+
+    for item in value.split(","):
+        origin = item.strip().rstrip("/")
+
+        if origin:
+            origins.append(origin)
+
+    return origins
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
 
     is_production = is_production_environment(settings.environment)
+
+    validate_production_settings(settings)
 
     app = FastAPI(
         title=settings.app_name,
@@ -43,9 +60,11 @@ def create_app() -> FastAPI:
         r"):(5173|5174|5175)$"
     )
 
+    production_allowed_origins = parse_cors_allowed_origins(settings.cors_allowed_origins)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[] if is_production else local_development_origins,
+        allow_origins=production_allowed_origins if is_production else local_development_origins,
         allow_origin_regex=None if is_production else local_network_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
