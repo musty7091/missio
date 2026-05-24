@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowLeft,
   BarChart3,
   Building2,
@@ -369,12 +369,6 @@ function CreateBusinessPanel({
         </div>
       </div>
 
-      {errorMessage && (
-        <div className="rounded-[1.25rem] border border-rose-200 bg-rose-50 p-3 text-sm font-bold leading-6 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-          {errorMessage}
-        </div>
-      )}
-
       <form
         className="rounded-[1.7rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm"
         onSubmit={handleSubmit}
@@ -536,6 +530,12 @@ function CreateBusinessPanel({
             />
           </label>
         </div>
+
+        {errorMessage && (
+          <div className="mt-5 rounded-[1.25rem] border border-rose-200 bg-rose-50 p-3 text-sm font-bold leading-6 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+            {errorMessage}
+          </div>
+        )}
 
         <div className="mt-5 flex gap-2">
           <button
