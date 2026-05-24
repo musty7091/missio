@@ -1,4 +1,5 @@
 ﻿import type {
+  BusinessResponse,
   BusinessWithOwnerCreatedResponse,
   CreateBusinessWithOwnerRequest,
 } from "../types/business"
@@ -8,6 +9,13 @@ export async function createBusinessWithOwner(payload: CreateBusinessWithOwnerRe
   return apiRequest<BusinessWithOwnerCreatedResponse>("/businesses", {
     method: "POST",
     body: payload,
+    requiresAuth: true,
+  })
+}
+
+export async function listBusinesses() {
+  return apiRequest<BusinessResponse[]>("/businesses", {
+    method: "GET",
     requiresAuth: true,
   })
 }

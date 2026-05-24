@@ -1,12 +1,34 @@
-﻿import { Building2, CheckCircle2, Loader2, ShieldCheck, Sparkles, UserPlus } from "lucide-react"
-import { useMemo, useState, type FormEvent } from "react"
+﻿import {
+  ArrowLeft,
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  ClipboardCheck,
+  FileCheck2,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  UsersRound,
+} from "lucide-react"
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
 
-import { createBusinessWithOwner } from "../../services/businessService"
+import { ApprovalsPanel } from "../approvals/ApprovalsPanel"
+import { BossDashboardPanel } from "../boss/BossDashboardPanel"
+import { BossReportsPanel } from "../boss/BossReportsPanel"
+import { createBusinessWithOwner, listBusinesses } from "../../services/businessService"
 import { ApiError } from "../../services/httpClient"
 import type {
+  BusinessResponse,
   BusinessWithOwnerCreatedResponse,
   CreateBusinessWithOwnerRequest,
 } from "../../types/business"
+
+type PanelMode = "list" | "create" | "manage"
+type ManageTab = "summary" | "approvals" | "reports"
 
 type CreateBusinessFormState = {
   businessName: string
@@ -64,10 +86,14 @@ function optionalText(value: string) {
 
 function getErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
-    const detail = error.data as { detail?: unknown } | null
+    const data = error.data as { detail?: unknown; message?: unknown } | null
 
-    if (typeof detail?.detail === "object" && detail.detail !== null) {
-      const nestedDetail = detail.detail as { message?: unknown; errors?: unknown }
+    if (typeof data?.detail === "string") {
+      return data.detail
+    }
+
+    if (typeof data?.detail === "object" && data.detail !== null) {
+      const nestedDetail = data.detail as { message?: unknown; errors?: unknown }
 
       if (typeof nestedDetail.message === "string") {
         if (Array.isArray(nestedDetail.errors) && nestedDetail.errors.length > 0) {
@@ -78,6 +104,10 @@ function getErrorMessage(error: unknown) {
       }
     }
 
+    if (typeof data?.message === "string") {
+      return data.message
+    }
+
     return error.message
   }
 
@@ -85,18 +115,18 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return "İşletme oluşturulamadı."
+  return "İşlem tamamlanamadı."
 }
 
 function formatDateTime(value: string | null) {
   if (!value) {
-    return "Süre bilgisi yok"
+    return "Tarih yok"
   }
 
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
-    return "Süre bilgisi yok"
+    return "Tarih yok"
   }
 
   return date.toLocaleString("tr-TR", {
@@ -125,7 +155,42 @@ function buildPayload(formState: CreateBusinessFormState): CreateBusinessWithOwn
   }
 }
 
-function ResultCard({ result }: { result: BusinessWithOwnerCreatedResponse }) {
+function MetricCard({
+  label,
+  value,
+  helper,
+  icon,
+}: {
+  label: string
+  value: string | number
+  helper: string
+  icon: ReactNode
+}) {
+  return (
+    <div className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[0.66rem] font-black uppercase tracking-[0.15em] text-[var(--missio-text-muted)]">
+          {label}
+        </p>
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
+          {icon}
+        </div>
+      </div>
+      <p className="text-2xl font-black text-[var(--missio-text-main)]">{value}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
+        {helper}
+      </p>
+    </div>
+  )
+}
+
+function CreatedResultBanner({
+  result,
+  onManage,
+}: {
+  result: BusinessWithOwnerCreatedResponse
+  onManage: (business: BusinessResponse) => void
+}) {
   return (
     <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40">
       <div className="mb-3 flex items-center gap-2 text-emerald-700 dark:text-emerald-200">
@@ -133,7 +198,7 @@ function ResultCard({ result }: { result: BusinessWithOwnerCreatedResponse }) {
         <p className="text-sm font-black">İşletme başarıyla oluşturuldu</p>
       </div>
 
-      <div className="space-y-2 text-sm font-bold text-[var(--missio-text-main)]">
+      <div className="space-y-1 text-sm font-bold text-[var(--missio-text-main)]">
         <p>
           İşletme: <span className="font-black">{result.business.name}</span>
         </p>
@@ -145,9 +210,7 @@ function ResultCard({ result }: { result: BusinessWithOwnerCreatedResponse }) {
         </p>
         <p>
           Abonelik:{" "}
-          <span className="font-black">
-            {result.subscription?.status ?? "abonelik yok"}
-          </span>
+          <span className="font-black">{result.subscription?.status ?? "abonelik yok"}</span>
         </p>
         <p>
           Kullanıcı limiti:{" "}
@@ -155,27 +218,82 @@ function ResultCard({ result }: { result: BusinessWithOwnerCreatedResponse }) {
             {result.subscription?.max_users_snapshot ?? "-"}
           </span>
         </p>
-        <p>
-          Deneme bitişi:{" "}
-          <span className="font-black">
-            {formatDateTime(result.subscription?.ends_at_utc ?? null)}
-          </span>
-        </p>
       </div>
 
-      <p className="mt-3 rounded-2xl bg-white/70 p-3 text-xs font-bold leading-5 text-emerald-800 dark:bg-black/20 dark:text-emerald-100">
-        Müşteri giriş yaparken işletme kodu, patron kullanıcı adı ve belirlediğiniz şifreyi
-        kullanacak.
-      </p>
+      <button
+        type="button"
+        onClick={() => onManage(result.business)}
+        className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white shadow-sm"
+      >
+        <ShieldCheck size={18} />
+        Bu işletmeyi yönet
+      </button>
     </div>
   )
 }
 
-export function SuperAdminBusinessesPanel() {
+function BusinessCard({
+  business,
+  onManage,
+}: {
+  business: BusinessResponse
+  onManage: (business: BusinessResponse) => void
+}) {
+  return (
+    <div className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-base font-black text-[var(--missio-text-main)]">
+            {business.name}
+          </p>
+          <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
+            Kod: {business.slug}
+          </p>
+          <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
+            Oluşturma: {formatDateTime(business.created_at)}
+          </p>
+        </div>
+
+        <span
+          className={
+            business.is_active
+              ? "shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-[0.68rem] font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
+              : "shrink-0 rounded-full bg-rose-100 px-3 py-1 text-[0.68rem] font-black text-rose-700 dark:bg-rose-950 dark:text-rose-200"
+          }
+        >
+          {business.is_active ? "Aktif" : "Pasif"}
+        </span>
+      </div>
+
+      {(business.phone || business.email) && (
+        <div className="mt-3 border-t border-[var(--missio-border)] pt-3 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
+          {business.phone && <p>Telefon: {business.phone}</p>}
+          {business.email && <p>E-posta: {business.email}</p>}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => onManage(business)}
+        className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-sm"
+      >
+        <ShieldCheck size={18} />
+        Yönet
+      </button>
+    </div>
+  )
+}
+
+function CreateBusinessPanel({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void
+  onCreated: (result: BusinessWithOwnerCreatedResponse) => Promise<void>
+}) {
   const [formState, setFormState] = useState<CreateBusinessFormState>(initialFormState)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [createdResult, setCreatedResult] = useState<BusinessWithOwnerCreatedResponse | null>(null)
 
   const previewSlug = useMemo(() => {
     if (formState.businessSlug.trim()) {
@@ -199,18 +317,11 @@ export function SuperAdminBusinessesPanel() {
     }))
   }
 
-  function resetForm() {
-    setFormState(initialFormState)
-    setErrorMessage(null)
-    setCreatedResult(null)
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     setIsSubmitting(true)
     setErrorMessage(null)
-    setCreatedResult(null)
 
     try {
       const payload = buildPayload({
@@ -219,8 +330,7 @@ export function SuperAdminBusinessesPanel() {
       })
 
       const response = await createBusinessWithOwner(payload)
-      setCreatedResult(response)
-      setFormState(initialFormState)
+      await onCreated(response)
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
     } finally {
@@ -231,53 +341,33 @@ export function SuperAdminBusinessesPanel() {
   return (
     <section className="flex flex-1 flex-col gap-4 pb-24">
       <div className="rounded-[1.7rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-[var(--missio-soft-bg)] px-3 py-2 text-xs font-black text-[var(--missio-text-main)]"
+        >
+          <ArrowLeft size={16} />
+          İşletmelere dön
+        </button>
+
+        <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-              Super Admin
+              Yeni müşteri
             </p>
             <h1 className="mt-1 text-2xl font-black text-[var(--missio-text-main)]">
-              Yeni işletme oluştur
+              İşletme oluştur
             </h1>
             <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-              İşletmeyi, ilk patron kullanıcısını ve 14 günlük deneme aboneliğini tek
-              işlemle oluştur.
+              İşletme, ilk patron kullanıcısı ve deneme aboneliği tek işlemle açılır.
             </p>
           </div>
 
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
-            <ShieldCheck size={24} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-2xl bg-[var(--missio-soft-bg)] p-3">
-            <div className="mb-1 flex items-center gap-2 text-[var(--missio-text-muted)]">
-              <Building2 size={16} />
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.14em]">
-                İşletme
-              </p>
-            </div>
-            <p className="text-sm font-black text-[var(--missio-text-main)]">
-              Firma + kod
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-[var(--missio-soft-bg)] p-3">
-            <div className="mb-1 flex items-center gap-2 text-[var(--missio-text-muted)]">
-              <UserPlus size={16} />
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.14em]">
-                Patron
-              </p>
-            </div>
-            <p className="text-sm font-black text-[var(--missio-text-main)]">
-              İlk boss hesabı
-            </p>
+            <Plus size={24} />
           </div>
         </div>
       </div>
-
-      {createdResult && <ResultCard result={createdResult} />}
 
       {errorMessage && (
         <div className="rounded-[1.25rem] border border-rose-200 bg-rose-50 p-3 text-sm font-bold leading-6 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
@@ -460,13 +550,325 @@ export function SuperAdminBusinessesPanel() {
           <button
             type="button"
             className="min-h-12 rounded-2xl bg-[var(--missio-soft-bg)] px-4 text-sm font-black text-[var(--missio-text-main)]"
-            onClick={resetForm}
+            onClick={onCancel}
             disabled={isSubmitting}
           >
-            Temizle
+            Vazgeç
           </button>
         </div>
       </form>
+    </section>
+  )
+}
+
+function BusinessManagePanel({
+  business,
+  activeTab,
+  onTabChange,
+  onBack,
+}: {
+  business: BusinessResponse
+  activeTab: ManageTab
+  onTabChange: (tab: ManageTab) => void
+  onBack: () => void
+}) {
+  const tabs: { id: ManageTab; label: string; icon: ReactNode }[] = [
+    {
+      id: "summary",
+      label: "Özet",
+      icon: <ClipboardCheck size={17} />,
+    },
+    {
+      id: "approvals",
+      label: "Onay",
+      icon: <FileCheck2 size={17} />,
+    },
+    {
+      id: "reports",
+      label: "Rapor",
+      icon: <BarChart3 size={17} />,
+    },
+  ]
+
+  return (
+    <section className="flex flex-1 flex-col gap-4 pb-24">
+      <div className="rounded-[1.7rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-[var(--missio-soft-bg)] px-3 py-2 text-xs font-black text-[var(--missio-text-main)]"
+        >
+          <ArrowLeft size={16} />
+          İşletmelere dön
+        </button>
+
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
+              İşletme yönetimi
+            </p>
+            <h1 className="mt-1 truncate text-2xl font-black text-[var(--missio-text-main)]">
+              {business.name}
+            </h1>
+            <p className="mt-1 text-sm font-bold text-[var(--missio-text-muted)]">
+              Kod: {business.slug}
+            </p>
+          </div>
+
+          <span
+            className={
+              business.is_active
+                ? "shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-[0.68rem] font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
+                : "shrink-0 rounded-full bg-rose-100 px-3 py-1 text-[0.68rem] font-black text-rose-700 dark:bg-rose-950 dark:text-rose-200"
+            }
+          >
+            {business.is_active ? "Aktif" : "Pasif"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-3xl bg-[var(--missio-soft-bg)] p-1.5">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onTabChange(tab.id)}
+              className={
+                activeTab === tab.id
+                  ? "flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-[var(--missio-primary)] px-2 text-xs font-black text-white shadow-sm"
+                  : "flex min-h-11 items-center justify-center gap-1.5 rounded-2xl px-2 text-xs font-black text-[var(--missio-text-muted)]"
+              }
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === "summary" ? (
+        <BossDashboardPanel
+          businessId={business.id}
+          onOpenApprovals={() => onTabChange("approvals")}
+          onOpenReports={() => onTabChange("reports")}
+        />
+      ) : activeTab === "approvals" ? (
+        <ApprovalsPanel
+          businessId={business.id}
+          onChanged={() => undefined}
+        />
+      ) : (
+        <BossReportsPanel businessId={business.id} />
+      )}
+    </section>
+  )
+}
+
+export function SuperAdminBusinessesPanel() {
+  const [mode, setMode] = useState<PanelMode>("list")
+  const [businesses, setBusinesses] = useState<BusinessResponse[]>([])
+  const [selectedBusiness, setSelectedBusiness] = useState<BusinessResponse | null>(null)
+  const [manageTab, setManageTab] = useState<ManageTab>("summary")
+  const [searchValue, setSearchValue] = useState("")
+  const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(false)
+  const [businessesErrorMessage, setBusinessesErrorMessage] = useState<string | null>(null)
+  const [createdResult, setCreatedResult] = useState<BusinessWithOwnerCreatedResponse | null>(null)
+
+  useEffect(() => {
+    void loadBusinesses()
+  }, [])
+
+  const activeBusinessCount = businesses.filter((business) => business.is_active).length
+  const passiveBusinessCount = businesses.length - activeBusinessCount
+
+  const filteredBusinesses = useMemo(() => {
+    const keyword = searchValue.trim().toLocaleLowerCase("tr-TR")
+
+    if (!keyword) {
+      return businesses
+    }
+
+    return businesses.filter((business) => {
+      return (
+        business.name.toLocaleLowerCase("tr-TR").includes(keyword) ||
+        business.slug.toLocaleLowerCase("tr-TR").includes(keyword) ||
+        (business.phone ?? "").toLocaleLowerCase("tr-TR").includes(keyword) ||
+        (business.email ?? "").toLocaleLowerCase("tr-TR").includes(keyword)
+      )
+    })
+  }, [businesses, searchValue])
+
+  async function loadBusinesses() {
+    setIsLoadingBusinesses(true)
+    setBusinessesErrorMessage(null)
+
+    try {
+      const response = await listBusinesses()
+      setBusinesses(response)
+    } catch (error) {
+      setBusinessesErrorMessage(getErrorMessage(error))
+    } finally {
+      setIsLoadingBusinesses(false)
+    }
+  }
+
+  function openManageMode(business: BusinessResponse) {
+    setSelectedBusiness(business)
+    setManageTab("summary")
+    setCreatedResult(null)
+    setMode("manage")
+  }
+
+  async function handleBusinessCreated(result: BusinessWithOwnerCreatedResponse) {
+    setCreatedResult(result)
+    setSearchValue("")
+    setMode("list")
+    await loadBusinesses()
+  }
+
+  if (mode === "create") {
+    return (
+      <CreateBusinessPanel
+        onCancel={() => setMode("list")}
+        onCreated={handleBusinessCreated}
+      />
+    )
+  }
+
+  if (mode === "manage" && selectedBusiness) {
+    return (
+      <BusinessManagePanel
+        business={selectedBusiness}
+        activeTab={manageTab}
+        onTabChange={setManageTab}
+        onBack={() => setMode("list")}
+      />
+    )
+  }
+
+  return (
+    <section className="flex flex-1 flex-col gap-4 pb-24">
+      <div className="rounded-[1.7rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
+              Super Admin
+            </p>
+            <h1 className="mt-1 text-2xl font-black text-[var(--missio-text-main)]">
+              İşletme yönetimi
+            </h1>
+            <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
+              Tüm müşteri işletmelerini buradan gör, yeni işletme aç ve seçtiğin
+              işletmeyi yönet.
+            </p>
+          </div>
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
+            <ShieldCheck size={24} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <MetricCard
+            label="Toplam"
+            value={businesses.length}
+            helper="İşletme"
+            icon={<Building2 size={19} />}
+          />
+          <MetricCard
+            label="Aktif"
+            value={activeBusinessCount}
+            helper="Kullanımda"
+            icon={<UsersRound size={19} />}
+          />
+          <MetricCard
+            label="Pasif"
+            value={passiveBusinessCount}
+            helper="Kapalı"
+            icon={<ShieldCheck size={19} />}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setCreatedResult(null)
+            setMode("create")
+          }}
+          className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-sm"
+        >
+          <Plus size={18} />
+          Yeni işletme oluştur
+        </button>
+      </div>
+
+      {createdResult && (
+        <CreatedResultBanner
+          result={createdResult}
+          onManage={openManageMode}
+        />
+      )}
+
+      <div className="rounded-[1.7rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
+              Müşteri işletmeleri
+            </p>
+            <h2 className="mt-1 text-xl font-black text-[var(--missio-text-main)]">
+              Kayıtlı işletmeler
+            </h2>
+            <p className="mt-1 text-sm font-bold leading-5 text-[var(--missio-text-muted)]">
+              {filteredBusinesses.length} işletme listeleniyor.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void loadBusinesses()}
+            disabled={isLoadingBusinesses}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-soft-bg)] text-[var(--missio-text-main)] disabled:opacity-60"
+            aria-label="İşletmeleri yenile"
+          >
+            <RefreshCw size={18} className={isLoadingBusinesses ? "animate-spin" : ""} />
+          </button>
+        </div>
+
+        <div className="mb-3 flex items-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-input-bg)] px-4 py-3">
+          <Search size={18} className="text-[var(--missio-text-muted)]" />
+          <input
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[var(--missio-text-main)] outline-none placeholder:text-[var(--missio-text-muted)]"
+            placeholder="İşletme ara"
+          />
+        </div>
+
+        {businessesErrorMessage && (
+          <div className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold leading-6 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+            {businessesErrorMessage}
+          </div>
+        )}
+
+        {isLoadingBusinesses && businesses.length === 0 ? (
+          <div className="rounded-2xl bg-[var(--missio-soft-bg)] p-4 text-sm font-bold text-[var(--missio-text-muted)]">
+            İşletmeler yükleniyor...
+          </div>
+        ) : filteredBusinesses.length === 0 ? (
+          <div className="rounded-2xl bg-[var(--missio-soft-bg)] p-4 text-sm font-bold text-[var(--missio-text-muted)]">
+            Gösterilecek işletme bulunamadı.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredBusinesses.map((business) => (
+              <BusinessCard
+                key={business.id}
+                business={business}
+                onManage={openManageMode}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   )
 }

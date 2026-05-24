@@ -1,9 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.core.roles import UserRole
 from app.db.session import get_db
 from app.models.business import Business
 from app.models.business_subscription import BusinessSubscription
@@ -15,7 +17,7 @@ from app.schemas.business import (
     BusinessWithOwnerCreatedResponse,
     CreateBusinessWithOwnerRequest,
 )
-from app.services.access_control_service import AccessControlError
+from app.services.access_control_service import AccessControlError, require_roles
 from app.services.auth_service import (
     AuthServiceError,
     DuplicateUsernameError,
@@ -118,6 +120,33 @@ def build_business_subscription_response(
         max_daily_tasks_snapshot=subscription.max_daily_tasks_snapshot,
         report_retention_days_snapshot=subscription.report_retention_days_snapshot,
     )
+
+
+@router.get("", response_model=list[BusinessResponse])
+def list_businesses_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[BusinessResponse]:
+    """List all businesses for super admin panel."""
+
+    try:
+        require_roles(current_user, [UserRole.SUPER_ADMIN])
+
+        businesses = (
+            db.execute(
+                select(Business)
+                .order_by(Business.created_at.desc(), Business.id.desc())
+            )
+            .scalars()
+            .all()
+        )
+
+        return [build_business_response(business) for business in businesses]
+    except AccessControlError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu işlem için yetkiniz yok.",
+        ) from exc
 
 
 @router.post(
