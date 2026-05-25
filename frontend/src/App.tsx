@@ -801,6 +801,7 @@ export default function App() {
             theme={theme}
             onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
             onLogout={handleLogout}
+            onProfileUpdated={setCurrentUser}
           />
         ) : (
           <ComingSoonPanel tab={activeTab} />

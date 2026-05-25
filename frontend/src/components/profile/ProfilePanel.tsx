@@ -44,7 +44,7 @@ import {
   requestMissioWebPushPermissionAndSubscribe,
   sendCurrentUserWebPushTest,
 } from "../../services/webPushNotificationService"
-import { changeOwnPassword } from "../../services/profileSecurityService"
+import { changeOwnPassword, updateMyProfile } from "../../services/profileSecurityService"
 import type { UserMeResponse } from "../../types/auth"
 import type { ThemeMode } from "../../types/task"
 
@@ -53,6 +53,7 @@ type ProfilePanelProps = {
   theme: ThemeMode
   onToggleTheme: () => void
   onLogout: () => void
+  onProfileUpdated: (user: UserMeResponse) => void
 }
 
 type InfoRowProps = {
@@ -86,6 +87,11 @@ type PasswordFormState = {
   current_password: string
   new_password: string
   new_password_repeat: string
+}
+
+type ProfileFormState = {
+  full_name: string
+  email: string
 }
 
 const emptyCreateForm: CreateUserFormState = {
@@ -945,7 +951,13 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
   )
 }
 
-export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePanelProps) {
+export function ProfilePanel({
+  user,
+  theme,
+  onToggleTheme,
+  onLogout,
+  onProfileUpdated,
+}: ProfilePanelProps) {
   const emailValue = user.email && user.email.trim() ? user.email : "E-posta tanımlı değil"
   const initials = getInitials(user.full_name)
   const [isRequestingPushPermission, setIsRequestingPushPermission] = useState(false)
@@ -954,11 +966,25 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
   const [isPushEnabled, setIsPushEnabled] = useState(
     () => isWebPushLocallyEnabled(),
   )
+  const [profileForm, setProfileForm] = useState<ProfileFormState>({
+    full_name: user.full_name,
+    email: user.email ?? "",
+  })
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+  const [profileStatusMessage, setProfileStatusMessage] = useState<string | null>(null)
+  const [profileErrorMessage, setProfileErrorMessage] = useState<string | null>(null)
   const [isSendingPushTest, setIsSendingPushTest] = useState(false)
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [passwordStatusMessage, setPasswordStatusMessage] = useState<string | null>(null)
   const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    setProfileForm({
+      full_name: user.full_name,
+      email: user.email ?? "",
+    })
+  }, [user.full_name, user.email])
 
   function rememberPushEnabledState(enabled: boolean) {
     localStorage.setItem(
@@ -966,6 +992,53 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
       enabled ? "false" : "true",
     )
   }
+
+  async function handleUpdateMyProfile() {
+    const fullName = profileForm.full_name.trim()
+    const email = normalizeOptionalEmail(profileForm.email)
+
+    setProfileStatusMessage(null)
+    setProfileErrorMessage(null)
+
+    if (!fullName) {
+      setProfileErrorMessage("Ad soyad boş olamaz.")
+      return
+    }
+
+    if (email !== null) {
+      const emailDomain = email.includes("@") ? email.split("@")[1] : ""
+
+      if (!email.includes("@") || !emailDomain.includes(".")) {
+        setProfileErrorMessage("Geçerli bir e-posta adresi giriniz.")
+        return
+      }
+    }
+
+    setIsUpdatingProfile(true)
+
+    try {
+      const response = await updateMyProfile({
+        full_name: fullName,
+        email,
+      })
+
+      onProfileUpdated(response.user)
+      setProfileStatusMessage(response.message)
+      setProfileForm({
+        full_name: response.user.full_name,
+        email: response.user.email ?? "",
+      })
+    } catch (error) {
+      if (error instanceof Error) {
+        setProfileErrorMessage(error.message)
+      } else {
+        setProfileErrorMessage("Profil bilgileri güncellenemedi.")
+      }
+    } finally {
+      setIsUpdatingProfile(false)
+    }
+  }
+
 
   async function handleEnablePushNotifications() {
     setIsRequestingPushPermission(true)
@@ -1147,6 +1220,72 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
             label="Hesap durumu"
             value={user.is_active ? "Aktif" : "Pasif"}
           />
+        </div>
+      </div>
+
+      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+            <UserRound size={22} />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-black tracking-tight">Profil bilgileri</h3>
+            <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
+              Ad soyad ve e-posta bilgilerini buradan güncelleyebilirsin.
+            </p>
+          </div>
+        </div>
+
+        {profileStatusMessage && (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+            {profileStatusMessage}
+          </div>
+        )}
+
+        {profileErrorMessage && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+            {profileErrorMessage}
+          </div>
+        )}
+
+        <div className="mt-4 grid gap-3">
+          <input
+            value={profileForm.full_name}
+            onChange={(event) =>
+              setProfileForm((currentForm) => ({
+                ...currentForm,
+                full_name: event.target.value,
+              }))
+            }
+            placeholder="Ad soyad"
+            autoComplete="name"
+            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+          />
+
+          <input
+            value={profileForm.email}
+            onChange={(event) =>
+              setProfileForm((currentForm) => ({
+                ...currentForm,
+                email: event.target.value,
+              }))
+            }
+            placeholder="E-posta / isteğe bağlı"
+            type="email"
+            autoComplete="email"
+            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+          />
+
+          <button
+            type="button"
+            onClick={() => void handleUpdateMyProfile()}
+            disabled={isUpdatingProfile}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Save size={18} />
+            {isUpdatingProfile ? "Profil güncelleniyor..." : "Profil bilgilerimi kaydet"}
+          </button>
         </div>
       </div>
 
