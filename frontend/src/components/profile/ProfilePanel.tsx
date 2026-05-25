@@ -110,7 +110,7 @@ const emptyPasswordForm: PasswordFormState = {
 
 function getRoleLabel(role: string) {
   if (role === "boss") {
-    return "Patron"
+    return "İşletme Sahibi"
   }
 
   if (role === "super_admin") {
@@ -617,7 +617,7 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
                   className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400"
                 >
                   <option value="all">Tüm roller</option>
-                  <option value="boss">Patron</option>
+                  <option value="boss">İşletme Sahibi</option>
                   <option value="manager">Manager</option>
                   <option value="staff">Personel</option>
                 </select>
@@ -1498,7 +1498,7 @@ export function ProfilePanel({
           <div>
             <h3 className="text-lg font-black tracking-tight">Mobil öncelikli kullanım</h3>
             <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Missio; görev, fotoğraf kanıtı, konum ve gün sonu kontrolünü sahada hızlı kullanmak için tasarlanıyor.
+              Missio; görev, kanıt fotoğrafı, konum ve gün sonu kontrolünü sahada hızlı kullanmak için tasarlanıyor.
             </p>
           </div>
         </div>

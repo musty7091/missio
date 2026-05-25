@@ -11,7 +11,7 @@ type AppHeaderProps = {
 
 function getRoleLabel(role: string) {
   if (role === "boss") {
-    return "Patron"
+    return "İşletme Sahibi"
   }
 
   if (role === "super_admin") {

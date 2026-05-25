@@ -98,7 +98,7 @@ export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
             </span>
 
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.65rem] font-black text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+              {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
             </span>
 
             {task.priority !== "normal" && (

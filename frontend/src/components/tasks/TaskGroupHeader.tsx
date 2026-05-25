@@ -8,7 +8,7 @@ type TaskGroupHeaderProps = {
 export function TaskGroupHeader({ type, count }: TaskGroupHeaderProps) {
   const isRoutine = type === "routine"
 
-  const title = isRoutine ? "Rutin görevler" : "Ekstra görevler"
+  const title = isRoutine ? "Rutin görevler" : "Tek seferlik görevler"
   const description = isRoutine
     ? "Her gün takip edilen standart işler"
     : "Bugüne özel verilen işler"

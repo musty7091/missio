@@ -286,7 +286,7 @@ function StaffCard({
                 </span>
 
                 <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200">
-                  {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+                  {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
                 </span>
 
                 <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
@@ -350,7 +350,7 @@ function ManagerTaskRow({ task }: { task: TodayTask }) {
             </span>
 
             <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200">
-              {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+              {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
             </span>
 
             <span className="rounded-full bg-[var(--missio-page-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
@@ -480,7 +480,7 @@ export function ManagerTasksPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Manager görev verileri alınamadı.")
+        setErrorMessage("Yönetici görev verileri alınamadı.")
       }
     } finally {
       setIsLoading(false)
@@ -508,7 +508,7 @@ export function ManagerTasksPanel({
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              Bugünün görevleri
+              Bugünkü görevler
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
@@ -557,7 +557,7 @@ export function ManagerTasksPanel({
               Görevlerim
             </h3>
             <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-              Manager olarak sana atanan işler
+              Yönetici olarak sana atanan işler
             </p>
           </div>
 
@@ -653,7 +653,7 @@ export function ManagerTasksPanel({
 
       {isLoading ? (
         <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
-          Manager görev ekranı yükleniyor...
+          Yönetici görev ekranı yükleniyor...
         </div>
       ) : tasks.length === 0 ? (
         <div className="rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">

@@ -141,10 +141,10 @@ function buildAssignmentNotifications(tasks: TodayTask[]) {
   if (extraTasks.length > 0) {
     notifications.push({
       id: "extra-assigned",
-      title: `${extraTasks.length} ekstra görev atandı`,
-      message: `Bugüne özel ekstra görevlerin var. İlk görev: ${getTaskPreview(extraTasks)}.`,
+      title: `${extraTasks.length} tek seferlik görev atandı`,
+      message: `Bugüne özel tek seferlik görevlerin var. İlk görev: ${getTaskPreview(extraTasks)}.`,
       timeLabel: formatNotificationTime(getLatestTime(extraTasks, "assignedAtUtc")),
-      meta: "Ekstra görev",
+      meta: "Tek seferlik görev",
       tone: "extra",
       icon: Sparkles,
       isUnread: extraTasks.some((task) => task.status === "assigned"),
@@ -191,7 +191,7 @@ function buildAttentionNotifications(tasks: TodayTask[]) {
     notifications.push({
       id: "photo-required",
       title: "Kanıtlı görev var",
-      message: `${photoRequiredTasks.length} görev fotoğraf kanıtı istiyor. Kanıt eklenmeden görev tamamlanamayabilir.`,
+      message: `${photoRequiredTasks.length} görev kanıt fotoğrafı istiyor. Kanıt eklenmeden görev tamamlanamayabilir.`,
       timeLabel: "Kanıt gerekli",
       meta: "Dikkat",
       tone: "warning",
@@ -254,7 +254,7 @@ function NotificationTaskRow({
                 : "rounded-full bg-violet-100 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200"
             }
           >
-            {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+            {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
           </span>
 
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">

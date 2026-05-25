@@ -260,11 +260,11 @@ function TaskEvidencePanel({ task }: { task: TodayTask }) {
       <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3">
         <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--missio-text-muted)]">
           <MessageSquareText size={14} />
-          Tamamlama notu
+          Tamamlama açıklaması
         </div>
 
         <p className="text-sm font-bold leading-6 text-[var(--missio-text-main)]">
-          {completionNote || "Personel tamamlama notu yazmamış."}
+          {completionNote || "Personel tamamlama açıklaması yazmamış."}
         </p>
 
         <div className="mt-3 grid grid-cols-2 gap-2 text-[0.7rem] font-bold text-[var(--missio-text-muted)]">
@@ -294,7 +294,7 @@ function TaskEvidencePanel({ task }: { task: TodayTask }) {
         <div className="mb-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--missio-text-muted)]">
             <Camera size={14} />
-            Fotoğraf kanıtı
+            Kanıt fotoğrafı
           </div>
 
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2.5 py-1 text-[0.65rem] font-black text-[var(--missio-text-muted)]">
@@ -305,7 +305,7 @@ function TaskEvidencePanel({ task }: { task: TodayTask }) {
         {attachments.length === 0 ? (
           task.requiresPhoto ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-xs font-black leading-5 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-              Bu görev fotoğraf kanıtı gerektiriyor; ancak fotoğraf bulunamadı.
+              Bu görev kanıt fotoğrafı gerektiriyor; ancak fotoğraf bulunamadı.
             </div>
           ) : (
             <div className="rounded-2xl bg-[var(--missio-card-bg)] p-3 text-xs font-bold text-[var(--missio-text-muted)]">
@@ -371,7 +371,7 @@ function ApprovalTaskCard({
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap gap-1.5">
               <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[0.6rem] font-black text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
-                {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+                {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
               </span>
 
               <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">

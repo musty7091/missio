@@ -102,7 +102,7 @@ function getNavigationItems(role: string): NavigationItem[] {
       },
       {
         id: "reports",
-        label: "Kontrol",
+        label: "Denetim",
         icon: ShieldCheck,
       },
       {
@@ -151,7 +151,7 @@ function getNavigationItems(role: string): NavigationItem[] {
     },
     {
       id: "reports",
-      label: "Gün Kapat",
+      label: "Gün Kapanışı",
       icon: ShieldCheck,
     },
     {

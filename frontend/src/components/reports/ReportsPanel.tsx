@@ -1,4 +1,4 @@
-﻿import {
+import {
   AlertTriangle,
   Camera,
   CheckCircle2,
@@ -83,7 +83,7 @@ function getClosureStatusLabel(status: string) {
     return "Sorunlu kapanış"
   }
 
-  return "Gün kapatıldı"
+  return "Gün kapanışııldı"
 }
 
 function getClosureStatusMessage(status: string) {
@@ -326,7 +326,7 @@ function ControlTaskRow({
                 : "rounded-full bg-violet-100 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200"
             }
           >
-            {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+            {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
           </span>
 
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
@@ -514,7 +514,7 @@ function StaffControlPanel({
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
               <ShieldCheck size={14} />
-              Kontrol
+              Denetim
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
@@ -559,7 +559,7 @@ function StaffControlPanel({
               <ClipboardCheck size={28} />
             </div>
 
-            <h3 className="mt-4 text-lg font-black">Kontrol edilecek görev yok</h3>
+            <h3 className="mt-4 text-lg font-black">Denetim edilecek görev yok</h3>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
               Bugüne görev atandığında gün sonu kontrolün burada oluşacak.
@@ -615,7 +615,7 @@ function StaffControlPanel({
 
             {blockingTasks.length === 0 ? (
               <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
-                Kontrol gerektiren açık iş görünmüyor. Bugün kapatılabilir.
+                Denetim gerektiren açık iş görünmüyor. Bugün kapatılabilir.
               </div>
             ) : (
               <div className="space-y-2">
@@ -687,7 +687,7 @@ function ManagementCloseDayPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Gün kapatma ekranı yüklenemedi.")
+        setErrorMessage("Gün kapanışıma ekranı yüklenemedi.")
       }
 
       setReportTasks([])
@@ -792,7 +792,7 @@ function ManagementCloseDayPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Gün kapatılamadı.")
+        setErrorMessage("Gün kapanışıılamadı.")
       }
     } finally {
       setIsClosingDay(false)
@@ -812,7 +812,7 @@ function ManagementCloseDayPanel({
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
               <ShieldCheck size={14} />
-              Gün Kapat
+              Gün Kapanışı
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
@@ -961,7 +961,7 @@ function ManagementCloseDayPanel({
 
       {isLoading ? (
         <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
-          Gün kapatma ekranı yükleniyor...
+          Gün kapanışıma ekranı yükleniyor...
         </div>
       ) : totalCount === 0 ? (
         <div className="flex flex-1 items-center justify-center rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">
@@ -1052,13 +1052,13 @@ function ManagementCloseDayPanel({
               icon={photoRequiredOpenTasks.length === 0 ? <CheckCircle2 size={22} /> : <Camera size={22} />}
               title={
                 photoRequiredOpenTasks.length === 0
-                  ? "Eksik fotoğraf kanıtı görünmüyor"
+                  ? "Eksik kanıt fotoğrafı görünmüyor"
                   : `${photoRequiredOpenTasks.length} açık görev fotoğraf istiyor`
               }
               description={
                 photoRequiredOpenTasks.length === 0
                   ? "Fotoğraf isteyen açık görev bulunmuyor."
-                  : "Bu görevlerde fotoğraf kanıtı tamamlanmadan kapanış sorunlu sayılır."
+                  : "Bu görevlerde kanıt fotoğrafı tamamlanmadan kapanış sorunlu sayılır."
               }
             />
           </div>
@@ -1082,7 +1082,7 @@ function ManagementCloseDayPanel({
 
             {blockingTasks.length === 0 ? (
               <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
-                Kontrol gerektiren açık iş görünmüyor. Temiz kapanış yapılabilir.
+                Denetim gerektiren açık iş görünmüyor. Temiz kapanış yapılabilir.
               </div>
             ) : (
               <div className="space-y-2">

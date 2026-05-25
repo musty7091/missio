@@ -1,4 +1,4 @@
-﻿import { useState } from "react"
+import { useState } from "react"
 import { Plus } from "lucide-react"
 
 import { TaskAssignSheet } from "../tasks/TaskAssignSheet"
@@ -32,7 +32,7 @@ export function BossTaskAssignCard({
           </h2>
 
           <p className="mt-1 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
-            Patron ve manager için ortak standart görev atama akışı.
+            İşletme sahibi ve yönetici için ortak standart görev atama akışı.
           </p>
         </div>
 

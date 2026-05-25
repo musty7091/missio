@@ -259,7 +259,7 @@ function ReportTaskRow({ item }: { item: ClosureItem }) {
 
       <div className="flex flex-wrap gap-1.5 text-[0.62rem] font-black">
         <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-          {item.task_type === "routine" ? "Rutin" : "Ekstra"}
+          {item.task_type === "routine" ? "Rutin" : "Tek seferlik"}
         </span>
 
         {item.requires_photo && (
@@ -427,7 +427,7 @@ function ReportsDetailModal({
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                Kontrol gerektirenler
+                Denetim gerektirenler
               </p>
 
               <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
@@ -590,7 +590,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
           <div className="min-w-0">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-100">
               <FileText size={14} />
-              Patron rapor arşivi
+              İşletme Sahibi rapor arşivi
             </div>
 
             <h1 className="text-2xl font-black tracking-tight">

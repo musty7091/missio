@@ -786,7 +786,7 @@ export default function App() {
               {!isLoadingTasks && !tasksErrorMessage && tasks.length === 0 && (
                 <AppStatePanel
                   icon={<ClipboardCheck size={30} />}
-                  eyebrow="Bugünün görevleri"
+                  eyebrow="Bugünkü görevler"
                   title="Bugün atanmış görev yok"
                   description="Yeni görev atandığında burada görünecek."
                 />

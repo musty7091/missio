@@ -92,7 +92,7 @@ function getDetailGuidance(task: TodayTask) {
 
   if (task.status === "in_progress") {
     if (task.requiresPhoto) {
-      return "Görev devam ediyor. Fotoğraf kanıtını ekledikten sonra tamamlayabilirsin."
+      return "Görev devam ediyor. Kanıt fotoğrafını ekledikten sonra tamamlayabilirsin."
     }
 
     return "Görev devam ediyor. İş bittiğinde tamamlayabilirsin."
@@ -403,7 +403,7 @@ export function TaskDetailPanel({
   }
 
   async function handleDeleteAttachment(attachmentId: number) {
-    const confirmed = window.confirm("Bu fotoğraf kanıtını silmek istiyor musun?")
+    const confirmed = window.confirm("Bu kanıt fotoğrafını silmek istiyor musun?")
 
     if (!confirmed) {
       return
@@ -420,7 +420,7 @@ export function TaskDetailPanel({
       if (error instanceof Error) {
         setAttachmentErrorMessage(error.message)
       } else {
-        setAttachmentErrorMessage("Fotoğraf kanıtı silinemedi.")
+        setAttachmentErrorMessage("Kanıt fotoğrafı silinemedi.")
       }
     } finally {
       setDeletingAttachmentId(null)
@@ -456,7 +456,7 @@ export function TaskDetailPanel({
                   </h2>
 
                   <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-                    {task.taskType === "routine" ? "Rutin görev" : "Ekstra görev"} · {task.time}
+                    {task.taskType === "routine" ? "Rutin görev" : "Tek seferlik görev"} · {task.time}
                   </p>
                 </div>
 
@@ -480,7 +480,7 @@ export function TaskDetailPanel({
                 </span>
 
                 <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-slate-200">
-                  {task.taskType === "routine" ? "Rutin" : "Ekstra"}
+                  {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
                 </span>
               </div>
             </div>
@@ -629,9 +629,9 @@ export function TaskDetailPanel({
 
             <div className="mt-3 flex flex-wrap gap-2">
               {task.requiresPhoto ? (
-                <DetailChip icon={<Camera size={14} />} label="Fotoğraf zorunlu" />
+                <DetailChip icon={<Camera size={14} />} label="Kanıt fotoğrafı zorunlu" />
               ) : (
-                <DetailChip icon={<Camera size={14} />} label="Fotoğraf zorunlu değil" />
+                <DetailChip icon={<Camera size={14} />} label="Kanıt fotoğrafı zorunlu değil" />
               )}
 
               {task.requiresLocation ? (
@@ -641,7 +641,7 @@ export function TaskDetailPanel({
               )}
 
               {task.requiresManagerApproval ? (
-                <DetailChip icon={<FileCheck2 size={14} />} label="Manager onayı gerekli" />
+                <DetailChip icon={<FileCheck2 size={14} />} label="Yönetici onayı gerekli" />
               ) : (
                 <DetailChip icon={<FileCheck2 size={14} />} label="Onay gerekmiyor" />
               )}
@@ -657,7 +657,7 @@ export function TaskDetailPanel({
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-black">Fotoğraf kanıtı</h3>
+                    <h3 className="text-sm font-black">Kanıt fotoğrafı</h3>
                     <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
                       {evidenceAttachmentPreviews.length > 0
                         ? `${evidenceAttachmentPreviews.length} kanıt fotoğrafı eklendi.`
@@ -680,7 +680,7 @@ export function TaskDetailPanel({
               {!isLoadingAttachments && !attachmentErrorMessage && evidenceAttachmentPreviews.length === 0 && (
                 <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-muted)]">
                   <ImageIcon size={19} />
-                  Fotoğraf eklendiğinde burada görünecek.
+                  Kanıt fotoğrafı eklendiğinde burada görünecek.
                 </div>
               )}
 
@@ -746,9 +746,9 @@ export function TaskDetailPanel({
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-black">Tamamlama notu</h3>
+                  <h3 className="text-sm font-black">Tamamlama açıklaması</h3>
                   <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                    Yaptığın işle ilgili kısa açıklama yazabilirsin. Bu not manager onay ekranında görünecek.
+                    Yaptığın işle ilgili kısa açıklama yazabilirsin. Bu not yönetici onay ekranında görünecek.
                   </p>
                 </div>
               </div>
@@ -774,7 +774,7 @@ export function TaskDetailPanel({
               <div className="mb-3 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
                 <AlertCircle className="mt-0.5 shrink-0" size={17} />
                 <span>
-                  Bu görev fotoğraf kanıtı istiyor. Tamamlamadan önce fotoğraf eklemelisin.
+                  Bu görev kanıt fotoğrafı istiyor. Tamamlamadan önce fotoğraf eklemelisin.
                 </span>
               </div>
             )}
@@ -823,7 +823,7 @@ export function TaskDetailPanel({
                       }
                     >
                       <Camera size={18} />
-                      Fotoğraf ekle
+                      Kanıt fotoğrafı ekle
                     </button>
                   </>
                 )}
@@ -859,7 +859,7 @@ export function TaskDetailPanel({
               <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
                 {selectedPreview.attachment.attachment_type === "reference"
                   ? "Referans fotoğrafı"
-                  : "Fotoğraf kanıtı"}
+                  : "Kanıt fotoğrafı"}
               </p>
               <h3 className="mt-1 truncate text-base font-black">
                 {selectedPreview.attachment.file_name}

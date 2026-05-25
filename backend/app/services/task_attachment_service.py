@@ -445,7 +445,7 @@ def ensure_task_allows_attachment_upload(
     ) >= max_allowed_count:
         if attachment_type == TASK_ATTACHMENT_TYPE_REFERENCE:
             raise TaskAttachmentLimitError(
-                f"Bir göreve en fazla {MAX_ATTACHMENTS_PER_TASK} referans fotoğrafı eklenebilir."
+                f"Bir göreve en fazla {MAX_ATTACHMENTS_PER_TASK} referans görsel eklenebilir."
             )
 
         if attachment_type == TASK_ATTACHMENT_TYPE_VOICE_NOTE:
@@ -526,10 +526,10 @@ def upload_task_attachment(
 
         if normalized_attachment_type == TASK_ATTACHMENT_TYPE_REFERENCE:
             event_type = "task_reference_photo_uploaded"
-            event_note = "Göreve referans fotoğrafı yüklendi."
+            event_note = "Göreve referans görsel yüklendi."
         else:
             event_type = "task_evidence_photo_uploaded"
-            event_note = "Göreve fotoğraf kanıtı yüklendi."
+            event_note = "Göreve kanıt fotoğrafı yüklendi."
 
     physical_path, relative_path = build_safe_storage_path(
         task,

@@ -75,7 +75,7 @@ function getClosureStatusLabel(status: string) {
   }
 
   if (status === "closed") {
-    return "Gün kapatıldı"
+    return "Gün kapanışııldı"
   }
 
   return "Kapanış kaydı"
@@ -123,7 +123,7 @@ function getProblemLabel(task: TodayTask) {
     return "Onay bekliyor"
   }
 
-  return "Kontrol"
+  return "Denetim"
 }
 
 function getStaffRows(tasks: TodayTask[]) {
@@ -273,7 +273,7 @@ export function BossDashboardPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Patron ekranı yüklenemedi.")
+        setErrorMessage("İşletme sahibi ekranı yüklenemedi.")
       }
     } finally {
       setIsLoading(false)
@@ -313,7 +313,7 @@ export function BossDashboardPanel({
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-100">
               <ShieldCheck size={14} />
-              Patron kontrol merkezi
+              İşletme sahibi kontrol merkezi
             </div>
 
             <h1 className="text-2xl font-black tracking-tight">
@@ -379,7 +379,7 @@ export function BossDashboardPanel({
               className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 py-2 text-sm font-black text-slate-950 shadow-lg shadow-cyan-400/20 transition active:scale-95"
             >
               <BarChart3 size={17} />
-              Gün sonu raporuna git
+              Gün kapanışı raporuna git
             </button>
           )}
         </div>
@@ -408,7 +408,7 @@ export function BossDashboardPanel({
         <MetricCard
           label="Onay"
           value={approvalWaitingCount}
-          helper="Yönetici/patron onayı bekleyen"
+          helper="Yönetici/işletme sahibi onayı bekleyen"
           icon={<ClipboardCheck size={19} />}
           tone={approvalWaitingCount > 0 ? "amber" : "emerald"}
         />
@@ -434,10 +434,10 @@ export function BossDashboardPanel({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Kontrol
+              Denetim
             </p>
             <h2 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-              Dikkat gereken işler
+              İnceleme gereken işler
             </h2>
           </div>
 
@@ -558,7 +558,7 @@ export function BossDashboardPanel({
                       {row.open + row.approvalWaiting}
                     </p>
                     <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                      Kontrol
+                      Denetim
                     </p>
                   </div>
 

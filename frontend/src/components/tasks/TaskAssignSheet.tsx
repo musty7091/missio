@@ -152,7 +152,7 @@ export function TaskAssignSheet({
   )
 
   const selectedUserLabel = getSelectedUserLabel(assignableUsers, assignedToUserId)
-  const selectedTaskModeLabel = taskMode === "routine" ? "Rutin görev" : "Ekstra görev"
+  const selectedTaskModeLabel = taskMode === "routine" ? "Rutin görev" : "Tek seferlik görev"
   const selectedDueTimeLabel = dueTime || "Saat belirtilmedi"
   const requirementSummary =
     [
@@ -353,7 +353,7 @@ export function TaskAssignSheet({
 
   async function startVoiceRecording() {
     if (taskMode === "routine") {
-      setErrorMessage("Sesli görev notu şimdilik sadece ekstra görevlerde destekleniyor.")
+      setErrorMessage("Sesli görev notu şimdilik sadece tek seferlik görevlerde destekleniyor.")
       return
     }
 
@@ -512,7 +512,7 @@ export function TaskAssignSheet({
     }
 
     if (taskMode === "routine" && (referencePhotoFile || voiceNoteBlob)) {
-      setErrorMessage("Referans fotoğrafı ve sesli not şimdilik sadece ekstra görevlerde destekleniyor.")
+      setErrorMessage("Referans fotoğrafı ve sesli not şimdilik sadece tek seferlik görevlerde destekleniyor.")
       return
     }
 
@@ -583,8 +583,8 @@ export function TaskAssignSheet({
 
         onSuccess?.(
           referencePhotoFile || voiceNoteBlob
-            ? "Ekstra görev medya ekleriyle personele atandı."
-            : "Ekstra görev personele atandı.",
+            ? "Tek seferlik görev medya ekleriyle personele atandı."
+            : "Tek seferlik görev personele atandı.",
         )
       }
 
@@ -617,7 +617,7 @@ export function TaskAssignSheet({
               </p>
 
               <h3 className="mt-1 text-xl font-black text-[var(--missio-text-main)]">
-                {taskMode === "extra" ? "Ekstra görev ata" : "Rutin görev oluştur"}
+                {taskMode === "extra" ? "Tek seferlik görev ata" : "Rutin görev oluştur"}
               </h3>
             </div>
 
@@ -655,7 +655,7 @@ export function TaskAssignSheet({
                     : "min-h-12 rounded-2xl px-3 text-sm font-black text-[var(--missio-text-muted)]"
                 }
               >
-                Ekstra
+                Tek seferlik
               </button>
 
               <button
@@ -673,7 +673,7 @@ export function TaskAssignSheet({
 
             <p className="mt-2 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
               {taskMode === "extra"
-                ? "Ekstra görev bugüne özel tek seferlik olarak atanır."
+                ? "Tek seferlik görev yalnızca bugün için atanır."
                 : "Rutin görev şablonu oluşturulur ve bugüne de işlenir."}
             </p>
           </section>
@@ -814,7 +814,7 @@ export function TaskAssignSheet({
 
             {taskMode === "routine" ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
-                Referans fotoğrafı şimdilik sadece ekstra görevlerde kullanılabilir.
+                Referans fotoğrafı şimdilik sadece tek seferlik görevlerde kullanılabilir.
               </div>
             ) : referencePhotoPreviewUrl ? (
               <div className="overflow-hidden rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)]">
@@ -872,7 +872,7 @@ export function TaskAssignSheet({
 
             {taskMode === "routine" ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
-                Sesli görev notu şimdilik sadece ekstra görevlerde kullanılabilir.
+                Sesli görev notu şimdilik sadece tek seferlik görevlerde kullanılabilir.
               </div>
             ) : (
               <div className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3">
@@ -1019,7 +1019,7 @@ export function TaskAssignSheet({
             ) : (
               <Sparkles size={18} />
             )}
-            {taskMode === "extra" ? "Ekstra görevi ata" : "Rutin görevi oluştur"}
+            {taskMode === "extra" ? "Tek seferlik görevi ata" : "Rutin görevi oluştur"}
           </button>
         </div>
       </div>
