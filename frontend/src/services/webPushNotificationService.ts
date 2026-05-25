@@ -55,7 +55,7 @@ export type MissioWebPushEnableResult = {
   subscription?: PushSubscription
 }
 
-const WEB_PUSH_SERVICE_WORKER_PATH = "/sw.js"
+const WEB_PUSH_SERVICE_WORKER_PATH = "/missio-web-push-sw.js"
 const WEB_PUSH_DISABLED_STORAGE_KEY = "missio-web-push-notifications-disabled"
 const WEB_PUSH_ENDPOINT_STORAGE_KEY = "missio-web-push-endpoint"
 
@@ -342,3 +342,4 @@ export async function sendCurrentUserWebPushTest() {
     requiresAuth: true,
   })
 }
+
