@@ -47,6 +47,14 @@ ALLOWED_RECURRENCE_TYPES = {
     RECURRENCE_TYPE_DAILY,
 }
 
+TASK_ATTACHMENT_TYPE_REFERENCE = "reference"
+TASK_ATTACHMENT_TYPE_EVIDENCE = "evidence"
+
+ALLOWED_TASK_ATTACHMENT_TYPES = {
+    TASK_ATTACHMENT_TYPE_REFERENCE,
+    TASK_ATTACHMENT_TYPE_EVIDENCE,
+}
+
 
 def normalize_optional_text_value(value: object) -> object:
     """Trim optional text value and convert empty strings to None."""
@@ -103,6 +111,17 @@ def validate_recurrence_type_value(value: str) -> str:
 
     if normalized_value not in ALLOWED_RECURRENCE_TYPES:
         raise ValueError("Rutin görev tekrar tipi geçersiz.")
+
+    return normalized_value
+
+
+def validate_task_attachment_type_value(value: str) -> str:
+    """Validate task attachment type value."""
+
+    normalized_value = value.strip().lower()
+
+    if normalized_value not in ALLOWED_TASK_ATTACHMENT_TYPES:
+        raise ValueError("Görev fotoğraf tipi geçersiz.")
 
     return normalized_value
 
@@ -458,6 +477,7 @@ class TaskAttachmentResponse(BaseModel):
     event_id: int | None
     uploaded_by_user_id: int | None
     file_name: str
+    attachment_type: str
     file_type: str | None
     file_size: int | None
     latitude: float | None

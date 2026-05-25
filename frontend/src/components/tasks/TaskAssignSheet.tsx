@@ -1,11 +1,12 @@
-﻿import { useEffect, useMemo, useState, type ReactNode } from "react"
-import { Camera, FileCheck2, Loader2, MapPin, Send, Sparkles, X } from "lucide-react"
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react"
+import { Camera, FileCheck2, ImageIcon, Loader2, MapPin, Send, Sparkles, X } from "lucide-react"
 
 import { listBusinessUsers, type BusinessUser } from "../../services/businessUserService"
 import {
   createExtraTask,
   createRoutineTaskTemplate,
   generateDailyRoutineTasks,
+  uploadTaskAttachment,
 } from "../../services/taskService"
 
 export type TaskAssignMode = "extra" | "routine"
@@ -130,6 +131,8 @@ export function TaskAssignSheet({
   const [requiresManagerApproval, setRequiresManagerApproval] = useState(
     defaultRequiresManagerApproval,
   )
+  const [referencePhotoFile, setReferencePhotoFile] = useState<File | null>(null)
+  const [referencePhotoPreviewUrl, setReferencePhotoPreviewUrl] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const assignableUsers = useMemo(
@@ -148,6 +151,7 @@ export function TaskAssignSheet({
       requiresPhoto ? "Fotoğraf" : null,
       requiresLocation ? "Konum" : null,
       requiresManagerApproval ? "Yönetici onayı" : null,
+      referencePhotoFile ? "Referans fotoğraf" : null,
     ]
       .filter(Boolean)
       .join(" + ") || "Ek şart yok"
@@ -162,6 +166,14 @@ export function TaskAssignSheet({
     setRequiresPhoto(false)
     setRequiresLocation(false)
     setRequiresManagerApproval(defaultRequiresManagerApproval)
+    setReferencePhotoFile(null)
+    setReferencePhotoPreviewUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl)
+      }
+
+      return null
+    })
     setErrorMessage(null)
   }
 
@@ -216,6 +228,26 @@ export function TaskAssignSheet({
   }, [assignableUsers, assignedToUserId, isOpen])
 
   useEffect(() => {
+    if (!referencePhotoFile) {
+      setReferencePhotoPreviewUrl((currentUrl) => {
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl)
+        }
+
+        return null
+      })
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(referencePhotoFile)
+    setReferencePhotoPreviewUrl(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [referencePhotoFile])
+
+  useEffect(() => {
     if (!isOpen) {
       return
     }
@@ -246,6 +278,29 @@ export function TaskAssignSheet({
     }
   }, [isOpen])
 
+  function handleReferencePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+
+    if (!file) {
+      setReferencePhotoFile(null)
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("Referans fotoğrafı için sadece görsel dosyası seçebilirsin.")
+      event.target.value = ""
+      setReferencePhotoFile(null)
+      return
+    }
+
+    setErrorMessage(null)
+    setReferencePhotoFile(file)
+  }
+
+  function removeReferencePhoto() {
+    setReferencePhotoFile(null)
+  }
+
   function closeSheet() {
     if (isSaving) {
       return
@@ -275,6 +330,11 @@ export function TaskAssignSheet({
       return
     }
 
+    if (taskMode === "routine" && referencePhotoFile) {
+      setErrorMessage("Referans fotoğrafı şimdilik sadece ekstra görevlerde destekleniyor.")
+      return
+    }
+
     setIsSaving(true)
     setErrorMessage(null)
 
@@ -301,7 +361,7 @@ export function TaskAssignSheet({
 
         onSuccess?.("Rutin görev oluşturuldu ve bugünün görevlerine işlendi.")
       } else {
-        await createExtraTask({
+        const createdTaskResponse = await createExtraTask({
           assigned_to_user_id: selectedUserId,
           title: trimmedTitle,
           description: trimmedDescription || null,
@@ -313,7 +373,18 @@ export function TaskAssignSheet({
           requires_manager_approval: requiresManagerApproval,
         })
 
-        onSuccess?.("Ekstra görev personele atandı.")
+        if (referencePhotoFile) {
+          await uploadTaskAttachment(createdTaskResponse.task.id, {
+            file: referencePhotoFile,
+            attachmentType: "reference",
+          })
+        }
+
+        onSuccess?.(
+          referencePhotoFile
+            ? "Ekstra görev referans fotoğrafıyla personele atandı."
+            : "Ekstra görev personele atandı.",
+        )
       }
 
       resetForm()
@@ -521,6 +592,65 @@ export function TaskAssignSheet({
                 onToggle={() => setRequiresManagerApproval((value) => !value)}
               />
             </div>
+          </section>
+
+
+          <section className="rounded-[1.4rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3">
+            <div className="mb-3 flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+                <ImageIcon size={21} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+                  Referans fotoğrafı
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+                  Personel görevi açınca bu görseli “yapılacak işin örneği” olarak görecek.
+                </p>
+              </div>
+            </div>
+
+            {taskMode === "routine" ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
+                Referans fotoğrafı şimdilik sadece ekstra görevlerde kullanılabilir.
+              </div>
+            ) : referencePhotoPreviewUrl ? (
+              <div className="overflow-hidden rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)]">
+                <img
+                  src={referencePhotoPreviewUrl}
+                  alt="Referans fotoğrafı önizleme"
+                  className="max-h-56 w-full object-cover"
+                />
+
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <p className="min-w-0 truncate text-xs font-black text-[var(--missio-text-main)]">
+                    {referencePhotoFile?.name}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={removeReferencePhoto}
+                    disabled={isSaving}
+                    className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-black text-red-600 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+                  >
+                    Kaldır
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-4 text-center text-sm font-black text-[var(--missio-text-muted)] active:scale-[0.99]">
+                <ImageIcon size={24} />
+                Referans fotoğrafı seç
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={isSaving}
+                  onChange={handleReferencePhotoChange}
+                />
+              </label>
+            )}
           </section>
 
           <section className="rounded-[1.4rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3">

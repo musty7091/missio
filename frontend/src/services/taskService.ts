@@ -27,6 +27,7 @@ export type TaskAttachment = {
   event_id: number | null
   uploaded_by_user_id: number | null
   file_name: string
+  attachment_type: TaskAttachmentType
   file_type: string | null
   file_size: number | null
   latitude: number | null
@@ -72,8 +73,11 @@ type TaskEventListResponse = {
   total_count: number
 }
 
+export type TaskAttachmentType = "reference" | "evidence"
+
 type UploadTaskAttachmentPayload = {
   file: File
+  attachmentType?: TaskAttachmentType
   latitude?: number | null
   longitude?: number | null
   location_accuracy?: number | null
@@ -122,6 +126,13 @@ export function getMyTodayTasks(params: GetMyTodayTasksParams = {}) {
   })
 }
 
+
+export function getTaskDetail(taskId: number) {
+  return apiRequest<ApiTask>(`/tasks/${taskId}`, {
+    method: "GET",
+  })
+}
+
 export function startTask(taskId: number, payload: ChangeTaskPayload = {}) {
   return apiRequest<TaskStatusChangedResponse>(`/tasks/${taskId}/start`, {
     method: "POST",
@@ -140,6 +151,7 @@ export function uploadTaskAttachment(taskId: number, payload: UploadTaskAttachme
   const formData = new FormData()
 
   formData.append("file", payload.file)
+  formData.append("attachment_type", payload.attachmentType ?? "evidence")
 
   if (payload.latitude !== undefined && payload.latitude !== null) {
     formData.append("latitude", String(payload.latitude))
@@ -159,9 +171,15 @@ export function uploadTaskAttachment(taskId: number, payload: UploadTaskAttachme
   })
 }
 
-export function listTaskAttachments(taskId: number) {
+export function listTaskAttachments(
+  taskId: number,
+  attachmentType?: TaskAttachmentType,
+) {
   return apiRequest<TaskAttachmentListResponse>(`/tasks/${taskId}/attachments`, {
     method: "GET",
+    query: {
+      attachment_type: attachmentType,
+    },
   })
 }
 

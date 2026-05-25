@@ -30,6 +30,12 @@ class TaskAttachment(Base):
     )
     file_path: Mapped[str] = mapped_column(String(700), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    attachment_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="evidence",
+        index=True,
+    )
     file_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)

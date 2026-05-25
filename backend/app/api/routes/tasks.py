@@ -32,6 +32,7 @@ from app.schemas.task import (
     GenerateDailyRoutineTasksRequest,
     MyTodayTasksResponse,
     RejectTaskRequest,
+    TASK_ATTACHMENT_TYPE_EVIDENCE,
     TASK_STATUS_ASSIGNED,
     TASK_STATUS_IN_PROGRESS,
     TASK_STATUS_REJECTED,
@@ -232,7 +233,7 @@ def send_task_assigned_web_push_notification_safely(
                     subscription=subscription,
                     title="Yeni görev atandı",
                     body=notification_body,
-                    url="/",
+                    url=f"/?missioTaskId={task.id}&missioOpen=task",
                     tag=f"missio-task-assigned-{task.id}",
                     data={
                         "type": "task_assigned",
@@ -549,6 +550,7 @@ def build_task_attachment_response(attachment: TaskAttachment) -> TaskAttachment
         event_id=attachment.event_id,
         uploaded_by_user_id=attachment.uploaded_by_user_id,
         file_name=attachment.file_name,
+        attachment_type=attachment.attachment_type,
         file_type=attachment.file_type,
         file_size=attachment.file_size,
         latitude=attachment.latitude,
@@ -1056,6 +1058,7 @@ def upload_task_attachment_endpoint(
     task_id: int,
     request: Request,
     file: UploadFile = File(...),
+    attachment_type: str = Form(default=TASK_ATTACHMENT_TYPE_EVIDENCE),
     latitude: float | None = Form(default=None),
     longitude: float | None = Form(default=None),
     location_accuracy: float | None = Form(default=None),
@@ -1078,6 +1081,7 @@ def upload_task_attachment_endpoint(
             current_user=current_user,
             task=task,
             upload_file=file,
+            attachment_type=attachment_type,
             latitude=latitude,
             longitude=longitude,
             location_accuracy=location_accuracy,
@@ -1106,6 +1110,7 @@ def upload_task_attachment_endpoint(
 )
 def list_task_attachments_endpoint(
     task_id: int,
+    attachment_type: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -1120,6 +1125,7 @@ def list_task_attachments_endpoint(
             db=db,
             current_user=current_user,
             task=task,
+            attachment_type=attachment_type,
             limit=limit,
             offset=offset,
         )

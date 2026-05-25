@@ -16,8 +16,11 @@ from app.models.task import Task
 from app.models.task_attachment import TaskAttachment
 from app.models.user import User
 from app.schemas.task import (
+    TASK_ATTACHMENT_TYPE_EVIDENCE,
+    TASK_ATTACHMENT_TYPE_REFERENCE,
     TASK_STATUS_APPROVED,
     TASK_STATUS_CANCELLED,
+    validate_task_attachment_type_value,
 )
 from app.services.task_service import (
     TaskNotFoundError,
@@ -289,14 +292,20 @@ def build_safe_storage_path(task: Task) -> tuple[Path, str]:
     return safe_physical_path, relative_path
 
 
-def count_active_task_attachments(db: Session, *, task_id: int) -> int:
+def count_active_task_attachments(
+    db: Session,
+    *,
+    task_id: int,
+    attachment_type: str | None = None,
+) -> int:
     """Return active attachment count for task."""
 
-    return int(
-        db.execute(
-            select(func.count(TaskAttachment.id)).where(TaskAttachment.task_id == task_id)
-        ).scalar_one()
-    )
+    query = select(func.count(TaskAttachment.id)).where(TaskAttachment.task_id == task_id)
+
+    if attachment_type is not None:
+        query = query.where(TaskAttachment.attachment_type == attachment_type)
+
+    return int(db.execute(query).scalar_one())
 
 
 def ensure_task_allows_attachment_upload(
@@ -304,6 +313,7 @@ def ensure_task_allows_attachment_upload(
     *,
     current_user: User,
     task: Task,
+    attachment_type: str,
 ) -> None:
     """Ensure current user can upload attachment to task."""
 
@@ -320,9 +330,18 @@ def ensure_task_allows_attachment_upload(
             "Onaylanmış veya iptal edilmiş göreve artık fotoğraf eklenemez."
         )
 
-    if count_active_task_attachments(db, task_id=task.id) >= MAX_ATTACHMENTS_PER_TASK:
+    if count_active_task_attachments(
+        db,
+        task_id=task.id,
+        attachment_type=attachment_type,
+    ) >= MAX_ATTACHMENTS_PER_TASK:
+        if attachment_type == TASK_ATTACHMENT_TYPE_REFERENCE:
+            raise TaskAttachmentLimitError(
+                f"Bir göreve en fazla {MAX_ATTACHMENTS_PER_TASK} referans fotoğrafı eklenebilir."
+            )
+
         raise TaskAttachmentLimitError(
-            f"Bir göreve en fazla {MAX_ATTACHMENTS_PER_TASK} fotoğraf eklenebilir."
+            f"Bir göreve en fazla {MAX_ATTACHMENTS_PER_TASK} kanıt fotoğrafı eklenebilir."
         )
 
 
@@ -358,6 +377,7 @@ def upload_task_attachment(
     current_user: User,
     task: Task,
     upload_file: UploadFile,
+    attachment_type: str = TASK_ATTACHMENT_TYPE_EVIDENCE,
     latitude: float | None = None,
     longitude: float | None = None,
     location_accuracy: float | None = None,
@@ -366,10 +386,13 @@ def upload_task_attachment(
 ) -> TaskAttachment:
     """Upload, optimize, store, and register task attachment."""
 
+    normalized_attachment_type = validate_task_attachment_type_value(attachment_type)
+
     ensure_task_allows_attachment_upload(
         db=db,
         current_user=current_user,
         task=task,
+        attachment_type=normalized_attachment_type,
     )
     validate_upload_file_metadata(upload_file)
 
@@ -381,14 +404,21 @@ def upload_task_attachment(
     physical_path.write_bytes(optimized_content)
 
     try:
+        if normalized_attachment_type == TASK_ATTACHMENT_TYPE_REFERENCE:
+            event_type = "task_reference_photo_uploaded"
+            event_note = "Göreve referans fotoğrafı yüklendi."
+        else:
+            event_type = "task_evidence_photo_uploaded"
+            event_note = "Göreve fotoğraf kanıtı yüklendi."
+
         event = create_task_event(
             db=db,
             task=task,
             user_id=current_user.id,
-            event_type="task_attachment_uploaded",
+            event_type=event_type,
             old_status=task.status,
             new_status=task.status,
-            note="Göreve fotoğraf kanıtı yüklendi.",
+            note=event_note,
             latitude=latitude,
             longitude=longitude,
             location_accuracy=location_accuracy,
@@ -407,6 +437,7 @@ def upload_task_attachment(
             uploaded_by_user_id=current_user.id,
             file_path=relative_path,
             file_name=physical_path.name,
+            attachment_type=normalized_attachment_type,
             file_type="image/jpeg",
             file_size=optimized_size,
             latitude=latitude,
@@ -431,6 +462,7 @@ def list_task_attachments(
     *,
     current_user: User,
     task: Task,
+    attachment_type: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> TaskAttachmentListResult:
@@ -438,16 +470,23 @@ def list_task_attachments(
 
     ensure_can_view_task(current_user, task=task)
 
-    total_count = int(
-        db.execute(
-            select(func.count(TaskAttachment.id)).where(TaskAttachment.task_id == task.id)
-        ).scalar_one()
-    )
+    normalized_attachment_type = None
+
+    if attachment_type is not None:
+        normalized_attachment_type = validate_task_attachment_type_value(attachment_type)
+
+    count_query = select(func.count(TaskAttachment.id)).where(TaskAttachment.task_id == task.id)
+    list_query = select(TaskAttachment).where(TaskAttachment.task_id == task.id)
+
+    if normalized_attachment_type is not None:
+        count_query = count_query.where(TaskAttachment.attachment_type == normalized_attachment_type)
+        list_query = list_query.where(TaskAttachment.attachment_type == normalized_attachment_type)
+
+    total_count = int(db.execute(count_query).scalar_one())
 
     attachments = (
         db.execute(
-            select(TaskAttachment)
-            .where(TaskAttachment.task_id == task.id)
+            list_query
             .order_by(TaskAttachment.id.asc())
             .limit(limit)
             .offset(offset)

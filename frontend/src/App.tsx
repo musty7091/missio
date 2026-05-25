@@ -35,12 +35,16 @@ import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
 import {
   completeTask,
   getMyTodayTasks,
+  getTaskDetail,
   startTask,
   uploadTaskAttachment,
 } from "./services/taskService"
 import type { UserMeResponse } from "./types/auth"
 import type { ThemeMode, TodayTask } from "./types/task"
-import { mapMyTodayTasksResponseToTodayTasks } from "./utils/apiTaskMapper"
+import {
+  mapApiTaskToTodayTask,
+  mapMyTodayTasksResponseToTodayTasks,
+} from "./utils/apiTaskMapper"
 
 type LocationPayload = {
   latitude?: number | null
@@ -85,6 +89,37 @@ async function getLocationPayloadForTask(task: TodayTask): Promise<LocationPaylo
   }
 
   return getCurrentLocationPayload()
+}
+
+function getMissioTaskIdFromUrl() {
+  const params = new URLSearchParams(window.location.search)
+  const openTarget = params.get("missioOpen")
+  const taskIdValue = params.get("missioTaskId")
+
+  if (openTarget !== "task" || !taskIdValue) {
+    return null
+  }
+
+  const taskId = Number(taskIdValue)
+
+  if (!Number.isFinite(taskId) || taskId <= 0) {
+    return null
+  }
+
+  return Math.trunc(taskId)
+}
+
+function clearMissioTaskUrlParams() {
+  const url = new URL(window.location.href)
+
+  url.searchParams.delete("missioOpen")
+  url.searchParams.delete("missioTaskId")
+
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  )
 }
 
 function getBottomNotificationCount(tasks: TodayTask[]) {
@@ -350,6 +385,7 @@ export default function App() {
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [tasksErrorMessage, setTasksErrorMessage] = useState<string | null>(null)
   const [busyTaskId, setBusyTaskId] = useState<number | null>(null)
+  const notificationTaskOpenHandledRef = useRef(false)
 
   useEffect(() => {
     const root = document.documentElement
@@ -428,6 +464,56 @@ export default function App() {
     }
 
     void loadTodayTasks()
+  }, [currentUser])
+
+  useEffect(() => {
+    if (!currentUser) {
+      return
+    }
+
+    if (notificationTaskOpenHandledRef.current) {
+      return
+    }
+
+    const taskIdFromUrl = getMissioTaskIdFromUrl()
+
+    if (taskIdFromUrl === null) {
+      return
+    }
+
+    notificationTaskOpenHandledRef.current = true
+    setActiveTab("tasks")
+    window.localStorage.setItem("missio-active-tab", "tasks")
+    setTasksErrorMessage(null)
+
+    getTaskDetail(taskIdFromUrl)
+      .then((apiTask) => {
+        const mappedTask = mapApiTaskToTodayTask(apiTask)
+
+        setTasks((currentTasks) => {
+          const exists = currentTasks.some((task) => task.id === mappedTask.id)
+
+          if (exists) {
+            return currentTasks.map((task) =>
+              task.id === mappedTask.id ? mappedTask : task,
+            )
+          }
+
+          return [mappedTask, ...currentTasks]
+        })
+
+        setSelectedTaskId(mappedTask.id)
+        clearMissioTaskUrlParams()
+      })
+      .catch((error) => {
+        if (error instanceof Error) {
+          setTasksErrorMessage(error.message)
+        } else {
+          setTasksErrorMessage("Bildirimdeki görev açılamadı.")
+        }
+
+        clearMissioTaskUrlParams()
+      })
   }, [currentUser])
 
   const selectedTask = useMemo(() => {

@@ -208,6 +208,16 @@ export function TaskDetailPanel({
   const canWriteCompletionNote =
     task.status === "in_progress" || task.status === "rejected"
 
+
+  const referenceAttachmentPreviews = attachmentPreviews.filter(
+    (preview) => preview.attachment.attachment_type === "reference",
+  )
+
+  const evidenceAttachmentPreviews = attachmentPreviews.filter(
+    (preview) => preview.attachment.attachment_type === "evidence",
+  )
+
+
   function triggerPhotoButtonFlash() {
     setShouldFlashPhotoButton(true)
 
@@ -222,12 +232,6 @@ export function TaskDetailPanel({
   }
 
   async function loadAttachments() {
-    if (!task.requiresPhoto) {
-      setAttachmentPreviews([])
-      setAttachmentErrorMessage(null)
-      return
-    }
-
     setIsLoadingAttachments(true)
     setAttachmentErrorMessage(null)
 
@@ -258,7 +262,7 @@ export function TaskDetailPanel({
       if (error instanceof Error) {
         setAttachmentErrorMessage(error.message)
       } else {
-        setAttachmentErrorMessage("Fotoğraf kanıtları alınamadı.")
+        setAttachmentErrorMessage("Görev fotoğrafları alınamadı.")
       }
     } finally {
       setIsLoadingAttachments(false)
@@ -359,7 +363,7 @@ export function TaskDetailPanel({
     }
 
     if (task.status === "in_progress" || task.status === "rejected") {
-      if (task.requiresPhoto && attachmentPreviews.length < 1) {
+      if (task.requiresPhoto && evidenceAttachmentPreviews.length < 1) {
         triggerPhotoButtonFlash()
         return
       }
@@ -519,6 +523,46 @@ export function TaskDetailPanel({
             </div>
           </div>
 
+          {referenceAttachmentPreviews.length > 0 && (
+            <div className="mb-4 rounded-[1.5rem] border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/30">
+              <div className="mb-3 flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500 text-white shadow-lg shadow-cyan-500/20">
+                  <ImageIcon size={21} />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-black text-slate-950 dark:text-white">
+                    Referans görsel
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">
+                    Görevi veren kişinin eklediği örnek / hedef görsel.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {referenceAttachmentPreviews.map((preview) => (
+                  <button
+                    key={preview.attachment.id}
+                    type="button"
+                    onClick={() => openPhotoPreview(preview)}
+                    className="group relative overflow-hidden rounded-2xl border border-cyan-200 bg-white text-left shadow-sm active:scale-[0.98] dark:border-cyan-900 dark:bg-slate-950"
+                  >
+                    <img
+                      src={preview.objectUrl}
+                      alt={preview.attachment.file_name}
+                      className="aspect-square w-full object-cover transition group-active:scale-95"
+                    />
+
+                    <span className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-950/70 text-white backdrop-blur-sm">
+                      <ZoomIn size={14} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mb-4 grid grid-cols-1 gap-3">
             <DetailInfoRow
               icon={<Clock3 size={19} />}
@@ -568,9 +612,9 @@ export function TaskDetailPanel({
                   <div>
                     <h3 className="text-sm font-black">Fotoğraf kanıtı</h3>
                     <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                      {attachmentPreviews.length > 0
-                        ? `${attachmentPreviews.length} fotoğraf eklendi.`
-                        : "Henüz fotoğraf eklenmedi."}
+                      {evidenceAttachmentPreviews.length > 0
+                        ? `${evidenceAttachmentPreviews.length} kanıt fotoğrafı eklendi.`
+                        : "Henüz kanıt fotoğrafı eklenmedi."}
                     </p>
                   </div>
                 </div>
@@ -586,16 +630,16 @@ export function TaskDetailPanel({
                 </div>
               )}
 
-              {!isLoadingAttachments && !attachmentErrorMessage && attachmentPreviews.length === 0 && (
+              {!isLoadingAttachments && !attachmentErrorMessage && evidenceAttachmentPreviews.length === 0 && (
                 <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-muted)]">
                   <ImageIcon size={19} />
                   Fotoğraf eklendiğinde burada görünecek.
                 </div>
               )}
 
-              {attachmentPreviews.length > 0 && (
+              {evidenceAttachmentPreviews.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
-                  {attachmentPreviews.map((preview) => (
+                  {evidenceAttachmentPreviews.map((preview) => (
                     <div
                       key={preview.attachment.id}
                       className="group overflow-hidden rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)]"
@@ -679,7 +723,7 @@ export function TaskDetailPanel({
           <TaskEventTimeline taskId={task.id} refreshVersion={timelineRefreshVersion} />
 
           <div className="sticky bottom-0 -mx-4 mt-5 border-t border-[var(--missio-border)] bg-[var(--missio-card-bg)]/95 px-4 pb-1 pt-4 backdrop-blur-xl">
-            {task.requiresPhoto && !isClosedTask && attachmentPreviews.length < 1 && (
+            {task.requiresPhoto && !isClosedTask && evidenceAttachmentPreviews.length < 1 && (
               <div className="mb-3 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
                 <AlertCircle className="mt-0.5 shrink-0" size={17} />
                 <span>
@@ -726,7 +770,7 @@ export function TaskDetailPanel({
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isBusy || isLoadingAttachments}
                       className={
-                        shouldFlashPhotoButton && attachmentPreviews.length < 1
+                        shouldFlashPhotoButton && evidenceAttachmentPreviews.length < 1
                           ? "flex flex-1 animate-pulse items-center justify-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 ring-4 ring-amber-300/70 shadow-lg shadow-amber-400/30 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-700/60"
                           : "flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
                       }
@@ -766,7 +810,9 @@ export function TaskDetailPanel({
           <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 pb-3 pt-5">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
-                Fotoğraf kanıtı
+                {selectedPreview.attachment.attachment_type === "reference"
+                  ? "Referans fotoğrafı"
+                  : "Fotoğraf kanıtı"}
               </p>
               <h3 className="mt-1 truncate text-base font-black">
                 {selectedPreview.attachment.file_name}
