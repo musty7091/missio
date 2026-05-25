@@ -4,7 +4,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -17,6 +17,12 @@ from app.models.task_attachment import TaskAttachment
 from app.models.task_event import TaskEvent
 from app.models.task_template import TaskTemplate
 from app.models.user import User
+from app.models.web_push_subscription import WebPushSubscription
+from app.services.web_push_service import (
+    WebPushConfigurationError,
+    WebPushSendError,
+    send_web_push_to_subscription,
+)
 from app.schemas.task import (
     BusinessTaskListResponse,
     CompleteTaskRequest,
@@ -26,6 +32,9 @@ from app.schemas.task import (
     GenerateDailyRoutineTasksRequest,
     MyTodayTasksResponse,
     RejectTaskRequest,
+    TASK_STATUS_ASSIGNED,
+    TASK_STATUS_IN_PROGRESS,
+    TASK_STATUS_REJECTED,
     TaskAttachmentCreatedResponse,
     TaskAttachmentDeletedResponse,
     TaskAttachmentListResponse,
@@ -140,6 +149,124 @@ def validate_optional_location_values(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="location_accuracy negatif olamaz.",
         )
+
+
+TASK_BADGE_ACTIVE_STATUSES = {
+    TASK_STATUS_ASSIGNED,
+    TASK_STATUS_IN_PROGRESS,
+    TASK_STATUS_REJECTED,
+}
+
+
+def count_active_assigned_tasks_for_user(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+) -> int:
+    """Return active task count used for PWA app badge."""
+
+    count_value = db.execute(
+        select(func.count(Task.id)).where(
+            Task.business_id == business_id,
+            Task.assigned_to_user_id == user_id,
+            Task.deleted_at_utc.is_(None),
+            Task.status.in_(TASK_BADGE_ACTIVE_STATUSES),
+        )
+    ).scalar_one()
+
+    return int(count_value or 0)
+
+
+def send_task_assigned_web_push_notification_safely(
+    db: Session,
+    *,
+    task: Task,
+    assigned_to_user: User,
+) -> dict[str, int]:
+    """Send Web Push notification when an extra task is assigned.
+
+    Notification failures must never block task creation.
+    """
+
+    attempted_count = 0
+    sent_count = 0
+    failed_count = 0
+
+    try:
+        subscriptions = (
+            db.query(WebPushSubscription)
+            .filter(
+                WebPushSubscription.user_id == assigned_to_user.id,
+                WebPushSubscription.is_active.is_(True),
+            )
+            .order_by(WebPushSubscription.id.desc())
+            .all()
+        )
+
+        attempted_count = len(subscriptions)
+
+        if attempted_count == 0:
+            return {
+                "attempted_count": attempted_count,
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+            }
+
+        task_title = (task.title or "Yeni görev").strip()
+        notification_body = f"{task_title[:120]} görevi sana atandı."
+
+        badge_count = count_active_assigned_tasks_for_user(
+            db=db,
+            business_id=task.business_id,
+            user_id=assigned_to_user.id,
+        )
+
+        if badge_count <= 0:
+            badge_count = 1
+
+        for subscription in subscriptions:
+            try:
+                send_web_push_to_subscription(
+                    db=db,
+                    subscription=subscription,
+                    title="Yeni görev atandı",
+                    body=notification_body,
+                    url="/",
+                    tag=f"missio-task-assigned-{task.id}",
+                    data={
+                        "type": "task_assigned",
+                        "task_id": str(task.id),
+                        "taskId": str(task.id),
+                        "business_id": str(task.business_id),
+                        "businessId": str(task.business_id),
+                        "badgeCount": badge_count,
+                        "badge_count": badge_count,
+                        "openTaskCount": badge_count,
+                        "open_task_count": badge_count,
+                    },
+                )
+                sent_count += 1
+            except WebPushSendError:
+                failed_count += 1
+
+        return {
+            "attempted_count": attempted_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+        }
+    except WebPushConfigurationError:
+        return {
+            "attempted_count": attempted_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+        }
+    except Exception:
+        return {
+            "attempted_count": attempted_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+        }
 
 
 def map_task_service_error(exc: Exception) -> HTTPException:
@@ -610,8 +737,21 @@ def create_extra_task_endpoint(
         db.commit()
         db.refresh(task)
 
+        task_response = build_task_response(task, db=db)
+
+        send_task_assigned_web_push_notification_safely(
+            db=db,
+            task=task,
+            assigned_to_user=assigned_to_user,
+        )
+
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
         return TaskCreatedResponse(
-            task=build_task_response(task, db=db),
+            task=task_response,
             message="Ekstra görev oluşturuldu.",
         )
     except HTTPException:
