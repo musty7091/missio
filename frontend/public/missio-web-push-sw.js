@@ -24,10 +24,14 @@ function resolveBadgeCount(payload) {
   const candidates = [
     payload.badgeCount,
     payload.badge_count,
+    payload.openTaskCount,
+    payload.open_task_count,
     payload.unreadCount,
     payload.unread_count,
     payload.data && payload.data.badgeCount,
     payload.data && payload.data.badge_count,
+    payload.data && payload.data.openTaskCount,
+    payload.data && payload.data.open_task_count,
     payload.data && payload.data.unreadCount,
     payload.data && payload.data.unread_count,
   ]
@@ -35,18 +39,43 @@ function resolveBadgeCount(payload) {
   for (const candidate of candidates) {
     const numberValue = Number(candidate)
 
-    if (Number.isFinite(numberValue) && numberValue > 0) {
+    if (Number.isFinite(numberValue) && numberValue >= 0) {
       return Math.trunc(numberValue)
     }
   }
 
-  return 1
+  return null
+}
+
+function shouldShowMissioNotification(payload) {
+  if (payload.showNotification === false) {
+    return false
+  }
+
+  if (payload.show_notification === false) {
+    return false
+  }
+
+  if (payload.data && payload.data.showNotification === false) {
+    return false
+  }
+
+  if (payload.data && payload.data.show_notification === false) {
+    return false
+  }
+
+  return true
 }
 
 async function setMissioAppBadge(count) {
-  const safeCount = Number.isFinite(Number(count)) && Number(count) > 0
-    ? Math.trunc(Number(count))
-    : 1
+  const numberValue = Number(count)
+
+  if (!Number.isFinite(numberValue) || numberValue <= 0) {
+    await clearMissioAppBadge()
+    return
+  }
+
+  const safeCount = Math.trunc(numberValue)
 
   try {
     if (self.navigator && typeof self.navigator.setAppBadge === "function") {
@@ -76,7 +105,14 @@ self.addEventListener("push", (event) => {
   const payload = parsePushPayload(event)
 
   const title = payload.title || "Missio"
-  const badgeCount = resolveBadgeCount(payload)
+  const resolvedBadgeCount = resolveBadgeCount(payload)
+  const badgeCount = resolvedBadgeCount === null ? 1 : resolvedBadgeCount
+  const showNotification = shouldShowMissioNotification(payload)
+
+  if (!showNotification) {
+    event.waitUntil(setMissioAppBadge(badgeCount))
+    return
+  }
 
   const notificationOptions = {
     body: payload.body || "Yeni bir Missio bildirimin var.",

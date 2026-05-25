@@ -269,6 +269,100 @@ def send_task_assigned_web_push_notification_safely(
         }
 
 
+
+def send_task_badge_update_web_push_safely(
+    db: Session,
+    *,
+    task: Task,
+) -> dict[str, int]:
+    """Send silent Web Push badge update for the task assignee.
+
+    Badge update failures must never block task status changes.
+    """
+
+    attempted_count = 0
+    sent_count = 0
+    failed_count = 0
+
+    try:
+        if task.assigned_to_user_id is None:
+            return {
+                "attempted_count": attempted_count,
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+            }
+
+        subscriptions = (
+            db.query(WebPushSubscription)
+            .filter(
+                WebPushSubscription.user_id == task.assigned_to_user_id,
+                WebPushSubscription.is_active.is_(True),
+            )
+            .order_by(WebPushSubscription.id.desc())
+            .all()
+        )
+
+        attempted_count = len(subscriptions)
+
+        if attempted_count == 0:
+            return {
+                "attempted_count": attempted_count,
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+            }
+
+        badge_count = count_active_assigned_tasks_for_user(
+            db=db,
+            business_id=task.business_id,
+            user_id=task.assigned_to_user_id,
+        )
+
+        for subscription in subscriptions:
+            try:
+                send_web_push_to_subscription(
+                    db=db,
+                    subscription=subscription,
+                    title="Missio",
+                    body="Görev sayısı güncellendi.",
+                    url="/",
+                    tag=f"missio-task-badge-update-{task.assigned_to_user_id}",
+                    data={
+                        "type": "task_badge_update",
+                        "task_id": str(task.id),
+                        "taskId": str(task.id),
+                        "business_id": str(task.business_id),
+                        "businessId": str(task.business_id),
+                        "badgeCount": badge_count,
+                        "badge_count": badge_count,
+                        "openTaskCount": badge_count,
+                        "open_task_count": badge_count,
+                        "showNotification": False,
+                        "show_notification": False,
+                    },
+                )
+                sent_count += 1
+            except WebPushSendError:
+                failed_count += 1
+
+        return {
+            "attempted_count": attempted_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+        }
+    except WebPushConfigurationError:
+        return {
+            "attempted_count": attempted_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+        }
+    except Exception:
+        return {
+            "attempted_count": attempted_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+        }
+
+
 def map_task_service_error(exc: Exception) -> HTTPException:
     """Map task and attachment service exceptions to HTTP exceptions."""
 
@@ -1301,6 +1395,7 @@ def complete_task_endpoint(
 
         db.commit()
         db.refresh(completed_task)
+        send_task_badge_update_web_push_safely(db=db, task=completed_task)
 
         return TaskStatusChangedResponse(
             task=build_task_response(completed_task, db=db),
@@ -1338,6 +1433,7 @@ def approve_task_endpoint(
 
         db.commit()
         db.refresh(approved_task)
+        send_task_badge_update_web_push_safely(db=db, task=approved_task)
 
         return TaskStatusChangedResponse(
             task=build_task_response(approved_task, db=db),
@@ -1375,6 +1471,7 @@ def reject_task_endpoint(
 
         db.commit()
         db.refresh(rejected_task)
+        send_task_badge_update_web_push_safely(db=db, task=rejected_task)
 
         return TaskStatusChangedResponse(
             task=build_task_response(rejected_task, db=db),
@@ -1412,6 +1509,7 @@ def cancel_task_endpoint(
 
         db.commit()
         db.refresh(cancelled_task)
+        send_task_badge_update_web_push_safely(db=db, task=cancelled_task)
 
         return TaskStatusChangedResponse(
             task=build_task_response(cancelled_task, db=db),
@@ -1449,6 +1547,7 @@ def delete_task_endpoint(
 
         db.commit()
         db.refresh(deleted_task)
+        send_task_badge_update_web_push_safely(db=db, task=deleted_task)
 
         return TaskStatusChangedResponse(
             task=build_task_response(deleted_task, db=db),
