@@ -10,6 +10,7 @@ from app.core.security import hash_password, validate_password_strength, verify_
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories.business_repository import get_business_by_slug
+from app.repositories.user_repository import normalize_email
 from app.schemas.auth import LoginRequest, TokenResponse, UserMeResponse
 from app.services.audit_log_service import create_audit_log
 from app.services.subscription_service import get_current_business_subscription
@@ -26,6 +27,21 @@ from app.services.auth_service import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
+
+
+class UpdateMyProfileRequest(BaseModel):
+    """Request payload for updating the authenticated user's own profile."""
+
+    full_name: str = Field(min_length=1, max_length=150)
+    email: str | None = Field(default=None, max_length=255)
+
+
+class UpdateMyProfileResponse(BaseModel):
+    """Response returned after updating the authenticated user's own profile."""
+
+    user: UserMeResponse
+    message: str
 
 
 class ChangeOwnPasswordRequest(BaseModel):
@@ -378,6 +394,91 @@ def change_my_password(
 
         return ChangeOwnPasswordResponse(
             message="Şifreniz başarıyla değiştirildi.",
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+@router.patch("/me/profile", response_model=UpdateMyProfileResponse)
+def update_my_profile(
+    payload: UpdateMyProfileRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UpdateMyProfileResponse:
+    """Update the authenticated user's own profile information."""
+
+    try:
+        normalized_full_name = payload.full_name.strip()
+        normalized_email = normalize_email(payload.email)
+
+        if not normalized_full_name:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Ad soyad boş olamaz.",
+            )
+
+        if normalized_email is not None:
+            email_domain = normalized_email.split("@")[-1] if "@" in normalized_email else ""
+
+            if "@" not in normalized_email or "." not in email_domain:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Geçerli bir e-posta adresi giriniz.",
+                )
+
+        changed_fields: list[str] = []
+
+        if current_user.full_name != normalized_full_name:
+            current_user.full_name = normalized_full_name
+            changed_fields.append("full_name")
+
+        if current_user.email != normalized_email:
+            current_user.email = normalized_email
+            changed_fields.append("email")
+
+        current_user.updated_at = get_utc_now_for_auth_route()
+
+        create_audit_log(
+            db=db,
+            action="auth.profile_updated",
+            business_id=current_user.business_id,
+            user_id=current_user.id,
+            entity_type="user",
+            entity_id=str(current_user.id),
+            detail={
+                "username": current_user.username,
+                "changed_fields": changed_fields,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+        )
+
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+
+        subscription_access_info = build_subscription_access_info(
+            db=db,
+            current_user=current_user,
+        )
+
+        return UpdateMyProfileResponse(
+            user=UserMeResponse(
+                id=current_user.id,
+                business_id=current_user.business_id,
+                full_name=current_user.full_name,
+                username=current_user.username,
+                email=current_user.email,
+                role=current_user.role,
+                is_active=current_user.is_active,
+                theme_preference=current_user.theme_preference,
+                **subscription_access_info,
+            ),
+            message="Profil bilgileriniz başarıyla güncellendi.",
         )
     except HTTPException:
         db.rollback()
