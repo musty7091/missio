@@ -41,6 +41,7 @@ export function mapApiTaskToTodayTask(task: ApiTask): TodayTask {
     requiresPhoto: task.requires_photo,
     requiresLocation: task.requires_location,
     requiresManagerApproval: task.requires_manager_approval,
+    hasVoiceNote: Boolean(task.has_voice_note),
   }
 }
 

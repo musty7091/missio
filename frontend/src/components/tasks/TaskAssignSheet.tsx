@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react"
-import { Camera, FileCheck2, ImageIcon, Loader2, MapPin, Send, Sparkles, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react"
+import { Camera, FileCheck2, ImageIcon, Loader2, MapPin, Mic, Send, Sparkles, Square, Trash2, X } from "lucide-react"
 
 import { listBusinessUsers, type BusinessUser } from "../../services/businessUserService"
 import {
@@ -133,6 +133,14 @@ export function TaskAssignSheet({
   )
   const [referencePhotoFile, setReferencePhotoFile] = useState<File | null>(null)
   const [referencePhotoPreviewUrl, setReferencePhotoPreviewUrl] = useState<string | null>(null)
+  const [voiceNoteBlob, setVoiceNoteBlob] = useState<Blob | null>(null)
+  const [voiceNotePreviewUrl, setVoiceNotePreviewUrl] = useState<string | null>(null)
+  const [voiceRecordingState, setVoiceRecordingState] = useState<"idle" | "recording" | "recorded">("idle")
+  const [voiceElapsedSeconds, setVoiceElapsedSeconds] = useState(0)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const voiceStreamRef = useRef<MediaStream | null>(null)
+  const voiceChunksRef = useRef<BlobPart[]>([])
+  const voiceTimerRef = useRef<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const assignableUsers = useMemo(
@@ -152,6 +160,7 @@ export function TaskAssignSheet({
       requiresLocation ? "Konum" : null,
       requiresManagerApproval ? "Yönetici onayı" : null,
       referencePhotoFile ? "Referans fotoğraf" : null,
+      voiceNoteBlob ? "Sesli not" : null,
     ]
       .filter(Boolean)
       .join(" + ") || "Ek şart yok"
@@ -174,6 +183,18 @@ export function TaskAssignSheet({
 
       return null
     })
+    setVoiceNoteBlob(null)
+    setVoiceNotePreviewUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl)
+      }
+
+      return null
+    })
+    setVoiceRecordingState("idle")
+    setVoiceElapsedSeconds(0)
+    clearVoiceRecordingTimer()
+    stopVoiceStream()
     setErrorMessage(null)
   }
 
@@ -227,6 +248,38 @@ export function TaskAssignSheet({
     }
   }, [assignableUsers, assignedToUserId, isOpen])
 
+  function clearVoiceRecordingTimer() {
+    if (voiceTimerRef.current !== null) {
+      window.clearInterval(voiceTimerRef.current)
+      voiceTimerRef.current = null
+    }
+  }
+
+  function stopVoiceStream() {
+    if (voiceStreamRef.current) {
+      voiceStreamRef.current.getTracks().forEach((track) => track.stop())
+      voiceStreamRef.current = null
+    }
+  }
+
+  function formatVoiceSeconds(seconds: number) {
+    return `00:${String(seconds).padStart(2, "0")}`
+  }
+
+  function getSupportedVoiceMimeType() {
+    if (typeof MediaRecorder === "undefined") {
+      return ""
+    }
+
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+    ]
+
+    return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? ""
+  }
+
   useEffect(() => {
     if (!referencePhotoFile) {
       setReferencePhotoPreviewUrl((currentUrl) => {
@@ -246,6 +299,26 @@ export function TaskAssignSheet({
       URL.revokeObjectURL(objectUrl)
     }
   }, [referencePhotoFile])
+
+  useEffect(() => {
+    if (!voiceNoteBlob) {
+      setVoiceNotePreviewUrl((currentUrl) => {
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl)
+        }
+
+        return null
+      })
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(voiceNoteBlob)
+    setVoiceNotePreviewUrl(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [voiceNoteBlob])
 
   useEffect(() => {
     if (!isOpen) {
@@ -277,6 +350,114 @@ export function TaskAssignSheet({
       window.scrollTo(0, scrollY)
     }
   }, [isOpen])
+
+  async function startVoiceRecording() {
+    if (taskMode === "routine") {
+      setErrorMessage("Sesli görev notu şimdilik sadece ekstra görevlerde destekleniyor.")
+      return
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErrorMessage("Bu tarayıcı ses kaydını desteklemiyor.")
+      return
+    }
+
+    if (typeof MediaRecorder === "undefined") {
+      setErrorMessage("Bu tarayıcı ses kaydını desteklemiyor.")
+      return
+    }
+
+    try {
+      setErrorMessage(null)
+      setVoiceNoteBlob(null)
+      setVoiceElapsedSeconds(0)
+      voiceChunksRef.current = []
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      voiceStreamRef.current = stream
+
+      const mimeType = getSupportedVoiceMimeType()
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
+
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          voiceChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onstop = () => {
+        clearVoiceRecordingTimer()
+        stopVoiceStream()
+
+        const recordedBlob = new Blob(voiceChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        })
+
+        if (recordedBlob.size <= 0) {
+          setVoiceRecordingState("idle")
+          setErrorMessage("Ses kaydı alınamadı. Lütfen tekrar dene.")
+          return
+        }
+
+        setVoiceNoteBlob(recordedBlob)
+        setVoiceRecordingState("recorded")
+      }
+
+      recorder.start()
+      setVoiceRecordingState("recording")
+
+      voiceTimerRef.current = window.setInterval(() => {
+        setVoiceElapsedSeconds((currentSeconds) => {
+          const nextSeconds = currentSeconds + 1
+
+          if (nextSeconds >= 30) {
+            stopVoiceRecording()
+            return 30
+          }
+
+          return nextSeconds
+        })
+      }, 1000)
+    } catch (error) {
+      clearVoiceRecordingTimer()
+      stopVoiceStream()
+      setVoiceRecordingState("idle")
+
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage("Ses kaydı başlatılamadı.")
+      }
+    }
+  }
+
+  function stopVoiceRecording() {
+    const recorder = mediaRecorderRef.current
+
+    if (recorder && recorder.state === "recording") {
+      recorder.stop()
+      return
+    }
+
+    clearVoiceRecordingTimer()
+    stopVoiceStream()
+    setVoiceRecordingState("idle")
+  }
+
+  function removeVoiceNote() {
+    if (voiceRecordingState === "recording") {
+      stopVoiceRecording()
+    }
+
+    setVoiceNoteBlob(null)
+    setVoiceRecordingState("idle")
+    setVoiceElapsedSeconds(0)
+  }
+
 
   function handleReferencePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
@@ -330,8 +511,13 @@ export function TaskAssignSheet({
       return
     }
 
-    if (taskMode === "routine" && referencePhotoFile) {
-      setErrorMessage("Referans fotoğrafı şimdilik sadece ekstra görevlerde destekleniyor.")
+    if (taskMode === "routine" && (referencePhotoFile || voiceNoteBlob)) {
+      setErrorMessage("Referans fotoğrafı ve sesli not şimdilik sadece ekstra görevlerde destekleniyor.")
+      return
+    }
+
+    if (voiceRecordingState === "recording") {
+      setErrorMessage("Görevi kaydetmeden önce ses kaydını durdurmalısın.")
       return
     }
 
@@ -380,9 +566,24 @@ export function TaskAssignSheet({
           })
         }
 
+        if (voiceNoteBlob) {
+          const voiceNoteFile = new File(
+            [voiceNoteBlob],
+            `missio-voice-note-${Date.now()}.webm`,
+            {
+              type: voiceNoteBlob.type || "audio/webm",
+            },
+          )
+
+          await uploadTaskAttachment(createdTaskResponse.task.id, {
+            file: voiceNoteFile,
+            attachmentType: "voice_note",
+          })
+        }
+
         onSuccess?.(
-          referencePhotoFile
-            ? "Ekstra görev referans fotoğrafıyla personele atandı."
+          referencePhotoFile || voiceNoteBlob
+            ? "Ekstra görev medya ekleriyle personele atandı."
             : "Ekstra görev personele atandı.",
         )
       }
@@ -650,6 +851,111 @@ export function TaskAssignSheet({
                   onChange={handleReferencePhotoChange}
                 />
               </label>
+            )}
+          </section>
+
+          <section className="rounded-[1.4rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3">
+            <div className="mb-3 flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+                <Mic size={21} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+                  Sesli görev notu
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+                  En fazla 30 saniyelik kısa bir sesli açıklama kaydedebilirsin.
+                </p>
+              </div>
+            </div>
+
+            {taskMode === "routine" ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
+                Sesli görev notu şimdilik sadece ekstra görevlerde kullanılabilir.
+              </div>
+            ) : (
+              <div className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-[var(--missio-text-main)]">
+                      {voiceRecordingState === "recording"
+                        ? "Kayıt yapılıyor..."
+                        : voiceRecordingState === "recorded"
+                          ? "Sesli not hazır"
+                          : "Kayıt hazır"}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
+                      {formatVoiceSeconds(voiceElapsedSeconds)} / 00:30
+                    </p>
+                  </div>
+
+                  <div
+                    className={
+                      voiceRecordingState === "recording"
+                        ? "flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 animate-pulse"
+                        : "flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500 text-white shadow-lg shadow-cyan-500/20"
+                    }
+                  >
+                    <Mic size={22} />
+                  </div>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                  <div
+                    className={
+                      voiceRecordingState === "recording"
+                        ? "h-full rounded-full bg-red-500 transition-all"
+                        : "h-full rounded-full bg-cyan-500 transition-all"
+                    }
+                    style={{ width: `${Math.min(100, (voiceElapsedSeconds / 30) * 100)}%` }}
+                  />
+                </div>
+
+                {voiceNotePreviewUrl && (
+                  <audio
+                    controls
+                    src={voiceNotePreviewUrl}
+                    className="mt-3 w-full"
+                  />
+                )}
+
+                <div className="mt-3 flex gap-2">
+                  {voiceRecordingState === "recording" ? (
+                    <button
+                      type="button"
+                      onClick={stopVoiceRecording}
+                      disabled={isSaving}
+                      className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-500/20 disabled:opacity-60"
+                    >
+                      <Square size={17} />
+                      Kaydı durdur
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void startVoiceRecording()}
+                      disabled={isSaving}
+                      className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-teal-500/20 disabled:opacity-60"
+                    >
+                      <Mic size={17} />
+                      {voiceNoteBlob ? "Yeniden kaydet" : "Kayıt başlat"}
+                    </button>
+                  )}
+
+                  {voiceNoteBlob && (
+                    <button
+                      type="button"
+                      onClick={removeVoiceNote}
+                      disabled={isSaving}
+                      className="flex min-h-12 items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-600 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+                      aria-label="Sesli notu sil"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </section>
 

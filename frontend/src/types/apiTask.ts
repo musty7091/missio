@@ -34,6 +34,7 @@ export type ApiTask = {
   requires_photo: boolean
   requires_location: boolean
   requires_manager_approval: boolean
+  has_voice_note?: boolean
   created_at_utc: string
   updated_at_utc: string
 }

@@ -5,6 +5,7 @@ import {
   Clock3,
   FileCheck2,
   MapPin,
+  Mic,
   PlayCircle,
   XCircle,
 } from "lucide-react"
@@ -128,6 +129,13 @@ export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
               <span className="inline-flex items-center gap-1">
                 <Camera size={12} />
                 Fotoğraf
+              </span>
+            )}
+
+            {task.hasVoiceNote && (
+              <span className="inline-flex items-center gap-1 font-black text-violet-700 dark:text-violet-200">
+                <Mic size={12} />
+                Sesli not
               </span>
             )}
 

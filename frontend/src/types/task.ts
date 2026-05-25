@@ -34,5 +34,6 @@ export type TodayTask = {
   requiresPhoto: boolean
   requiresLocation: boolean
   requiresManagerApproval: boolean
+  hasVoiceNote: boolean
 }
 

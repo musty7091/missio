@@ -18,6 +18,7 @@ from app.models.user import User
 from app.schemas.task import (
     TASK_ATTACHMENT_TYPE_EVIDENCE,
     TASK_ATTACHMENT_TYPE_REFERENCE,
+    TASK_ATTACHMENT_TYPE_VOICE_NOTE,
     TASK_STATUS_APPROVED,
     TASK_STATUS_CANCELLED,
     validate_task_attachment_type_value,
@@ -40,6 +41,9 @@ MAX_ATTACHMENTS_PER_TASK = 3
 MAX_IMAGE_LONG_EDGE_PX = 1600
 MAX_IMAGE_PIXELS = 20_000_000
 JPEG_QUALITY = 75
+
+MAX_AUDIO_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024
+MAX_VOICE_NOTES_PER_TASK = 1
 
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
@@ -71,6 +75,29 @@ ALLOWED_IMAGE_FORMATS = {
     "WEBP",
     "HEIF",
     "HEIC",
+}
+
+ALLOWED_AUDIO_EXTENSIONS = {
+    ".webm",
+    ".ogg",
+    ".mp3",
+    ".m4a",
+    ".mp4",
+    ".wav",
+}
+
+ALLOWED_AUDIO_CONTENT_TYPES = {
+    "audio/webm",
+    "audio/ogg",
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/mp4",
+    "audio/m4a",
+    "audio/x-m4a",
+    "audio/wav",
+    "audio/x-wav",
+    "video/webm",
+    "video/mp4",
 }
 
 
@@ -181,6 +208,72 @@ def read_upload_file_content(upload_file: UploadFile) -> bytes:
     return content
 
 
+def validate_audio_upload_file_metadata(upload_file: UploadFile) -> None:
+    """Validate voice note metadata before reading content."""
+
+    extension = normalize_file_extension(upload_file.filename)
+
+    if extension not in ALLOWED_AUDIO_EXTENSIONS:
+        raise TaskAttachmentFileError(
+            "Desteklenmeyen ses dosyası türü. WEBM, OGG, MP3, M4A, MP4 veya WAV yüklenebilir."
+        )
+
+    content_type = (upload_file.content_type or "").strip().lower()
+    base_content_type = content_type.split(";", 1)[0].strip()
+
+    if base_content_type and base_content_type not in ALLOWED_AUDIO_CONTENT_TYPES:
+        raise TaskAttachmentFileError(
+            f"Desteklenmeyen ses içerik türü: {content_type}"
+        )
+
+
+def read_upload_audio_file_content(upload_file: UploadFile) -> bytes:
+    """Read voice note content with size protection."""
+
+    upload_file.file.seek(0)
+    content = upload_file.file.read(MAX_AUDIO_UPLOAD_FILE_SIZE_BYTES + 1)
+    upload_file.file.seek(0)
+
+    if not content:
+        raise TaskAttachmentFileError("Yüklenen ses kaydı boş.")
+
+    if len(content) > MAX_AUDIO_UPLOAD_FILE_SIZE_BYTES:
+        raise TaskAttachmentFileError(
+            "Ses kaydı çok büyük. Maksimum ses kaydı boyutu 5 MB."
+        )
+
+    return content
+
+
+def get_audio_storage_extension(upload_file: UploadFile) -> str:
+    """Return safe storage extension for voice note."""
+
+    extension = normalize_file_extension(upload_file.filename)
+
+    if extension in ALLOWED_AUDIO_EXTENSIONS:
+        return extension
+
+    content_type = (upload_file.content_type or "").strip().lower()
+    base_content_type = content_type.split(";", 1)[0].strip()
+
+    if base_content_type in {"audio/webm", "video/webm"}:
+        return ".webm"
+
+    if base_content_type in {"audio/mp4", "audio/m4a", "audio/x-m4a", "video/mp4"}:
+        return ".m4a"
+
+    if base_content_type in {"audio/ogg"}:
+        return ".ogg"
+
+    if base_content_type in {"audio/mpeg", "audio/mp3"}:
+        return ".mp3"
+
+    if base_content_type in {"audio/wav", "audio/x-wav"}:
+        return ".wav"
+
+    return ".webm"
+
+
 def validate_opened_image(image: Image.Image) -> None:
     """Validate opened image format and dimensions."""
 
@@ -280,11 +373,20 @@ def get_attachment_storage_directory(task: Task) -> Path:
     )
 
 
-def build_safe_storage_path(task: Task) -> tuple[Path, str]:
+def build_safe_storage_path(
+    task: Task,
+    *,
+    file_extension: str = ".jpg",
+) -> tuple[Path, str]:
     """Build safe physical and relative storage path."""
 
     storage_directory = get_attachment_storage_directory(task)
-    safe_file_name = f"{uuid4()}.jpg"
+    safe_extension = file_extension.strip().lower()
+
+    if not safe_extension.startswith(".") or len(safe_extension) > 10:
+        safe_extension = ".bin"
+
+    safe_file_name = f"{uuid4()}{safe_extension}"
     physical_path = storage_directory / safe_file_name
     safe_physical_path = resolve_safe_task_attachment_storage_path(physical_path)
     relative_path = physical_path.as_posix()
@@ -330,14 +432,25 @@ def ensure_task_allows_attachment_upload(
             "Onaylanmış veya iptal edilmiş göreve artık fotoğraf eklenemez."
         )
 
+    max_allowed_count = (
+        MAX_VOICE_NOTES_PER_TASK
+        if attachment_type == TASK_ATTACHMENT_TYPE_VOICE_NOTE
+        else MAX_ATTACHMENTS_PER_TASK
+    )
+
     if count_active_task_attachments(
         db,
         task_id=task.id,
         attachment_type=attachment_type,
-    ) >= MAX_ATTACHMENTS_PER_TASK:
+    ) >= max_allowed_count:
         if attachment_type == TASK_ATTACHMENT_TYPE_REFERENCE:
             raise TaskAttachmentLimitError(
                 f"Bir göreve en fazla {MAX_ATTACHMENTS_PER_TASK} referans fotoğrafı eklenebilir."
+            )
+
+        if attachment_type == TASK_ATTACHMENT_TYPE_VOICE_NOTE:
+            raise TaskAttachmentLimitError(
+                f"Bir göreve en fazla {MAX_VOICE_NOTES_PER_TASK} sesli not eklenebilir."
             )
 
         raise TaskAttachmentLimitError(
@@ -394,16 +507,23 @@ def upload_task_attachment(
         task=task,
         attachment_type=normalized_attachment_type,
     )
-    validate_upload_file_metadata(upload_file)
 
-    original_content = read_upload_file_content(upload_file)
-    optimized_content, optimized_size = convert_image_to_optimized_jpeg(original_content)
+    if normalized_attachment_type == TASK_ATTACHMENT_TYPE_VOICE_NOTE:
+        validate_audio_upload_file_metadata(upload_file)
+        stored_content = read_upload_audio_file_content(upload_file)
+        stored_size = len(stored_content)
+        file_extension = get_audio_storage_extension(upload_file)
+        raw_audio_content_type = (upload_file.content_type or "audio/webm").strip().lower()
+        stored_file_type = raw_audio_content_type.split(";", 1)[0].strip() or "audio/webm"
+        event_type = "task_voice_note_uploaded"
+        event_note = "Göreve sesli görev notu yüklendi."
+    else:
+        validate_upload_file_metadata(upload_file)
+        original_content = read_upload_file_content(upload_file)
+        stored_content, stored_size = convert_image_to_optimized_jpeg(original_content)
+        file_extension = ".jpg"
+        stored_file_type = "image/jpeg"
 
-    physical_path, relative_path = build_safe_storage_path(task)
-    physical_path.parent.mkdir(parents=True, exist_ok=True)
-    physical_path.write_bytes(optimized_content)
-
-    try:
         if normalized_attachment_type == TASK_ATTACHMENT_TYPE_REFERENCE:
             event_type = "task_reference_photo_uploaded"
             event_note = "Göreve referans fotoğrafı yüklendi."
@@ -411,6 +531,14 @@ def upload_task_attachment(
             event_type = "task_evidence_photo_uploaded"
             event_note = "Göreve fotoğraf kanıtı yüklendi."
 
+    physical_path, relative_path = build_safe_storage_path(
+        task,
+        file_extension=file_extension,
+    )
+    physical_path.parent.mkdir(parents=True, exist_ok=True)
+    physical_path.write_bytes(stored_content)
+
+    try:
         event = create_task_event(
             db=db,
             task=task,
@@ -438,8 +566,8 @@ def upload_task_attachment(
             file_path=relative_path,
             file_name=physical_path.name,
             attachment_type=normalized_attachment_type,
-            file_type="image/jpeg",
-            file_size=optimized_size,
+            file_type=stored_file_type,
+            file_size=stored_size,
             latitude=latitude,
             longitude=longitude,
             location_accuracy=location_accuracy,

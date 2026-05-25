@@ -33,6 +33,7 @@ from app.schemas.task import (
     MyTodayTasksResponse,
     RejectTaskRequest,
     TASK_ATTACHMENT_TYPE_EVIDENCE,
+    TASK_ATTACHMENT_TYPE_VOICE_NOTE,
     TASK_STATUS_ASSIGNED,
     TASK_STATUS_IN_PROGRESS,
     TASK_STATUS_REJECTED,
@@ -491,6 +492,18 @@ def build_task_response(task: Task, *, db: Session | None = None) -> TaskRespons
             assigned_to_user_full_name = assigned_to_user.full_name
             assigned_to_username = assigned_to_user.username
 
+    has_voice_note = False
+
+    if db is not None:
+        voice_note_count = db.execute(
+            select(func.count(TaskAttachment.id)).where(
+                TaskAttachment.task_id == task.id,
+                TaskAttachment.attachment_type == TASK_ATTACHMENT_TYPE_VOICE_NOTE,
+            )
+        ).scalar_one()
+
+        has_voice_note = int(voice_note_count or 0) > 0
+
     return TaskResponse(
         id=task.id,
         business_id=task.business_id,
@@ -515,6 +528,7 @@ def build_task_response(task: Task, *, db: Session | None = None) -> TaskRespons
         requires_photo=task.requires_photo,
         requires_location=task.requires_location,
         requires_manager_approval=task.requires_manager_approval,
+        has_voice_note=has_voice_note,
         created_at_utc=task.created_at_utc,
         updated_at_utc=task.updated_at_utc,
     )

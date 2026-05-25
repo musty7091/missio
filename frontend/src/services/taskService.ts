@@ -73,7 +73,7 @@ type TaskEventListResponse = {
   total_count: number
 }
 
-export type TaskAttachmentType = "reference" | "evidence"
+export type TaskAttachmentType = "reference" | "evidence" | "voice_note"
 
 type UploadTaskAttachmentPayload = {
   file: File

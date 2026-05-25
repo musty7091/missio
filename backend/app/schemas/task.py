@@ -49,10 +49,12 @@ ALLOWED_RECURRENCE_TYPES = {
 
 TASK_ATTACHMENT_TYPE_REFERENCE = "reference"
 TASK_ATTACHMENT_TYPE_EVIDENCE = "evidence"
+TASK_ATTACHMENT_TYPE_VOICE_NOTE = "voice_note"
 
 ALLOWED_TASK_ATTACHMENT_TYPES = {
     TASK_ATTACHMENT_TYPE_REFERENCE,
     TASK_ATTACHMENT_TYPE_EVIDENCE,
+    TASK_ATTACHMENT_TYPE_VOICE_NOTE,
 }
 
 
@@ -438,6 +440,7 @@ class TaskResponse(BaseModel):
     requires_photo: bool
     requires_location: bool
     requires_manager_approval: bool
+    has_voice_note: bool = False
     created_at_utc: datetime
     updated_at_utc: datetime
 

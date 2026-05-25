@@ -217,6 +217,10 @@ export function TaskDetailPanel({
     (preview) => preview.attachment.attachment_type === "evidence",
   )
 
+  const voiceNotePreviews = attachmentPreviews.filter(
+    (preview) => preview.attachment.attachment_type === "voice_note",
+  )
+
 
   function triggerPhotoButtonFlash() {
     setShouldFlashPhotoButton(true)
@@ -558,6 +562,49 @@ export function TaskDetailPanel({
                       <ZoomIn size={14} />
                     </span>
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {voiceNotePreviews.length > 0 && (
+            <div className="mb-4 rounded-[1.5rem] border border-violet-200 bg-violet-50/70 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+              <div className="mb-3 flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-500 text-white shadow-lg shadow-violet-500/20">
+                  <MessageSquareText size={21} />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-black text-slate-950 dark:text-white">
+                    Sesli görev notu
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">
+                    Görevi veren kişinin kaydettiği sesli açıklama.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {voiceNotePreviews.map((preview) => (
+                  <div
+                    key={preview.attachment.id}
+                    className="rounded-2xl border border-violet-200 bg-white p-3 shadow-sm dark:border-violet-900 dark:bg-slate-950"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="truncate text-xs font-black text-slate-950 dark:text-white">
+                        Sesli not
+                      </p>
+                      <p className="shrink-0 text-[0.65rem] font-bold text-slate-500 dark:text-slate-400">
+                        {formatFileSize(preview.attachment.file_size)}
+                      </p>
+                    </div>
+
+                    <audio
+                      controls
+                      src={preview.objectUrl}
+                      className="w-full"
+                    />
+                  </div>
                 ))}
               </div>
             </div>
