@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.core.security import hash_password, validate_password_strength, verify_password
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories.business_repository import get_business_by_slug
 from app.schemas.auth import LoginRequest, TokenResponse, UserMeResponse
+from app.services.audit_log_service import create_audit_log
 from app.services.subscription_service import get_current_business_subscription
 from app.services.auth_service import (
     AccountTemporarilyLockedError,
@@ -22,6 +25,22 @@ from app.services.auth_service import (
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+
+class ChangeOwnPasswordRequest(BaseModel):
+    """Request payload for changing the authenticated user's own password."""
+
+    current_password: str = Field(min_length=1, max_length=255)
+    new_password: str = Field(min_length=1, max_length=255)
+    new_password_repeat: str = Field(min_length=1, max_length=255)
+
+
+class ChangeOwnPasswordResponse(BaseModel):
+    """Response returned after changing the authenticated user's own password."""
+
+    message: str
+
 
 
 def get_client_ip(request: Request) -> str | None:
@@ -280,3 +299,90 @@ def me(
         theme_preference=current_user.theme_preference,
         **subscription_access_info,
     )
+
+@router.post("/me/password", response_model=ChangeOwnPasswordResponse)
+def change_my_password(
+    payload: ChangeOwnPasswordRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ChangeOwnPasswordResponse:
+    """Change the authenticated user's own password after current password verification."""
+
+    try:
+        if payload.new_password != payload.new_password_repeat:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Yeni şifre ve yeni şifre tekrarı eşleşmiyor.",
+            )
+
+        if not verify_password(payload.current_password, current_user.password_hash):
+            create_audit_log(
+                db=db,
+                action="auth.password_change_failed",
+                business_id=current_user.business_id,
+                user_id=current_user.id,
+                entity_type="user",
+                entity_id=str(current_user.id),
+                detail={
+                    "username": current_user.username,
+                    "reason": "invalid_current_password",
+                },
+                ip_address=get_client_ip(request),
+                user_agent=get_user_agent(request),
+            )
+            db.commit()
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mevcut şifre hatalı.",
+            )
+
+        if verify_password(payload.new_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Yeni şifre mevcut şifre ile aynı olamaz.",
+            )
+
+        password_errors = validate_password_strength(payload.new_password)
+
+        if password_errors:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Yeni şifre güvenlik politikasına uygun değil.",
+                    "errors": password_errors,
+                },
+            )
+
+        current_user.password_hash = hash_password(payload.new_password)
+        current_user.updated_at = get_utc_now_for_auth_route()
+
+        create_audit_log(
+            db=db,
+            action="auth.password_changed",
+            business_id=current_user.business_id,
+            user_id=current_user.id,
+            entity_type="user",
+            entity_id=str(current_user.id),
+            detail={
+                "username": current_user.username,
+                "role": current_user.role,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+        )
+
+        db.add(current_user)
+        db.commit()
+
+        return ChangeOwnPasswordResponse(
+            message="Şifreniz başarıyla değiştirildi.",
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+

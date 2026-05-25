@@ -44,6 +44,7 @@ import {
   requestMissioWebPushPermissionAndSubscribe,
   sendCurrentUserWebPushTest,
 } from "../../services/webPushNotificationService"
+import { changeOwnPassword } from "../../services/profileSecurityService"
 import type { UserMeResponse } from "../../types/auth"
 import type { ThemeMode } from "../../types/task"
 
@@ -58,12 +59,6 @@ type InfoRowProps = {
   icon: ReactNode
   label: string
   value: string
-}
-
-type ComingSoonActionCardProps = {
-  icon: ReactNode
-  title: string
-  description: string
 }
 
 type UserManagementPanelProps = {
@@ -87,12 +82,24 @@ type EditUserFormState = {
 type UserRoleFilter = "all" | "boss" | "manager" | "staff"
 type UserStatusFilter = "all" | "active" | "passive"
 
+type PasswordFormState = {
+  current_password: string
+  new_password: string
+  new_password_repeat: string
+}
+
 const emptyCreateForm: CreateUserFormState = {
   full_name: "",
   username: "",
   password: "",
   role: "staff",
   email: "",
+}
+
+const emptyPasswordForm: PasswordFormState = {
+  current_password: "",
+  new_password: "",
+  new_password_repeat: "",
 }
 
 function getRoleLabel(role: string) {
@@ -200,34 +207,6 @@ function InfoRow({ icon, label, value }: InfoRowProps) {
         <p className="mt-1 truncate text-sm font-black text-[var(--missio-text-main)]">
           {value}
         </p>
-      </div>
-    </div>
-  )
-}
-
-function ComingSoonActionCard({ icon, title, description }: ComingSoonActionCardProps) {
-  return (
-    <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-          {icon}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <h4 className="text-sm font-black text-[var(--missio-text-main)]">
-              {title}
-            </h4>
-
-            <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[0.65rem] font-black text-amber-700 dark:bg-amber-950 dark:text-amber-200">
-              Yakında
-            </span>
-          </div>
-
-          <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-            {description}
-          </p>
-        </div>
       </div>
     </div>
   )
@@ -976,6 +955,10 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
     () => isWebPushLocallyEnabled(),
   )
   const [isSendingPushTest, setIsSendingPushTest] = useState(false)
+  const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [passwordStatusMessage, setPasswordStatusMessage] = useState<string | null>(null)
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null)
 
   function rememberPushEnabledState(enabled: boolean) {
     localStorage.setItem(
@@ -1068,6 +1051,52 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
   }
 
 
+  async function handleChangeOwnPassword() {
+    const currentPassword = passwordForm.current_password.trim()
+    const newPassword = passwordForm.new_password.trim()
+    const newPasswordRepeat = passwordForm.new_password_repeat.trim()
+
+    setPasswordStatusMessage(null)
+    setPasswordErrorMessage(null)
+
+    if (!currentPassword || !newPassword || !newPasswordRepeat) {
+      setPasswordErrorMessage("Mevcut şifre, yeni şifre ve tekrar alanları zorunludur.")
+      return
+    }
+
+    if (newPassword !== newPasswordRepeat) {
+      setPasswordErrorMessage("Yeni şifre ve yeni şifre tekrarı eşleşmiyor.")
+      return
+    }
+
+    if (currentPassword === newPassword) {
+      setPasswordErrorMessage("Yeni şifre mevcut şifre ile aynı olamaz.")
+      return
+    }
+
+    setIsChangingPassword(true)
+
+    try {
+      const response = await changeOwnPassword({
+        current_password: currentPassword,
+        new_password: newPassword,
+        new_password_repeat: newPasswordRepeat,
+      })
+
+      setPasswordStatusMessage(response.message)
+      setPasswordForm(emptyPasswordForm)
+    } catch (error) {
+      if (error instanceof Error) {
+        setPasswordErrorMessage(error.message)
+      } else {
+        setPasswordErrorMessage("Şifre değiştirilemedi.")
+      }
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+
   return (
     <section className="flex flex-1 flex-col gap-4 pb-24">
       <div className="overflow-hidden rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] shadow-xl shadow-slate-900/5">
@@ -1132,23 +1161,84 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
           <div>
             <h3 className="text-lg font-black tracking-tight">Güvenlik</h3>
             <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Şifre değiştirme işlemi mevcut şifre doğrulamasıyla güvenli şekilde hazırlanacak.
+              Mevcut şifreni doğrulayarak hesabının şifresini güvenli şekilde değiştirebilirsin.
             </p>
           </div>
         </div>
 
-        <div className="mt-4 space-y-3">
-          <ComingSoonActionCard
-            icon={<KeyRound size={21} />}
-            title="Şifre değiştir"
-            description="Mevcut şifre, yeni şifre ve yeni şifre tekrarı ile güvenli şifre değiştirme akışı eklenecek."
+        {passwordStatusMessage && (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+            {passwordStatusMessage}
+          </div>
+        )}
+
+        {passwordErrorMessage && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+            {passwordErrorMessage}
+          </div>
+        )}
+
+        <div className="mt-4 grid gap-3">
+          <input
+            value={passwordForm.current_password}
+            onChange={(event) =>
+              setPasswordForm((currentForm) => ({
+                ...currentForm,
+                current_password: event.target.value,
+              }))
+            }
+            placeholder="Mevcut şifre"
+            type="password"
+            autoComplete="current-password"
+            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
           />
 
-          <ComingSoonActionCard
-            icon={<Clock3 size={21} />}
-            title="Oturum güvenliği"
-            description="Şifre değişince diğer cihazlardaki oturumları kapatma seçeneği ileride eklenecek."
+          <input
+            value={passwordForm.new_password}
+            onChange={(event) =>
+              setPasswordForm((currentForm) => ({
+                ...currentForm,
+                new_password: event.target.value,
+              }))
+            }
+            placeholder="Yeni şifre"
+            type="password"
+            autoComplete="new-password"
+            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
           />
+
+          <input
+            value={passwordForm.new_password_repeat}
+            onChange={(event) =>
+              setPasswordForm((currentForm) => ({
+                ...currentForm,
+                new_password_repeat: event.target.value,
+              }))
+            }
+            placeholder="Yeni şifre tekrar"
+            type="password"
+            autoComplete="new-password"
+            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+          />
+
+          <button
+            type="button"
+            onClick={() => void handleChangeOwnPassword()}
+            disabled={isChangingPassword}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <KeyRound size={18} />
+            {isChangingPassword ? "Şifre değiştiriliyor..." : "Şifremi değiştir"}
+          </button>
+
+          <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3">
+            <div className="flex items-start gap-2">
+              <Clock3 size={17} className="mt-0.5 shrink-0 text-[var(--missio-text-muted)]" />
+              <p className="text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+                Şifre değişikliği bu cihazdaki mevcut oturumu kapatmaz. Diğer cihazlardaki oturumları kapatma seçeneği ileride eklenecek.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
