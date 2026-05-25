@@ -1,4 +1,4 @@
-from functools import lru_cache
+﻿from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,9 +30,27 @@ class Settings(BaseSettings):
         default="",
         alias="MISSIO_CORS_ALLOWED_ORIGINS",
     )
+
     firebase_service_account_file: str = Field(
         default="",
         alias="MISSIO_FIREBASE_SERVICE_ACCOUNT_FILE",
+    )
+
+    web_push_enabled: bool = Field(
+        default=False,
+        alias="MISSIO_WEB_PUSH_ENABLED",
+    )
+    web_push_vapid_private_key_file: str = Field(
+        default="",
+        alias="MISSIO_WEB_PUSH_VAPID_PRIVATE_KEY_FILE",
+    )
+    web_push_vapid_public_key: str = Field(
+        default="",
+        alias="MISSIO_WEB_PUSH_VAPID_PUBLIC_KEY",
+    )
+    web_push_vapid_subject: str = Field(
+        default="mailto:admin@example.com",
+        alias="MISSIO_WEB_PUSH_VAPID_SUBJECT",
     )
 
     rate_limit_enabled: bool = Field(
@@ -63,4 +81,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

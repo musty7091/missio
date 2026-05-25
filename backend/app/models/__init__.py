@@ -1,4 +1,4 @@
-from app.models.app_setting import AppSetting
+﻿from app.models.app_setting import AppSetting
 from app.models.audit_log import AuditLog
 from app.models.business import Business
 from app.models.business_feature import BusinessFeature
@@ -24,6 +24,7 @@ from app.models.task_event import TaskEvent
 from app.models.task_template import TaskTemplate
 from app.models.user import User
 from app.models.user_consent import UserConsent
+from app.models.web_push_subscription import WebPushSubscription
 
 __all__ = [
     "AppSetting",
@@ -52,4 +53,5 @@ __all__ = [
     "TaskTemplate",
     "User",
     "UserConsent",
+    "WebPushSubscription",
 ]

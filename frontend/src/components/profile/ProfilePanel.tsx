@@ -39,13 +39,11 @@ import {
   type BusinessUserRole,
 } from "../../services/businessUserService"
 import {
-  getNotificationPermissionStatus,
-  requestMissioPushPermissionAndToken,
-} from "../../services/firebaseMessagingService"
-import {
-  deactivateCurrentDevicePushToken,
-  registerCurrentDevicePushToken,
-} from "../../services/pushNotificationService"
+  deactivateCurrentWebPushSubscription,
+  isWebPushLocallyEnabled,
+  requestMissioWebPushPermissionAndSubscribe,
+  sendCurrentUserWebPushTest,
+} from "../../services/webPushNotificationService"
 import type { UserMeResponse } from "../../types/auth"
 import type { ThemeMode } from "../../types/task"
 
@@ -975,14 +973,13 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
   const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null)
   const [pushErrorMessage, setPushErrorMessage] = useState<string | null>(null)
   const [isPushEnabled, setIsPushEnabled] = useState(
-    () =>
-      getNotificationPermissionStatus() === "granted" &&
-      localStorage.getItem("missio-push-notifications-disabled") !== "true",
+    () => isWebPushLocallyEnabled(),
   )
+  const [isSendingPushTest, setIsSendingPushTest] = useState(false)
 
   function rememberPushEnabledState(enabled: boolean) {
     localStorage.setItem(
-      "missio-push-notifications-disabled",
+      "missio-web-push-notifications-disabled",
       enabled ? "false" : "true",
     )
   }
@@ -993,26 +990,24 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
     setPushErrorMessage(null)
 
     try {
-      const result = await requestMissioPushPermissionAndToken()
+      const result = await requestMissioWebPushPermissionAndSubscribe()
 
-      if (!result.ok || !result.token) {
+      if (!result.ok) {
         setIsPushEnabled(false)
         setPushErrorMessage(result.message)
         return
       }
 
-      await registerCurrentDevicePushToken(result.token)
-
       rememberPushEnabledState(true)
       setIsPushEnabled(true)
-      setPushStatusMessage("Bu cihaz için bildirimler açık.")
+      setPushStatusMessage(result.message)
     } catch (error) {
       setIsPushEnabled(false)
 
       if (error instanceof Error) {
         setPushErrorMessage(error.message)
       } else {
-        setPushErrorMessage("Bildirimler açılamadı.")
+        setPushErrorMessage("Web Push bildirimleri açılamadı.")
       }
     } finally {
       setIsRequestingPushPermission(false)
@@ -1025,20 +1020,16 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
     setPushErrorMessage(null)
 
     try {
-      const result = await requestMissioPushPermissionAndToken()
-
-      if (result.token) {
-        await deactivateCurrentDevicePushToken(result.token)
-      }
+      const result = await deactivateCurrentWebPushSubscription()
 
       rememberPushEnabledState(false)
       setIsPushEnabled(false)
-      setPushStatusMessage("Bu cihaz için bildirimler kapalı.")
+      setPushStatusMessage(result.message)
     } catch (error) {
       if (error instanceof Error) {
         setPushErrorMessage(error.message)
       } else {
-        setPushErrorMessage("Bildirimler kapatılamadı.")
+        setPushErrorMessage("Web Push bildirimleri kapatılamadı.")
       }
     } finally {
       setIsRequestingPushPermission(false)
@@ -1052,6 +1043,28 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
     }
 
     await handleEnablePushNotifications()
+  }
+
+  async function handleSendWebPushTest() {
+    setIsSendingPushTest(true)
+    setPushStatusMessage(null)
+    setPushErrorMessage(null)
+
+    try {
+      const response = await sendCurrentUserWebPushTest()
+
+      setPushStatusMessage(
+        `${response.message} Gönderilen: ${response.sent_count}, Başarısız: ${response.failed_count}.`,
+      )
+    } catch (error) {
+      if (error instanceof Error) {
+        setPushErrorMessage(error.message)
+      } else {
+        setPushErrorMessage("Web Push test bildirimi gönderilemedi.")
+      }
+    } finally {
+      setIsSendingPushTest(false)
+    }
   }
 
 
@@ -1149,7 +1162,7 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
             <div className="min-w-0">
               <h3 className="text-lg font-black tracking-tight">Push bildirimleri</h3>
               <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-                Kritik görev ve operasyon uyarılarını uygulama kapalıyken de al.
+                Kritik görev ve operasyon uyarılarını Firebase olmadan standart Web Push ile al.
               </p>
             </div>
           </div>
@@ -1189,8 +1202,8 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
             {isRequestingPushPermission
               ? "Bildirimler hazırlanıyor..."
               : isPushEnabled
-                ? "Bildirimleri kapat"
-                : "Bildirimleri aç"}
+                ? "Web Push bildirimlerini kapat"
+                : "Web Push bildirimlerini aç"}
           </span>
 
           <span
@@ -1208,6 +1221,15 @@ export function ProfilePanel({ user, theme, onToggleTheme, onLogout }: ProfilePa
               }
             />
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => void handleSendWebPushTest()}
+          disabled={!isPushEnabled || isSendingPushTest}
+          className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSendingPushTest ? "Test bildirimi gönderiliyor..." : "Test bildirimi gönder"}
         </button>
       </div>
 
