@@ -1,4 +1,5 @@
-import { CalendarCheck2, Sparkles } from "lucide-react"
+﻿import { CalendarCheck2, Sparkles } from "lucide-react"
+import { useTranslation } from "../../i18n/language"
 
 type TaskGroupHeaderProps = {
   type: "routine" | "extra"
@@ -6,12 +7,16 @@ type TaskGroupHeaderProps = {
 }
 
 export function TaskGroupHeader({ type, count }: TaskGroupHeaderProps) {
+  const { t } = useTranslation()
   const isRoutine = type === "routine"
 
-  const title = isRoutine ? "Rutin görevler" : "Tek seferlik görevler"
+  const title = isRoutine
+    ? t("task.type.routineGroupTitle")
+    : t("task.type.oneTimeGroupTitle")
+
   const description = isRoutine
-    ? "Her gün takip edilen standart işler"
-    : "Bugüne özel verilen işler"
+    ? t("task.type.routineGroupDescription")
+    : t("task.type.oneTimeGroupDescription")
 
   const Icon = isRoutine ? CalendarCheck2 : Sparkles
 

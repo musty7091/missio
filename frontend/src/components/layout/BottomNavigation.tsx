@@ -1,4 +1,4 @@
-import {
+﻿import {
   BarChart3,
   Bell,
   Building2,
@@ -9,12 +9,13 @@ import {
   UserRound,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 
 export type AppTab = "tasks" | "notifications" | "reports" | "profile"
 
 type NavigationItem = {
   id: AppTab
-  label: string
+  labelKey: TranslationKey
   icon: typeof ClipboardCheck
 }
 
@@ -67,22 +68,22 @@ function getNavigationItems(role: string): NavigationItem[] {
     return [
       {
         id: "tasks",
-        label: "İşletme",
+        labelKey: "navigation.business",
         icon: Building2,
       },
       {
         id: "reports",
-        label: "Rapor",
+        labelKey: "navigation.report",
         icon: BarChart3,
       },
       {
         id: "notifications",
-        label: "Sistem",
+        labelKey: "navigation.system",
         icon: ShieldCheck,
       },
       {
         id: "profile",
-        label: "Profil",
+        labelKey: "navigation.profile",
         icon: UserRound,
       },
     ]
@@ -92,22 +93,22 @@ function getNavigationItems(role: string): NavigationItem[] {
     return [
       {
         id: "tasks",
-        label: "Görev",
+        labelKey: "navigation.task",
         icon: ClipboardCheck,
       },
       {
         id: "notifications",
-        label: "Bildirim",
+        labelKey: "navigation.notification",
         icon: Bell,
       },
       {
         id: "reports",
-        label: "Denetim",
+        labelKey: "navigation.review",
         icon: ShieldCheck,
       },
       {
         id: "profile",
-        label: "Profil",
+        labelKey: "navigation.profile",
         icon: UserRound,
       },
     ]
@@ -117,22 +118,22 @@ function getNavigationItems(role: string): NavigationItem[] {
     return [
       {
         id: "tasks",
-        label: "Özet",
+        labelKey: "navigation.summary",
         icon: Home,
       },
       {
         id: "reports",
-        label: "Rapor",
+        labelKey: "navigation.report",
         icon: BarChart3,
       },
       {
         id: "notifications",
-        label: "Onay",
+        labelKey: "navigation.approval",
         icon: FileCheck2,
       },
       {
         id: "profile",
-        label: "Profil",
+        labelKey: "navigation.profile",
         icon: UserRound,
       },
     ]
@@ -141,22 +142,22 @@ function getNavigationItems(role: string): NavigationItem[] {
   return [
     {
       id: "tasks",
-      label: "Operasyon",
+      labelKey: "navigation.operation",
       icon: ClipboardCheck,
     },
     {
       id: "notifications",
-      label: "Onay",
+      labelKey: "navigation.approval",
       icon: FileCheck2,
     },
     {
       id: "reports",
-      label: "Gün Kapanışı",
+      labelKey: "navigation.dayClosing",
       icon: ShieldCheck,
     },
     {
       id: "profile",
-      label: "Profil",
+      labelKey: "navigation.profile",
       icon: UserRound,
     },
   ]
@@ -168,6 +169,8 @@ export function BottomNavigation({
   role,
   onTabChange,
 }: BottomNavigationProps) {
+  const { t } = useTranslation()
+
   const [hasSeenNotificationsToday, setHasSeenNotificationsToday] = useState(() =>
     isNotificationsSeenToday(),
   )
@@ -197,7 +200,7 @@ export function BottomNavigation({
   return (
     <nav
       className="sticky bottom-3 z-20 mt-auto rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)]/95 p-2 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:shadow-black/30"
-      aria-label="Alt navigasyon"
+      aria-label={t("navigation.ariaLabel")}
     >
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
@@ -230,7 +233,7 @@ export function BottomNavigation({
                 )}
               </span>
 
-              <span className="leading-none">{item.label}</span>
+              <span className="leading-none">{t(item.labelKey)}</span>
             </button>
           )
         })}

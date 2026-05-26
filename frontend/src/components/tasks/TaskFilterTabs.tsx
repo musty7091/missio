@@ -1,3 +1,4 @@
+﻿import { useTranslation } from "../../i18n/language"
 import type { TodayTask } from "../../types/task"
 
 export type TaskListFilter = "all" | "waiting" | "active" | "completed"
@@ -19,6 +20,8 @@ export function TaskFilterTabs({
   tasks,
   onFilterChange,
 }: TaskFilterTabsProps) {
+  const { t } = useTranslation()
+
   const waitingCount = tasks.filter(
     (task) => task.status === "assigned" || task.status === "rejected",
   ).length
@@ -30,22 +33,22 @@ export function TaskFilterTabs({
   const filterItems: FilterItem[] = [
     {
       key: "all",
-      label: "Tümü",
+      label: t("task.filter.all"),
       count: tasks.length,
     },
     {
       key: "waiting",
-      label: "Yapılacak",
+      label: t("task.filter.waiting"),
       count: waitingCount,
     },
     {
       key: "active",
-      label: "Devam",
+      label: t("task.filter.active"),
       count: tasks.filter((task) => task.status === "in_progress").length,
     },
     {
       key: "completed",
-      label: "Biten",
+      label: t("task.filter.completed"),
       count: completedCount,
     },
   ]

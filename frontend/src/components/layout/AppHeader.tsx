@@ -1,4 +1,5 @@
-import { LogOut, Moon, Sun } from "lucide-react"
+﻿import { LogOut, Moon, Sun } from "lucide-react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 import type { ThemeMode } from "../../types/task"
 
 type AppHeaderProps = {
@@ -9,22 +10,14 @@ type AppHeaderProps = {
   onLogout: () => void
 }
 
-function getRoleLabel(role: string) {
-  if (role === "boss") {
-    return "İşletme Sahibi"
-  }
-
-  if (role === "super_admin") {
-    return "Süper Admin"
-  }
-
-  if (role === "manager") {
-    return "Manager"
-  }
-
-  if (role === "staff") {
-    return "Personel"
-  }
+function getRoleLabel(
+  role: string,
+  t: (key: TranslationKey) => string,
+) {
+  if (role === "boss") return t("role.boss")
+  if (role === "super_admin") return t("role.super_admin")
+  if (role === "manager") return t("role.manager")
+  if (role === "staff") return t("role.staff")
 
   return role
 }
@@ -51,6 +44,8 @@ export function AppHeader({
   onToggleTheme,
   onLogout,
 }: AppHeaderProps) {
+  const { t } = useTranslation()
+
   return (
     <header className="mb-5 rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
       <div className="flex items-center justify-between gap-3">
@@ -58,15 +53,18 @@ export function AppHeader({
           <MissioMiniLogo />
 
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-lg font-black leading-none tracking-tight">Missio</p>
-              <span className="rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
-                {getRoleLabel(role)}
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="shrink-0 text-lg font-black leading-none tracking-tight">
+                Missio
+              </p>
+
+              <span className="max-w-[7rem] truncate rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200">
+                {getRoleLabel(role, t)}
               </span>
             </div>
 
             <p className="mt-1 truncate text-sm font-bold text-[var(--missio-text-muted)]">
-              Merhaba, {displayName}
+              {t("header.greeting")}, {displayName}
             </p>
           </div>
         </div>
@@ -76,8 +74,8 @@ export function AppHeader({
             type="button"
             onClick={onToggleTheme}
             className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3 text-[var(--missio-text-main)] shadow-sm transition active:scale-95"
-            aria-label="Tema değiştir"
-            title="Tema değiştir"
+            aria-label={t("theme.toggle")}
+            title={t("theme.toggle")}
           >
             {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
           </button>
@@ -86,8 +84,8 @@ export function AppHeader({
             type="button"
             onClick={onLogout}
             className="rounded-2xl border border-red-200 bg-red-50 p-3 text-red-600 shadow-sm transition active:scale-95 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
-            aria-label="Çıkış yap"
-            title="Çıkış yap"
+            aria-label={t("header.logout")}
+            title={t("header.logout")}
           >
             <LogOut size={19} />
           </button>

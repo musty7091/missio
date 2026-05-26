@@ -9,8 +9,8 @@ import {
   PlayCircle,
   XCircle,
 } from "lucide-react"
-import type { TodayTask } from "../../types/task"
-import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
+import type { TodayTask, TaskPriority, TaskStatus } from "../../types/task"
 
 type TaskCardProps = {
   task: TodayTask
@@ -70,15 +70,41 @@ function getStatusBadgeClass(task: TodayTask) {
   return "rounded-full bg-[var(--missio-primary-soft)] px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:text-cyan-200"
 }
 
-function getTaskCardStatusLabel(task: TodayTask) {
+function getStatusTranslationKey(status: TaskStatus): TranslationKey {
+  if (status === "assigned") return "task.status.assigned"
+  if (status === "in_progress") return "task.status.inProgress"
+  if (status === "completed") return "task.status.completed"
+  if (status === "approved") return "task.status.approved"
+  if (status === "rejected") return "task.status.rejected"
+  if (status === "cancelled") return "task.status.cancelled"
+
+  return "task.status.assigned"
+}
+
+function getPriorityTranslationKey(priority: TaskPriority): TranslationKey {
+  if (priority === "urgent") return "task.priority.urgent"
+  if (priority === "high") return "task.priority.high"
+  if (priority === "normal") return "task.priority.normal"
+  if (priority === "low") return "task.priority.low"
+
+  return "task.priority.normal"
+}
+
+function getTaskCardStatusLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.status === "completed" && !task.requiresManagerApproval) {
-    return "Tamamlandı"
+    return t("task.status.completedNoApproval")
   }
 
-  return getStatusLabel(task.status)
+  return t(getStatusTranslationKey(task.status))
 }
 
 export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
+  const { t } = useTranslation()
+  const taskTimeLabel = task.dueAtUtc ? task.time : t("task.card.today")
+
   return (
     <button
       type="button"
@@ -94,16 +120,18 @@ export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
             <span className={getStatusBadgeClass(task)}>
-              {getTaskCardStatusLabel(task)}
+              {getTaskCardStatusLabel(task, t)}
             </span>
 
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.65rem] font-black text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
+              {task.taskType === "routine"
+                ? t("task.type.routine")
+                : t("task.type.oneTime")}
             </span>
 
             {task.priority !== "normal" && (
               <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[0.65rem] font-black text-amber-700 dark:bg-amber-950 dark:text-amber-200">
-                {getPriorityLabel(task.priority)}
+                {t(getPriorityTranslationKey(task.priority))}
               </span>
             )}
           </div>
@@ -115,41 +143,41 @@ export function TaskCard({ task, isBusy, onOpenDetails }: TaskCardProps) {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.7rem] font-bold text-[var(--missio-text-muted)]">
             <span className="inline-flex items-center gap-1">
               <Clock3 size={12} />
-              {task.time}
+              {taskTimeLabel}
             </span>
 
             {task.status === "rejected" && (
               <span className="inline-flex items-center gap-1 font-black text-red-700 dark:text-red-200">
                 <XCircle size={12} />
-                Tekrar gönderilmeli
+                {t("task.card.mustResubmit")}
               </span>
             )}
 
             {task.requiresPhoto && (
               <span className="inline-flex items-center gap-1">
                 <Camera size={12} />
-                Fotoğraf
+                {t("task.card.photo")}
               </span>
             )}
 
             {task.hasVoiceNote && (
               <span className="inline-flex items-center gap-1 font-black text-violet-700 dark:text-violet-200">
                 <Mic size={12} />
-                Sesli not
+                {t("task.card.voiceNote")}
               </span>
             )}
 
             {task.requiresLocation && (
               <span className="inline-flex items-center gap-1">
                 <MapPin size={12} />
-                Konum
+                {t("task.card.location")}
               </span>
             )}
 
             {task.requiresManagerApproval && (
               <span className="inline-flex items-center gap-1">
                 <FileCheck2 size={12} />
-                Onay
+                {t("task.card.approval")}
               </span>
             )}
           </div>
