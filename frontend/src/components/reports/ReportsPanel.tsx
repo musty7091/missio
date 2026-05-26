@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 
 import {
   createDailyOperationClosure,
@@ -21,9 +22,8 @@ import {
   type DailyOperationClosure,
 } from "../../services/dailyClosureService"
 import { listBusinessTasks } from "../../services/taskService"
-import type { TodayTask } from "../../types/task"
+import type { TaskPriority, TaskStatus, TodayTask } from "../../types/task"
 import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
-import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
 
 type ReportsPanelProps = {
   tasks: TodayTask[]
@@ -33,6 +33,36 @@ type ReportsPanelProps = {
 }
 
 type ControlCheckStatus = "success" | "warning" | "info" | "danger"
+
+
+function getStatusTranslationKey(status: TaskStatus): TranslationKey {
+  if (status === "assigned") return "task.status.assigned"
+  if (status === "in_progress") return "task.status.inProgress"
+  if (status === "completed") return "task.status.completed"
+  if (status === "approved") return "task.status.approved"
+  if (status === "rejected") return "task.status.rejected"
+  if (status === "cancelled") return "task.status.cancelled"
+
+  return "task.status.assigned"
+}
+
+function getPriorityTranslationKey(priority: TaskPriority): TranslationKey {
+  if (priority === "urgent") return "task.priority.urgent"
+  if (priority === "high") return "task.priority.high"
+  if (priority === "normal") return "task.priority.normal"
+  if (priority === "low") return "task.priority.low"
+
+  return "task.priority.normal"
+}
+
+function getTaskTypeLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
+  return task.taskType === "routine"
+    ? t("task.type.routine")
+    : t("task.type.oneTime")
+}
 
 type StaffReportRow = {
   key: string
@@ -74,25 +104,6 @@ function getLocalTodayDateKey() {
   return `${year}-${month}-${day}`
 }
 
-function getClosureStatusLabel(status: string) {
-  if (status === "closed_clean" || status === "closed") {
-    return "Temiz kapanış"
-  }
-
-  if (status === "closed_with_issues") {
-    return "Sorunlu kapanış"
-  }
-
-  return "Gün kapanışııldı"
-}
-
-function getClosureStatusMessage(status: string) {
-  if (status === "closed_with_issues") {
-    return "Bugün sorunlu kapanış olarak kaydedildi."
-  }
-
-  return "Bugün temiz kapanış olarak kaydedildi."
-}
 
 function getClosureStatusClassName(status: string) {
   if (status === "closed_with_issues") {
@@ -138,7 +149,10 @@ function getPercent(value: number, total: number) {
   return Math.round((value / total) * 100)
 }
 
-function getAssigneeName(task: TodayTask) {
+function getAssigneeName(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.assignedToUserFullName) {
     return task.assignedToUserFullName
   }
@@ -148,17 +162,20 @@ function getAssigneeName(task: TodayTask) {
   }
 
   if (task.assignedToUserId) {
-    return `Personel ID #${task.assignedToUserId}`
+    return `${t("review.staff.unknownIdPrefix")} #${task.assignedToUserId}`
   }
 
-  return "Personel bilgisi yok"
+  return t("review.staff.unknown")
 }
 
-function getStaffReportRows(tasks: TodayTask[]) {
+function getStaffReportRows(
+  tasks: TodayTask[],
+  t: (key: TranslationKey) => string,
+) {
   const groups = new Map<string, StaffReportRow>()
 
   for (const task of tasks) {
-    const name = getAssigneeName(task)
+    const name = getAssigneeName(task, t)
     const key = task.assignedToUserId ? `user-${task.assignedToUserId}` : `name-${name}`
 
     const row =
@@ -313,6 +330,7 @@ function ControlTaskRow({
   task: TodayTask
   onOpenTaskDetails?: (task: TodayTask) => void
 }) {
+  const { t } = useTranslation()
   const clickable = Boolean(onOpenTaskDetails)
 
   const content = (
@@ -326,26 +344,26 @@ function ControlTaskRow({
                 : "rounded-full bg-violet-100 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200"
             }
           >
-            {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
+            {getTaskTypeLabel(task, t)}
           </span>
 
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
-            {getStatusLabel(task.status)}
+            {t(getStatusTranslationKey(task.status))}
           </span>
 
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
-            {getPriorityLabel(task.priority)}
+            {t(getPriorityTranslationKey(task.priority))}
           </span>
 
           {task.requiresManagerApproval && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6rem] font-black text-amber-700 dark:bg-amber-950 dark:text-amber-200">
-              Onay
+              {t("task.card.approval")}
             </span>
           )}
 
           {task.requiresPhoto && (
             <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[0.6rem] font-black text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
-              Fotoğraf
+              {t("task.card.photo")}
             </span>
           )}
         </div>
@@ -355,7 +373,7 @@ function ControlTaskRow({
         </p>
 
         <p className="mt-1 line-clamp-1 text-xs font-bold text-[var(--missio-text-muted)]">
-          {getAssigneeName(task)}
+          {getAssigneeName(task, t)}
         </p>
       </div>
 
@@ -385,6 +403,7 @@ function ControlTaskRow({
 }
 
 function StaffReportCard({ row }: { row: StaffReportRow }) {
+  const { t } = useTranslation()
   const completionRate = getPercent(row.completed, row.total)
 
   return (
@@ -411,7 +430,7 @@ function StaffReportCard({ row }: { row: StaffReportRow }) {
             %{completionRate}
           </p>
           <p className="mt-1 text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-            tamam
+            {t("review.staff.completedRate")}
           </p>
         </div>
       </div>
@@ -422,7 +441,7 @@ function StaffReportCard({ row }: { row: StaffReportRow }) {
             {row.total}
           </p>
           <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">
-            Toplam
+            {t("review.staff.total")}
           </p>
         </div>
 
@@ -431,7 +450,7 @@ function StaffReportCard({ row }: { row: StaffReportRow }) {
             {row.completed}
           </p>
           <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">
-            Biten
+            {t("review.staff.completed")}
           </p>
         </div>
 
@@ -440,7 +459,7 @@ function StaffReportCard({ row }: { row: StaffReportRow }) {
             {row.open}
           </p>
           <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">
-            Açık
+            {t("review.staff.open")}
           </p>
         </div>
 
@@ -455,14 +474,14 @@ function StaffReportCard({ row }: { row: StaffReportRow }) {
             {row.rejected}
           </p>
           <p className="text-[0.56rem] font-black text-[var(--missio-text-muted)]">
-            Red
+            {t("review.staff.rejected")}
           </p>
         </div>
       </div>
 
       {row.approvalPending > 0 && (
         <div className="mt-3 rounded-2xl bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
-          {row.approvalPending} görev yönetici onayı bekliyor.
+          {row.approvalPending} {t("review.staff.approvalPendingSuffix")}
         </div>
       )}
     </article>
@@ -476,6 +495,7 @@ function StaffControlPanel({
   tasks: TodayTask[]
   onOpenTaskDetails: (task: TodayTask) => void
 }) {
+  const { t } = useTranslation()
   const totalCount = tasks.length
   const completedTasks = tasks.filter(isCompletedTask)
   const openTasks = tasks.filter(isOpenTask)
@@ -514,40 +534,40 @@ function StaffControlPanel({
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
               <ShieldCheck size={14} />
-              Denetim
+              {t("review.hero.badge")}
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              {isReadyToClose ? "Bugün kapatılabilir" : "Eksik kontrolü"}
+              {isReadyToClose ? t("review.hero.readyTitle") : t("review.hero.missingTitle")}
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Gün bitmeden açık, işlemde veya kanıt isteyen görevleri kontrol et.
+              {t("review.hero.description")}
             </p>
           </div>
 
           <div className="shrink-0 rounded-2xl bg-cyan-300 px-3 py-2 text-center text-slate-950">
             <p className="text-lg font-black leading-none">%{completionRate}</p>
-            <p className="mt-1 text-[0.62rem] font-black">tamam</p>
+            <p className="mt-1 text-[0.62rem] font-black">{t("review.hero.completedRate")}</p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <div className="rounded-2xl bg-white/10 px-3 py-2">
             <p className="text-xl font-black leading-none">{openTasks.length}</p>
-            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">Açık</p>
+            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">{t("review.metric.open")}</p>
           </div>
 
           <div className="rounded-2xl bg-white/10 px-3 py-2">
             <p className="text-xl font-black leading-none">{activeTasks.length}</p>
-            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">İşlemde</p>
+            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">{t("review.metric.active")}</p>
           </div>
 
           <div className="rounded-2xl bg-white/10 px-3 py-2">
             <p className="text-xl font-black leading-none">
               {photoRequiredOpenTasks.length}
             </p>
-            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">Kanıt</p>
+            <p className="mt-1 text-[0.64rem] font-bold text-slate-300">{t("review.metric.proof")}</p>
           </div>
         </div>
       </div>
@@ -559,10 +579,10 @@ function StaffControlPanel({
               <ClipboardCheck size={28} />
             </div>
 
-            <h3 className="mt-4 text-lg font-black">Denetim edilecek görev yok</h3>
+            <h3 className="mt-4 text-lg font-black">{t("review.empty.title")}</h3>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Bugüne görev atandığında gün sonu kontrolün burada oluşacak.
+              {t("review.empty.description")}
             </p>
           </div>
         </div>
@@ -572,11 +592,15 @@ function StaffControlPanel({
             <ControlCheckCard
               status={openTasks.length === 0 ? "success" : "warning"}
               icon={openTasks.length === 0 ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
-              title={openTasks.length === 0 ? "Açık görev kalmadı" : `${openTasks.length} açık görev var`}
+              title={
+                openTasks.length === 0
+                  ? t("review.check.openClearTitle")
+                  : `${openTasks.length} ${t("review.check.openWarningSuffix")}`
+              }
               description={
                 openTasks.length === 0
-                  ? "Bugünkü görevlerin tamamlanmış görünüyor."
-                  : "Günü kapatmadan önce açık görevleri kontrol etmelisin."
+                  ? t("review.check.openClearDescription")
+                  : t("review.check.openWarningDescription")
               }
             />
 
@@ -585,13 +609,13 @@ function StaffControlPanel({
               icon={<FileCheck2 size={22} />}
               title={
                 approvalWaitingTasks.length === 0
-                  ? "Onay bekleyen görev yok"
-                  : `${approvalWaitingTasks.length} görev yönetici onayında`
+                  ? t("review.check.approvalClearTitle")
+                  : `${approvalWaitingTasks.length} ${t("review.check.approvalWarningSuffix")}`
               }
               description={
                 approvalWaitingTasks.length === 0
-                  ? "Yönetici onayı bekleyen tamamlanmış görevin yok."
-                  : "Bu görevler tamamlanmış, yönetici onayı bekliyor."
+                  ? t("review.check.approvalClearDescription")
+                  : t("review.check.approvalWarningDescription")
               }
             />
           </div>
@@ -600,11 +624,11 @@ function StaffControlPanel({
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Hemen kontrol et
+                  {t("review.control.eyebrow")}
                 </p>
 
                 <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-                  Günü kapatmadan önce bakılacak işler
+                  {t("review.control.title")}
                 </h3>
               </div>
 
@@ -615,7 +639,7 @@ function StaffControlPanel({
 
             {blockingTasks.length === 0 ? (
               <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
-                Denetim gerektiren açık iş görünmüyor. Bugün kapatılabilir.
+                {t("review.control.clean")}
               </div>
             ) : (
               <div className="space-y-2">
@@ -644,6 +668,7 @@ function ManagementCloseDayPanel({
   businessId: number | null
   onOpenTaskDetails: (task: TodayTask) => void
 }) {
+  const { t } = useTranslation()
   const [reportTasks, setReportTasks] = useState<TodayTask[]>([])
   const [closures, setClosures] = useState<DailyOperationClosure[]>([])
   const [closureNote, setClosureNote] = useState("")
@@ -658,7 +683,7 @@ function ManagementCloseDayPanel({
     if (!businessId) {
       setReportTasks([])
       setClosures([])
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage(t("dayClosing.error.noBusiness"))
       return
     }
 
@@ -687,7 +712,7 @@ function ManagementCloseDayPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Gün kapanışıma ekranı yüklenemedi.")
+        setErrorMessage(t("dayClosing.error.loadFailed"))
       }
 
       setReportTasks([])
@@ -726,7 +751,7 @@ function ManagementCloseDayPanel({
     ...assignedTasks,
   ].filter((task, index, list) => list.findIndex((item) => item.id === task.id) === index)
 
-  const staffRows = useMemo(() => getStaffReportRows(reportTasks), [reportTasks])
+  const staffRows = useMemo(() => getStaffReportRows(reportTasks, t), [reportTasks, t])
   const completionRate = getPercent(completedTasks.length, totalCount)
   const closureRate = getPercent(approvedOrClosedTasks.length, totalCount)
 
@@ -743,27 +768,27 @@ function ManagementCloseDayPanel({
 
   async function handleCloseDay() {
     if (!businessId) {
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage(t("dayClosing.error.noBusiness"))
       return
     }
 
     if (!canShowCloseButton) {
-      setErrorMessage("Bu kullanıcı günü kapatamaz.")
+      setErrorMessage(t("dayClosing.error.noPermission"))
       return
     }
 
     if (!hasTasksForClosure) {
-      setErrorMessage("Bugün kapatılacak görev bulunamadı.")
+      setErrorMessage(t("dayClosing.error.noTask"))
       return
     }
 
     if (isDayAlreadyClosed) {
-      setErrorMessage("Bugün zaten kapatılmış.")
+      setErrorMessage(t("dayClosing.error.alreadyClosed"))
       return
     }
 
     if (closureHasIssues && !closureNote.trim()) {
-      setErrorMessage("Sorunlu gün kapanışında kapanış notu zorunludur.")
+      setErrorMessage(t("dayClosing.error.noteRequired"))
       return
     }
 
@@ -792,7 +817,7 @@ function ManagementCloseDayPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Gün kapanışıılamadı.")
+        setErrorMessage(t("dayClosing.error.closeFailed"))
       }
     } finally {
       setIsClosingDay(false)
@@ -812,15 +837,15 @@ function ManagementCloseDayPanel({
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
               <ShieldCheck size={14} />
-              Gün Kapanışı
+              {t("dayClosing.hero.badge")}
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              Yönetici gün kapatma
+              {t("dayClosing.hero.title")}
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Bugünkü işleri kontrol et, gerekiyorsa not düş ve günü resmi rapora bağla.
+              {t("dayClosing.hero.description")}
             </p>
           </div>
 
@@ -829,8 +854,8 @@ function ManagementCloseDayPanel({
             onClick={() => void loadReportTasks()}
             disabled={isLoading}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-cyan-200 transition active:scale-95 disabled:opacity-60"
-            aria-label="Yenile"
-            title="Yenile"
+            aria-label={t("dayClosing.refresh")}
+            title={t("dayClosing.refresh")}
           >
             {isLoading ? <Loader2 className="animate-spin" size={19} /> : <RefreshCw size={19} />}
           </button>
@@ -840,14 +865,14 @@ function ManagementCloseDayPanel({
           <div className="rounded-2xl bg-white/10 px-3 py-2">
             <p className="text-xl font-black leading-none">{totalCount}</p>
             <p className="mt-1 text-[0.64rem] font-bold text-slate-300">
-              Toplam görev
+              {t("dayClosing.metric.totalTasks")}
             </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 px-3 py-2">
             <p className="text-xl font-black leading-none">%{completionRate}</p>
             <p className="mt-1 text-[0.64rem] font-bold text-slate-300">
-              Tamamlama
+              {t("dayClosing.metric.completion")}
             </p>
           </div>
         </div>
@@ -859,10 +884,16 @@ function ManagementCloseDayPanel({
                 todayClosure.status,
               )}`}
             >
-              <p className="font-black">{getClosureStatusLabel(todayClosure.status)}</p>
-              <p className="mt-1">{getClosureStatusMessage(todayClosure.status)}</p>
+              <p className="font-black">{todayClosure.status === "closed_with_issues"
+                  ? t("dayClosing.closed.statusIssues")
+                  : todayClosure.status === "closed_clean" || todayClosure.status === "closed"
+                    ? t("dayClosing.closed.statusClean")
+                    : t("dayClosing.closed.statusDefault")}</p>
+              <p className="mt-1">{todayClosure.status === "closed_with_issues"
+                  ? t("dayClosing.closed.messageIssues")
+                  : t("dayClosing.closed.messageClean")}</p>
               <p className="mt-1 text-xs">
-                Kapatan: {todayClosure.closed_by_user_full_name} ·{" "}
+                {t("dayClosing.closed.closedBy")}: {todayClosure.closed_by_user_full_name} ·{" "}
                 {formatDateTime(todayClosure.closed_at_utc)}
               </p>
 
@@ -885,14 +916,14 @@ function ManagementCloseDayPanel({
                   }
                 >
                   {canCleanClose
-                    ? "Temiz kapanış yapılabilir."
+                    ? t("dayClosing.status.cleanReady")
                     : hasTasksForClosure
-                      ? "Sorunlu kapanış yapılabilir."
-                      : "Kapatılacak görev yok."}
+                      ? t("dayClosing.status.issueReady")
+                      : t("dayClosing.status.noTasks")}
                 </p>
 
                 <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
-                  Kapanış uygunluğu: %{closureRate}
+                  {t("dayClosing.closureEligibility")}: %{closureRate}
                 </p>
               </div>
 
@@ -903,8 +934,8 @@ function ManagementCloseDayPanel({
                     onChange={(event) => setClosureNote(event.target.value)}
                     placeholder={
                       closureHasIssues
-                        ? "Sorunlu kapanış notu zorunlu. Örn: Ali'nin kasa kontrol görevi reddedildi, yarın tekrar kontrol edilecek."
-                        : "Kapanış notu isteğe bağlı. Örn: Gün sorunsuz tamamlandı."
+                        ? t("dayClosing.note.issuePlaceholder")
+                        : t("dayClosing.note.cleanPlaceholder")
                     }
                     maxLength={5000}
                     className="min-h-20 w-full resize-none rounded-2xl border border-white/20 bg-white/10 px-3 py-3 text-sm font-bold text-white outline-none placeholder:text-slate-300 focus:border-cyan-300"
@@ -927,19 +958,18 @@ function ManagementCloseDayPanel({
                     ) : (
                       <ShieldCheck size={18} />
                     )}
-                    {closureHasIssues ? "Sorunlu Kapat" : "Temiz Kapat"}
+                    {closureHasIssues ? t("dayClosing.button.closeWithIssues") : t("dayClosing.button.closeClean")}
                   </button>
 
                   {closureHasIssues && (
                     <p className="rounded-2xl bg-amber-50/95 p-3 text-xs font-bold leading-5 text-amber-900">
-                      Açık, reddedilmiş, işlemde veya onay bekleyen işler var.
-                      Gün yine kapatılabilir; ancak kapanış notu zorunludur ve sorunlar rapora yansır.
+                      {t("dayClosing.warning.issues")}
                     </p>
                   )}
                 </div>
               ) : (
                 <p className="rounded-2xl bg-white/10 p-3 text-xs font-bold leading-5 text-slate-300">
-                  Bu kullanıcı günü kapatamaz.
+                  {t("dayClosing.noPermission")}
                 </p>
               )}
             </div>
@@ -961,7 +991,7 @@ function ManagementCloseDayPanel({
 
       {isLoading ? (
         <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
-          Gün kapanışıma ekranı yükleniyor...
+          {t("dayClosing.loading")}
         </div>
       ) : totalCount === 0 ? (
         <div className="flex flex-1 items-center justify-center rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">
@@ -970,10 +1000,10 @@ function ManagementCloseDayPanel({
               <ClipboardCheck size={28} />
             </div>
 
-            <h3 className="mt-4 text-lg font-black">Bugün kapatılacak görev yok</h3>
+            <h3 className="mt-4 text-lg font-black">{t("dayClosing.empty.title")}</h3>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              İşletmeye görev atandığında gün kapatma kontrolü burada oluşacak.
+              {t("dayClosing.empty.description")}
             </p>
           </div>
         </div>
@@ -981,30 +1011,30 @@ function ManagementCloseDayPanel({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2.5">
             <MetricCard
-              title="Tamamlanan"
+              title={t("dayClosing.cards.completed")}
               value={completedTasks.length}
-              description="Tamamlanan veya onaylanan"
+              description={t("dayClosing.cards.completedDesc")}
               icon={<CheckCircle2 size={22} />}
             />
 
             <MetricCard
-              title="Açık"
+              title={t("dayClosing.cards.open")}
               value={openTasks.length}
-              description="Bekleyen, işlemde veya red"
+              description={t("dayClosing.cards.openDesc")}
               icon={<AlertTriangle size={22} />}
             />
 
             <MetricCard
-              title="Onay"
+              title={t("dayClosing.cards.approval")}
               value={approvalWaitingTasks.length}
-              description="Yönetici onayı bekliyor"
+              description={t("dayClosing.cards.approvalDesc")}
               icon={<FileCheck2 size={22} />}
             />
 
             <MetricCard
-              title="Red"
+              title={t("dayClosing.cards.rejected")}
               value={rejectedTasks.length}
-              description="Düzeltilmesi gereken"
+              description={t("dayClosing.cards.rejectedDesc")}
               icon={<XCircle size={22} />}
             />
           </div>
@@ -1013,11 +1043,15 @@ function ManagementCloseDayPanel({
             <ControlCheckCard
               status={openTasks.length === 0 ? "success" : "warning"}
               icon={openTasks.length === 0 ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
-              title={openTasks.length === 0 ? "Açık görev kalmadı" : `${openTasks.length} açık görev var`}
+              title={
+                openTasks.length === 0
+                  ? t("review.check.openClearTitle")
+                  : `${openTasks.length} ${t("review.check.openWarningSuffix")}`
+              }
               description={
                 openTasks.length === 0
-                  ? "Bekleyen, işlemde veya reddedilmiş görev görünmüyor."
-                  : "Gün kapanışı öncesi bu görevler kontrol edilmeli."
+                  ? t("dayClosing.check.openClearDesc")
+                  : t("dayClosing.check.openWarningDesc")
               }
             />
 
@@ -1026,24 +1060,24 @@ function ManagementCloseDayPanel({
               icon={<FileCheck2 size={22} />}
               title={
                 approvalWaitingTasks.length === 0
-                  ? "Onay bekleyen görev yok"
-                  : `${approvalWaitingTasks.length} görev onay bekliyor`
+                  ? t("dayClosing.check.approvalClear")
+                  : `${approvalWaitingTasks.length} ${t("dayClosing.check.approvalWarningSuffix")}`
               }
               description={
                 approvalWaitingTasks.length === 0
-                  ? "Yönetici onayı bekleyen görev görünmüyor."
-                  : "Onay sekmesinden bu görevler onaylanmalı veya reddedilmeli."
+                  ? t("dayClosing.check.approvalClearDesc")
+                  : t("dayClosing.check.approvalWarningDesc")
               }
             />
 
             <ControlCheckCard
               status={rejectedTasks.length === 0 ? "success" : "danger"}
               icon={rejectedTasks.length === 0 ? <CheckCircle2 size={22} /> : <XCircle size={22} />}
-              title={rejectedTasks.length === 0 ? "Reddedilmiş görev yok" : `${rejectedTasks.length} görev reddedilmiş`}
+              title={rejectedTasks.length === 0 ? t("dayClosing.check.rejectedClear") : `${rejectedTasks.length} ${t("dayClosing.check.rejectedWarningSuffix")}`}
               description={
                 rejectedTasks.length === 0
-                  ? "Düzeltme bekleyen iş görünmüyor."
-                  : "Personelin düzeltip tekrar göndermesi gereken görevler var."
+                  ? t("dayClosing.check.rejectedClearDesc")
+                  : t("dayClosing.check.rejectedWarningDesc")
               }
             />
 
@@ -1052,13 +1086,13 @@ function ManagementCloseDayPanel({
               icon={photoRequiredOpenTasks.length === 0 ? <CheckCircle2 size={22} /> : <Camera size={22} />}
               title={
                 photoRequiredOpenTasks.length === 0
-                  ? "Eksik kanıt fotoğrafı görünmüyor"
-                  : `${photoRequiredOpenTasks.length} açık görev fotoğraf istiyor`
+                  ? t("dayClosing.check.photoClear")
+                  : `${photoRequiredOpenTasks.length} ${t("dayClosing.check.photoWarningSuffix")}`
               }
               description={
                 photoRequiredOpenTasks.length === 0
-                  ? "Fotoğraf isteyen açık görev bulunmuyor."
-                  : "Bu görevlerde kanıt fotoğrafı tamamlanmadan kapanış sorunlu sayılır."
+                  ? t("dayClosing.check.photoClearDesc")
+                  : t("dayClosing.check.photoWarningDesc")
               }
             />
           </div>
@@ -1067,11 +1101,11 @@ function ManagementCloseDayPanel({
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Kapanış kontrolü
+                  {t("dayClosing.control.eyebrow")}
                 </p>
 
                 <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-                  Günü kapatmadan önce bakılacak işler
+                  {t("review.control.title")}
                 </h3>
               </div>
 
@@ -1082,7 +1116,7 @@ function ManagementCloseDayPanel({
 
             {blockingTasks.length === 0 ? (
               <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
-                Denetim gerektiren açık iş görünmüyor. Temiz kapanış yapılabilir.
+                {t("dayClosing.control.clean")}
               </div>
             ) : (
               <div className="space-y-2">
@@ -1101,11 +1135,11 @@ function ManagementCloseDayPanel({
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Personel özeti
+                  {t("dayClosing.staff.eyebrow")}
                 </p>
 
                 <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-                  Kişi bazlı durum
+                  {t("dayClosing.staff.title")}
                 </h3>
               </div>
 
@@ -1116,7 +1150,7 @@ function ManagementCloseDayPanel({
 
             {staffRows.length === 0 ? (
               <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3 text-sm font-bold text-[var(--missio-text-muted)]">
-                Personel özeti bulunamadı.
+                {t("dayClosing.staff.empty")}
               </div>
             ) : (
               <div className="space-y-2.5">

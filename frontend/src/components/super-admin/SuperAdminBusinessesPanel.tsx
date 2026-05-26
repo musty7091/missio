@@ -16,6 +16,7 @@ import {
   UsersRound,
 } from "lucide-react"
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 
 import { ApprovalsPanel } from "../approvals/ApprovalsPanel"
 import { BossDashboardPanel } from "../boss/BossDashboardPanel"
@@ -141,57 +142,65 @@ function formatDateTime(value: string | null) {
 }
 
 
-function getSubscriptionStatusLabel(value: string | null) {
-  const labels: Record<string, string> = {
-    trialing: "Trial",
-    active: "Aktif",
-    suspended: "Askıda",
-    cancelled: "İptal",
-    expired: "Süresi doldu",
+function getSubscriptionStatusLabel(
+  value: string | null,
+  t: (key: TranslationKey) => string,
+) {
+  const labels: Record<string, TranslationKey> = {
+    trialing: "superAdmin.business.subscription.trialing",
+    active: "superAdmin.business.subscription.active",
+    suspended: "superAdmin.business.subscription.suspended",
+    cancelled: "superAdmin.business.subscription.cancelled",
+    expired: "superAdmin.business.subscription.expired",
   }
 
   if (!value) {
-    return "Abonelik yok"
+    return t("superAdmin.business.subscription.none")
   }
 
-  return labels[value] ?? value
+  const key = labels[value]
+
+  return key ? t(key) : value
 }
 
-function getBusinessRemainingDaysLabel(business: BusinessResponse) {
+function getBusinessRemainingDaysLabel(
+  business: BusinessResponse,
+  t: (key: TranslationKey) => string,
+) {
   if (typeof business.subscription_remaining_days === "number") {
     if (business.subscription_remaining_days < 0) {
-      return "Süresi geçmiş"
+      return t("superAdmin.business.remaining.expired")
     }
 
     if (business.subscription_remaining_days === 0) {
-      return "Bugün bitiyor"
+      return t("superAdmin.business.remaining.today")
     }
 
-    return `${business.subscription_remaining_days} gün kaldı`
+    return `${business.subscription_remaining_days} ${t("superAdmin.business.remaining.dayLeft")}`
   }
 
   if (!business.subscription_ends_at_utc) {
-    return "Bitiş tarihi yok"
+    return t("superAdmin.business.remaining.noEndDate")
   }
 
   const endDate = new Date(business.subscription_ends_at_utc)
 
   if (Number.isNaN(endDate.getTime())) {
-    return "Bitiş tarihi okunamadı"
+    return t("superAdmin.business.remaining.badEndDate")
   }
 
   const now = new Date()
   const remainingDays = Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000)
 
   if (remainingDays < 0) {
-    return "Süresi geçmiş"
+    return t("superAdmin.business.remaining.expired")
   }
 
   if (remainingDays === 0) {
-    return "Bugün bitiyor"
+    return t("superAdmin.business.remaining.today")
   }
 
-  return `${remainingDays} gün kaldı`
+  return `${remainingDays} ${t("superAdmin.business.remaining.dayLeft")}`
 }
 
 function buildPayload(formState: CreateBusinessFormState): CreateBusinessWithOwnerRequest {
@@ -295,6 +304,8 @@ function BusinessCard({
   business: BusinessResponse
   onManage: (business: BusinessResponse) => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <div className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -303,10 +314,10 @@ function BusinessCard({
             {business.name}
           </p>
           <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-            Kod: {business.slug}
+            {t("superAdmin.business.code")}: {business.slug}
           </p>
           <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-            Oluşturma: {formatDateTime(business.created_at)}
+            {t("superAdmin.business.createdAt")}: {formatDateTime(business.created_at)}
           </p>
         </div>
 
@@ -317,29 +328,29 @@ function BusinessCard({
               : "shrink-0 rounded-full bg-rose-100 px-3 py-1 text-[0.68rem] font-black text-rose-700 dark:bg-rose-950 dark:text-rose-200"
           }
         >
-          {business.is_active ? "Aktif" : "Pasif"}
+          {business.is_active ? t("superAdmin.business.active") : t("superAdmin.business.passive")}
         </span>
       </div>
 
       <div className="mt-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 text-xs font-bold leading-5 text-cyan-900 dark:border-cyan-900 dark:bg-cyan-950/20 dark:text-cyan-100">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="font-black">
-            Plan: {business.subscription_plan_name ?? "Plan yok"}
+            {t("superAdmin.business.plan")}: {business.subscription_plan_name ?? t("superAdmin.business.noPlan")}
           </p>
           <span className="rounded-full bg-white px-2 py-1 text-[0.64rem] font-black text-cyan-700 shadow-sm dark:bg-slate-900 dark:text-cyan-200">
-            {getSubscriptionStatusLabel(business.subscription_status)}
+            {getSubscriptionStatusLabel(business.subscription_status, t)}
           </span>
         </div>
 
-        <p>Bitiş: {formatDateTime(business.subscription_ends_at_utc)}</p>
-        <p>Kalan: {getBusinessRemainingDaysLabel(business)}</p>
-        <p>Kullanıcı limiti: {business.subscription_max_users ?? "-"}</p>
+        <p>{t("superAdmin.business.endAt")}: {formatDateTime(business.subscription_ends_at_utc)}</p>
+        <p>{t("superAdmin.business.remaining")}: {getBusinessRemainingDaysLabel(business, t)}</p>
+        <p>{t("superAdmin.business.userLimit")}: {business.subscription_max_users ?? "-"}</p>
       </div>
 
       {(business.phone || business.email) && (
         <div className="mt-3 border-t border-[var(--missio-border)] pt-3 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
-          {business.phone && <p>Telefon: {business.phone}</p>}
-          {business.email && <p>E-posta: {business.email}</p>}
+          {business.phone && <p>{t("superAdmin.business.phone")}: {business.phone}</p>}
+          {business.email && <p>{t("superAdmin.business.email")}: {business.email}</p>}
         </div>
       )}
 
@@ -349,7 +360,7 @@ function BusinessCard({
         className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-sm"
       >
         <ShieldCheck size={18} />
-        Yönet
+        {t("superAdmin.business.manage")}
       </button>
     </div>
   )
@@ -644,6 +655,8 @@ function BusinessManagePanel({
   onTabChange: (tab: ManageTab) => void
   onBack: () => void
 }) {
+  const { t } = useTranslation()
+
   const tabs: { id: ManageTab; label: string; icon: ReactNode }[] = [
     {
       id: "summary",
@@ -682,13 +695,13 @@ function BusinessManagePanel({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-              İşletme yönetimi
+              {t("superAdmin.business.hero.title")}
             </p>
             <h1 className="mt-1 truncate text-2xl font-black text-[var(--missio-text-main)]">
               {business.name}
             </h1>
             <p className="mt-1 text-sm font-bold text-[var(--missio-text-muted)]">
-              Kod: {business.slug}
+              {t("superAdmin.business.code")}: {business.slug}
             </p>
           </div>
 
@@ -699,7 +712,7 @@ function BusinessManagePanel({
                 : "shrink-0 rounded-full bg-rose-100 px-3 py-1 text-[0.68rem] font-black text-rose-700 dark:bg-rose-950 dark:text-rose-200"
             }
           >
-            {business.is_active ? "Aktif" : "Pasif"}
+            {business.is_active ? t("superAdmin.business.active") : t("superAdmin.business.passive")}
           </span>
         </div>
 
@@ -760,6 +773,7 @@ function BusinessManagePanel({
 }
 
 export function SuperAdminBusinessesPanel() {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<PanelMode>("list")
   const [businesses, setBusinesses] = useState<BusinessResponse[]>([])
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessResponse | null>(null)
@@ -847,14 +861,13 @@ export function SuperAdminBusinessesPanel() {
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-              Super Admin
+              {t("superAdmin.business.hero.eyebrow")}
             </p>
             <h1 className="mt-1 text-2xl font-black text-[var(--missio-text-main)]">
-              İşletme yönetimi
+              {t("superAdmin.business.hero.title")}
             </h1>
             <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-              Tüm müşteri işletmelerini buradan gör, yeni işletme aç ve seçtiğin
-              işletmeyi yönet.
+              {t("superAdmin.business.hero.description")}
             </p>
           </div>
 
@@ -865,21 +878,21 @@ export function SuperAdminBusinessesPanel() {
 
         <div className="grid grid-cols-3 gap-2">
           <MetricCard
-            label="Toplam"
+            label={t("superAdmin.business.metric.total")}
             value={businesses.length}
-            helper="İşletme"
+            helper={t("superAdmin.business.metric.business")}
             icon={<Building2 size={19} />}
           />
           <MetricCard
-            label="Aktif"
+            label={t("superAdmin.business.metric.active")}
             value={activeBusinessCount}
-            helper="Kullanımda"
+            helper={t("superAdmin.business.metric.inUse")}
             icon={<UsersRound size={19} />}
           />
           <MetricCard
-            label="Pasif"
+            label={t("superAdmin.business.metric.passive")}
             value={passiveBusinessCount}
-            helper="Kapalı"
+            helper={t("superAdmin.business.metric.closed")}
             icon={<ShieldCheck size={19} />}
           />
         </div>
@@ -893,7 +906,7 @@ export function SuperAdminBusinessesPanel() {
           className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-sm"
         >
           <Plus size={18} />
-          Yeni işletme oluştur
+          {t("superAdmin.business.createButton")}
         </button>
       </div>
 
@@ -908,13 +921,13 @@ export function SuperAdminBusinessesPanel() {
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-              Müşteri işletmeleri
+              {t("superAdmin.business.section.eyebrow")}
             </p>
             <h2 className="mt-1 text-xl font-black text-[var(--missio-text-main)]">
-              Kayıtlı işletmeler
+              {t("superAdmin.business.section.title")}
             </h2>
             <p className="mt-1 text-sm font-bold leading-5 text-[var(--missio-text-muted)]">
-              {filteredBusinesses.length} işletme listeleniyor.
+              {filteredBusinesses.length} {filteredBusinesses.length === 1 ? t("superAdmin.business.listingSingular") : t("superAdmin.business.listingPlural")}
             </p>
           </div>
 
@@ -923,7 +936,7 @@ export function SuperAdminBusinessesPanel() {
             onClick={() => void loadBusinesses()}
             disabled={isLoadingBusinesses}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-soft-bg)] text-[var(--missio-text-main)] disabled:opacity-60"
-            aria-label="İşletmeleri yenile"
+            aria-label={t("superAdmin.business.refreshAria")}
           >
             <RefreshCw size={18} className={isLoadingBusinesses ? "animate-spin" : ""} />
           </button>
@@ -935,7 +948,7 @@ export function SuperAdminBusinessesPanel() {
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[var(--missio-text-main)] outline-none placeholder:text-[var(--missio-text-muted)]"
-            placeholder="İşletme ara"
+            placeholder={t("superAdmin.business.searchPlaceholder")}
           />
         </div>
 
@@ -947,11 +960,11 @@ export function SuperAdminBusinessesPanel() {
 
         {isLoadingBusinesses && businesses.length === 0 ? (
           <div className="rounded-2xl bg-[var(--missio-soft-bg)] p-4 text-sm font-bold text-[var(--missio-text-muted)]">
-            İşletmeler yükleniyor...
+            {t("superAdmin.business.loading")}
           </div>
         ) : filteredBusinesses.length === 0 ? (
           <div className="rounded-2xl bg-[var(--missio-soft-bg)] p-4 text-sm font-bold text-[var(--missio-text-muted)]">
-            Gösterilecek işletme bulunamadı.
+            {t("superAdmin.business.empty")}
           </div>
         ) : (
           <div className="space-y-3">

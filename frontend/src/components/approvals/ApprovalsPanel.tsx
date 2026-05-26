@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "../../i18n/language"
 import {
   approveTask,
   getTaskAttachmentFileBlob,
@@ -548,6 +549,7 @@ function StaffApprovalGroupCard({
 }
 
 export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
+  const { t } = useTranslation()
   const [approvalTasks, setApprovalTasks] = useState<TodayTask[]>([])
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null)
   const [rejectNotes, setRejectNotes] = useState<Record<number, string>>({})
@@ -563,7 +565,7 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
   async function loadApprovals() {
     if (!businessId) {
       setApprovalTasks([])
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage(t("approval.error.noBusiness"))
       return
     }
 
@@ -586,7 +588,7 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Onay bekleyen görevler alınamadı.")
+        setErrorMessage(t("approval.error.loadFailed"))
       }
 
       setApprovalTasks([])
@@ -668,15 +670,15 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
               <FileCheck2 size={14} />
-              Yönetici onayı
+              {t("approval.hero.badge")}
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              Kanıtlı onay ekranı
+              {t("approval.hero.title")}
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Personelin tamamladığı işleri not, fotoğraf ve durum bilgisiyle kontrol et.
+              {t("approval.hero.description")}
             </p>
           </div>
 
@@ -685,8 +687,8 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
             onClick={() => void loadApprovals()}
             disabled={isLoading}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-cyan-200 transition active:scale-95 disabled:opacity-60"
-            aria-label="Yenile"
-            title="Yenile"
+            aria-label={t("approval.refresh")}
+            title={t("approval.refresh")}
           >
             <RefreshCw size={19} />
           </button>
@@ -696,7 +698,7 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
           <div className="rounded-2xl bg-white/10 px-3 py-2">
             <p className="text-xl font-black leading-none">{approvalTasks.length}</p>
             <p className="mt-1 text-[0.64rem] font-bold text-slate-300">
-              Onay bekleyen
+              {t("approval.stat.pending")}
             </p>
           </div>
 
@@ -708,7 +710,7 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
               </p>
             </div>
             <p className="mt-1 text-[0.64rem] font-bold text-slate-300">
-              İlgili personel
+              {t("approval.stat.staff")}
             </p>
           </div>
         </div>
@@ -723,7 +725,7 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
 
       {isLoading ? (
         <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
-          Onay bekleyen görevler yükleniyor...
+          {t("approval.loading")}
         </div>
       ) : approvalTasks.length === 0 ? (
         <div className="flex flex-1 items-center justify-center rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">
@@ -732,10 +734,10 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
               <CheckCircle2 size={28} />
             </div>
 
-            <h3 className="mt-4 text-lg font-black">Onay bekleyen görev yok</h3>
+            <h3 className="mt-4 text-lg font-black">{t("approval.empty.title")}</h3>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Personel onay gerektiren bir görevi tamamladığında burada görünecek.
+              {t("approval.empty.description")}
             </p>
           </div>
         </div>

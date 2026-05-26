@@ -1,4 +1,4 @@
-import {
+﻿import {
   Bell,
   Camera,
   CheckCircle2,
@@ -11,8 +11,8 @@ import {
   Sparkles,
 } from "lucide-react"
 import { useState } from "react"
-import type { TodayTask } from "../../types/task"
-import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
+import type { TaskPriority, TaskStatus, TodayTask } from "../../types/task"
 
 type NotificationPanelProps = {
   tasks: TodayTask[]
@@ -64,31 +64,57 @@ function getToneStyles(tone: NotificationTone) {
   return styles[tone]
 }
 
-function formatNotificationTime(value: string | null) {
+function getStatusTranslationKey(status: TaskStatus): TranslationKey {
+  if (status === "assigned") return "task.status.assigned"
+  if (status === "in_progress") return "task.status.inProgress"
+  if (status === "completed") return "task.status.completed"
+  if (status === "approved") return "task.status.approved"
+  if (status === "rejected") return "task.status.rejected"
+  if (status === "cancelled") return "task.status.cancelled"
+
+  return "task.status.assigned"
+}
+
+function getPriorityTranslationKey(priority: TaskPriority): TranslationKey {
+  if (priority === "urgent") return "task.priority.urgent"
+  if (priority === "high") return "task.priority.high"
+  if (priority === "normal") return "task.priority.normal"
+  if (priority === "low") return "task.priority.low"
+
+  return "task.priority.normal"
+}
+
+function formatNotificationTime(
+  value: string | null,
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   if (!value) {
-    return "Saat yok"
+    return t("notification.time.noTime")
   }
 
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
-    return "Saat yok"
+    return t("notification.time.noTime")
   }
 
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
 
-  const time = date.toLocaleTimeString("tr-TR", {
+  const locale = language === "tr" ? "tr-TR" : "en-GB"
+
+  const time = date.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   })
 
   if (isToday) {
-    return `Bugün ${time}`
+    return `${t("notification.time.today")} ${time}`
   }
 
   return (
-    date.toLocaleDateString("tr-TR", {
+    date.toLocaleDateString(locale, {
       day: "2-digit",
       month: "2-digit",
     }) + ` ${time}`
@@ -106,7 +132,11 @@ function getLatestTime(tasks: TodayTask[], field: keyof TodayTask) {
   return dates[0]?.toISOString() ?? null
 }
 
-function getTaskPreview(tasks: TodayTask[]) {
+function getTaskPreview(
+  tasks: TodayTask[],
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   if (tasks.length === 0) {
     return ""
   }
@@ -115,10 +145,34 @@ function getTaskPreview(tasks: TodayTask[]) {
     return tasks[0].title
   }
 
-  return `${tasks[0].title} ve ${tasks.length - 1} görev daha`
+  if (language === "tr") {
+    return `${tasks[0].title} ve ${tasks.length - 1} ${t("notification.preview.moreTasks")}`
+  }
+
+  return `${tasks[0].title} and ${tasks.length - 1} ${t("notification.preview.moreTasks")}`
 }
 
-function buildAssignmentNotifications(tasks: TodayTask[]) {
+function getRecordCountLabel(
+  count: number,
+  t: (key: TranslationKey) => string,
+) {
+  const key = count === 1 ? "notification.record" : "notification.records"
+
+  return `${count} ${t(key)}`
+}
+
+function getTaskShowLabel(
+  count: number,
+  t: (key: TranslationKey) => string,
+) {
+  return `${count} ${t("notification.card.showTasks")}`
+}
+
+function buildAssignmentNotifications(
+  tasks: TodayTask[],
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   const notifications: NotificationItem[] = []
 
   const routineTasks = tasks.filter((task) => task.taskType === "routine")
@@ -127,10 +181,18 @@ function buildAssignmentNotifications(tasks: TodayTask[]) {
   if (routineTasks.length > 0) {
     notifications.push({
       id: "routine-assigned",
-      title: `${routineTasks.length} rutin görev atandı`,
-      message: `Günlük rutin görevlerin hazır. İlk görev: ${getTaskPreview(routineTasks)}.`,
-      timeLabel: formatNotificationTime(getLatestTime(routineTasks, "assignedAtUtc")),
-      meta: "Rutin görev",
+      title: `${routineTasks.length} ${t("notification.assignment.routine.titleUnit")}`,
+      message: `${t("notification.assignment.routine.messageStart")} ${getTaskPreview(
+        routineTasks,
+        language,
+        t,
+      )}.`,
+      timeLabel: formatNotificationTime(
+        getLatestTime(routineTasks, "assignedAtUtc"),
+        language,
+        t,
+      ),
+      meta: t("notification.meta.routine"),
       tone: "info",
       icon: Clock3,
       isUnread: routineTasks.some((task) => task.status === "assigned"),
@@ -141,10 +203,18 @@ function buildAssignmentNotifications(tasks: TodayTask[]) {
   if (extraTasks.length > 0) {
     notifications.push({
       id: "extra-assigned",
-      title: `${extraTasks.length} tek seferlik görev atandı`,
-      message: `Bugüne özel tek seferlik görevlerin var. İlk görev: ${getTaskPreview(extraTasks)}.`,
-      timeLabel: formatNotificationTime(getLatestTime(extraTasks, "assignedAtUtc")),
-      meta: "Tek seferlik görev",
+      title: `${extraTasks.length} ${t("notification.assignment.oneTime.titleUnit")}`,
+      message: `${t("notification.assignment.oneTime.messageStart")} ${getTaskPreview(
+        extraTasks,
+        language,
+        t,
+      )}.`,
+      timeLabel: formatNotificationTime(
+        getLatestTime(extraTasks, "assignedAtUtc"),
+        language,
+        t,
+      ),
+      meta: t("notification.meta.oneTime"),
       tone: "extra",
       icon: Sparkles,
       isUnread: extraTasks.some((task) => task.status === "assigned"),
@@ -155,7 +225,11 @@ function buildAssignmentNotifications(tasks: TodayTask[]) {
   return notifications
 }
 
-function buildAttentionNotifications(tasks: TodayTask[]) {
+function buildAttentionNotifications(
+  tasks: TodayTask[],
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   const notifications: NotificationItem[] = []
 
   const activeTasks = tasks.filter((task) => task.status === "in_progress")
@@ -176,10 +250,21 @@ function buildAttentionNotifications(tasks: TodayTask[]) {
   if (activeTasks.length > 0) {
     notifications.push({
       id: "active-tasks",
-      title: "Devam eden görev var",
-      message: `${getTaskPreview(activeTasks)} şu anda işlemde. İş bittiyse tamamlandı olarak işaretlenmeli.`,
-      timeLabel: formatNotificationTime(getLatestTime(activeTasks, "startedAtUtc")),
-      meta: "Aksiyon gerekli",
+      title: t("notification.attention.active.title"),
+      message:
+        language === "tr"
+          ? `${getTaskPreview(activeTasks, language, t)} ${t(
+              "notification.attention.active.messageEnd",
+            )}`
+          : `${getTaskPreview(activeTasks, language, t)} ${t(
+              "notification.attention.active.messageEnd",
+            )}`,
+      timeLabel: formatNotificationTime(
+        getLatestTime(activeTasks, "startedAtUtc"),
+        language,
+        t,
+      ),
+      meta: t("notification.meta.actionRequired"),
       tone: "warning",
       icon: PlayCircle,
       isUnread: true,
@@ -190,10 +275,12 @@ function buildAttentionNotifications(tasks: TodayTask[]) {
   if (photoRequiredTasks.length > 0) {
     notifications.push({
       id: "photo-required",
-      title: "Kanıtlı görev var",
-      message: `${photoRequiredTasks.length} görev kanıt fotoğrafı istiyor. Kanıt eklenmeden görev tamamlanamayabilir.`,
-      timeLabel: "Kanıt gerekli",
-      meta: "Dikkat",
+      title: t("notification.attention.photo.title"),
+      message: `${photoRequiredTasks.length} ${t(
+        "notification.attention.photo.messageEnd",
+      )}`,
+      timeLabel: t("notification.meta.proofRequired"),
+      meta: t("notification.meta.attention"),
       tone: "warning",
       icon: Camera,
       isUnread: true,
@@ -204,10 +291,16 @@ function buildAttentionNotifications(tasks: TodayTask[]) {
   if (approvalWaitingTasks.length > 0) {
     notifications.push({
       id: "approval-waiting",
-      title: "Onay bekleyen görev var",
-      message: `${approvalWaitingTasks.length} tamamlanan görev yönetici onayı bekliyor.`,
-      timeLabel: formatNotificationTime(getLatestTime(approvalWaitingTasks, "completedAtUtc")),
-      meta: "Onay süreci",
+      title: t("notification.attention.approval.title"),
+      message: `${approvalWaitingTasks.length} ${t(
+        "notification.attention.approval.messageEnd",
+      )}`,
+      timeLabel: formatNotificationTime(
+        getLatestTime(approvalWaitingTasks, "completedAtUtc"),
+        language,
+        t,
+      ),
+      meta: t("notification.meta.approvalProcess"),
       tone: "info",
       icon: FileCheck2,
       isUnread: false,
@@ -218,10 +311,16 @@ function buildAttentionNotifications(tasks: TodayTask[]) {
   if (completedTasks.length > 0) {
     notifications.push({
       id: "completed-tasks",
-      title: "Tamamlanan görev bildirimi",
-      message: `Bugün ${completedTasks.length} görev tamamlandı veya onaylandı.`,
-      timeLabel: formatNotificationTime(getLatestTime(completedTasks, "completedAtUtc")),
-      meta: "Bilgi",
+      title: t("notification.attention.completed.title"),
+      message: `${t("notification.attention.completed.messageStart")} ${
+        completedTasks.length
+      } ${t("notification.attention.completed.messageEnd")}`,
+      timeLabel: formatNotificationTime(
+        getLatestTime(completedTasks, "completedAtUtc"),
+        language,
+        t,
+      ),
+      meta: t("notification.meta.info"),
       tone: "success",
       icon: CheckCircle2,
       isUnread: false,
@@ -234,9 +333,13 @@ function buildAttentionNotifications(tasks: TodayTask[]) {
 
 function NotificationTaskRow({
   task,
+  language,
+  t,
   onOpenTaskDetails,
 }: {
   task: TodayTask
+  language: "tr" | "en"
+  t: (key: TranslationKey) => string
   onOpenTaskDetails: (task: TodayTask) => void
 }) {
   return (
@@ -254,15 +357,17 @@ function NotificationTaskRow({
                 : "rounded-full bg-violet-100 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200"
             }
           >
-            {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
+            {task.taskType === "routine"
+              ? t("task.type.routine")
+              : t("task.type.oneTime")}
           </span>
 
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
-            {getStatusLabel(task.status)}
+            {t(getStatusTranslationKey(task.status))}
           </span>
 
           <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
-            {getPriorityLabel(task.priority)}
+            {t(getPriorityTranslationKey(task.priority))}
           </span>
         </div>
 
@@ -271,7 +376,8 @@ function NotificationTaskRow({
         </p>
 
         <p className="mt-1 truncate text-[0.68rem] font-bold text-[var(--missio-text-muted)]">
-          Atanma: {formatNotificationTime(task.assignedAtUtc)}
+          {t("notification.task.assignedAt")}:{" "}
+          {formatNotificationTime(task.assignedAtUtc, language, t)}
         </p>
       </div>
 
@@ -282,11 +388,15 @@ function NotificationTaskRow({
 
 function NotificationCard({
   notification,
+  language,
+  t,
   isExpanded,
   onToggle,
   onOpenTaskDetails,
 }: {
   notification: NotificationItem
+  language: "tr" | "en"
+  t: (key: TranslationKey) => string
   isExpanded: boolean
   onToggle: () => void
   onOpenTaskDetails: (task: TodayTask) => void
@@ -341,8 +451,8 @@ function NotificationCard({
                 {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                 <span>
                   {isExpanded
-                    ? "Görevleri gizle"
-                    : `${notification.relatedTasks.length} görevi göster`}
+                    ? t("notification.card.hideTasks")
+                    : getTaskShowLabel(notification.relatedTasks.length, t)}
                 </span>
               </div>
             )}
@@ -358,6 +468,8 @@ function NotificationCard({
             <NotificationTaskRow
               key={task.id}
               task={task}
+              language={language}
+              t={t}
               onOpenTaskDetails={onOpenTaskDetails}
             />
           ))}
@@ -371,10 +483,11 @@ export function NotificationPanel({
   tasks,
   onOpenTaskDetails,
 }: NotificationPanelProps) {
+  const { language, t } = useTranslation()
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null)
 
-  const assignmentNotifications = buildAssignmentNotifications(tasks)
-  const attentionNotifications = buildAttentionNotifications(tasks)
+  const assignmentNotifications = buildAssignmentNotifications(tasks, language, t)
+  const attentionNotifications = buildAttentionNotifications(tasks, language, t)
   const notifications = [...assignmentNotifications, ...attentionNotifications]
 
   function toggleNotification(notificationId: string) {
@@ -390,15 +503,15 @@ export function NotificationPanel({
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
               <Bell size={14} />
-              Bildirimler
+              {t("notification.hero.badge")}
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              Bugünkü bildirimler
+              {t("notification.hero.title")}
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Bildirime dokunarak ilgili görevleri görüntüleyebilirsin.
+              {t("notification.hero.description")}
             </p>
           </div>
         </div>
@@ -411,10 +524,10 @@ export function NotificationPanel({
               <CheckCircle2 size={28} />
             </div>
 
-            <h3 className="mt-4 text-lg font-black">Yeni bildirim yok</h3>
+            <h3 className="mt-4 text-lg font-black">{t("notification.empty.title")}</h3>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Şu anda dikkat gerektiren görev bildirimi bulunmuyor.
+              {t("notification.empty.description")}
             </p>
           </div>
         </div>
@@ -424,11 +537,11 @@ export function NotificationPanel({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between px-1">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Görev atamaları
+                  {t("notification.section.assignments")}
                 </p>
 
                 <span className="rounded-full bg-[var(--missio-card-bg)] px-2.5 py-1 text-[0.65rem] font-black text-[var(--missio-text-muted)]">
-                  {assignmentNotifications.length} kayıt
+                  {getRecordCountLabel(assignmentNotifications.length, t)}
                 </span>
               </div>
 
@@ -436,6 +549,8 @@ export function NotificationPanel({
                 <NotificationCard
                   key={notification.id}
                   notification={notification}
+                  language={language}
+                  t={t}
                   isExpanded={expandedNotificationId === notification.id}
                   onToggle={() => toggleNotification(notification.id)}
                   onOpenTaskDetails={onOpenTaskDetails}
@@ -448,11 +563,11 @@ export function NotificationPanel({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between px-1">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Dikkat edilmesi gerekenler
+                  {t("notification.section.attention")}
                 </p>
 
                 <span className="rounded-full bg-[var(--missio-card-bg)] px-2.5 py-1 text-[0.65rem] font-black text-[var(--missio-text-muted)]">
-                  {attentionNotifications.length} kayıt
+                  {getRecordCountLabel(attentionNotifications.length, t)}
                 </span>
               </div>
 
@@ -460,6 +575,8 @@ export function NotificationPanel({
                 <NotificationCard
                   key={notification.id}
                   notification={notification}
+                  language={language}
+                  t={t}
                   isExpanded={expandedNotificationId === notification.id}
                   onToggle={() => toggleNotification(notification.id)}
                   onOpenTaskDetails={onOpenTaskDetails}
@@ -476,11 +593,11 @@ export function NotificationPanel({
 
               <div>
                 <h3 className="text-sm font-black text-[var(--missio-text-main)]">
-                  Bildirimden göreve hızlı geçiş
+                  {t("notification.quick.title")}
                 </h3>
 
                 <p className="mt-1 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
-                  Bildirime dokun, ilgili görevleri gör, görev satırına dokunarak detayına geç.
+                  {t("notification.quick.description")}
                 </p>
               </div>
             </div>
@@ -490,5 +607,3 @@ export function NotificationPanel({
     </section>
   )
 }
-
-

@@ -1,4 +1,4 @@
-import {
+﻿import {
   AlertCircle,
   ArrowLeft,
   Camera,
@@ -19,15 +19,15 @@ import {
 } from "lucide-react"
 import type { ChangeEvent, ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 import {
   deleteTaskAttachment,
   getTaskAttachmentFileBlob,
   listTaskAttachments,
   type TaskAttachment,
 } from "../../services/taskService"
-import type { TodayTask } from "../../types/task"
+import type { TaskPriority, TaskStatus, TodayTask } from "../../types/task"
 import { TaskEventTimeline } from "./TaskEventTimeline"
-import { getActionLabel, getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
 
 type TaskDetailPanelProps = {
   task: TodayTask
@@ -85,85 +85,146 @@ function DetailInfoRow({
   )
 }
 
-function getDetailGuidance(task: TodayTask) {
+function getStatusTranslationKey(status: TaskStatus): TranslationKey {
+  if (status === "assigned") return "task.status.assigned"
+  if (status === "in_progress") return "task.status.inProgress"
+  if (status === "completed") return "task.status.completed"
+  if (status === "approved") return "task.status.approved"
+  if (status === "rejected") return "task.status.rejected"
+  if (status === "cancelled") return "task.status.cancelled"
+
+  return "task.status.assigned"
+}
+
+function getPriorityTranslationKey(priority: TaskPriority): TranslationKey {
+  if (priority === "urgent") return "task.priority.urgent"
+  if (priority === "high") return "task.priority.high"
+  if (priority === "normal") return "task.priority.normal"
+  if (priority === "low") return "task.priority.low"
+
+  return "task.priority.normal"
+}
+
+function getDetailGuidance(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.status === "assigned") {
-    return "Bu görevi başlatarak işleme alabilirsin."
+    return t("task.detail.guidance.assigned")
   }
 
   if (task.status === "in_progress") {
     if (task.requiresPhoto) {
-      return "Görev devam ediyor. Kanıt fotoğrafını ekledikten sonra tamamlayabilirsin."
+      return t("task.detail.guidance.inProgressWithPhoto")
     }
 
-    return "Görev devam ediyor. İş bittiğinde tamamlayabilirsin."
+    return t("task.detail.guidance.inProgress")
   }
 
   if (task.status === "completed") {
     if (task.requiresManagerApproval) {
-      return "Görev tamamlandı. Manager onayı bekleniyor."
+      return t("task.detail.guidance.completedWaitingApproval")
     }
 
-    return "Görev tamamlandı."
+    return t("task.detail.guidance.completed")
   }
 
   if (task.status === "approved") {
-    return "Görev onaylandı ve kapanmış durumda."
+    return t("task.detail.guidance.approved")
   }
 
   if (task.status === "rejected") {
-    return "Görev reddedilmiş. Gerekli düzeltmeyi yapıp tekrar gönderebilirsin."
+    return t("task.detail.guidance.rejected")
   }
 
   if (task.status === "cancelled") {
-    return "Görev iptal edilmiş. Bu görevde işlem yapılamaz."
+    return t("task.detail.guidance.cancelled")
   }
 
-  return "Görev detaylarını buradan takip edebilirsin."
+  return t("task.detail.guidance.default")
 }
 
-function getDetailStatusLabel(task: TodayTask) {
+function getDetailStatusLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.status === "completed" && !task.requiresManagerApproval) {
-    return "Tamamlandı"
+    return t("task.status.completedNoApproval")
   }
 
-  return getStatusLabel(task.status)
+  return t(getStatusTranslationKey(task.status))
 }
 
-function getActionButtonLabel(task: TodayTask) {
+function getActionButtonLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.status === "assigned") {
-    return "Görevi başlat"
+    return t("task.detail.action.start")
   }
 
   if (task.status === "in_progress") {
-    return "Görevi tamamla"
+    return t("task.detail.action.complete")
   }
 
   if (task.status === "rejected") {
-    return "Tekrar gönder"
+    return t("task.detail.action.resubmit")
   }
 
-  return getActionLabel(task.status)
+  if (
+    task.status === "completed" ||
+    task.status === "approved" ||
+    task.status === "cancelled"
+  ) {
+    return t("task.action.detail")
+  }
+
+  return t("task.action.open")
 }
 
-function getClosedTaskLabel(task: TodayTask) {
+function getClosedTaskLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.status === "approved") {
-    return "Bu görev onaylandı"
+    return t("task.detail.closed.approved")
   }
 
   if (task.status === "cancelled") {
-    return "Bu görev iptal edildi"
+    return t("task.detail.closed.cancelled")
   }
 
   if (task.status === "completed" && task.requiresManagerApproval) {
-    return "İşlem tamamlandı, onay bekliyor"
+    return t("task.detail.closed.waitingApproval")
   }
 
-  return "Bu görevde işlem tamamlandı"
+  return t("task.detail.closed.completed")
 }
 
-function formatFileSize(fileSize: number | null) {
+function getTaskTypeLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
+  return task.taskType === "routine"
+    ? t("task.type.routine")
+    : t("task.type.oneTime")
+}
+
+function getTaskTypeDetailLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
+  return task.taskType === "routine"
+    ? t("task.detail.routineTask")
+    : t("task.detail.oneTimeTask")
+}
+
+function formatFileSize(
+  fileSize: number | null,
+  t: (key: TranslationKey) => string,
+) {
   if (!fileSize || fileSize <= 0) {
-    return "Boyut bilinmiyor"
+    return t("task.detail.fileSizeUnknown")
   }
 
   if (fileSize < 1024 * 1024) {
@@ -181,6 +242,7 @@ export function TaskDetailPanel({
   onCompleteTask,
   onUploadPhoto,
 }: TaskDetailPanelProps) {
+  const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const photoPreviewHistoryTokenRef = useRef<string | null>(null)
 
@@ -195,6 +257,8 @@ export function TaskDetailPanel({
   const [timelineRefreshVersion, setTimelineRefreshVersion] = useState(0)
   const [completionNote, setCompletionNote] = useState("")
 
+  const taskTimeLabel = task.dueAtUtc ? task.time : t("task.card.today")
+
   const canUseMainAction =
     task.status === "assigned" || task.status === "in_progress" || task.status === "rejected"
 
@@ -208,7 +272,6 @@ export function TaskDetailPanel({
   const canWriteCompletionNote =
     task.status === "in_progress" || task.status === "rejected"
 
-
   const referenceAttachmentPreviews = attachmentPreviews.filter(
     (preview) => preview.attachment.attachment_type === "reference",
   )
@@ -220,7 +283,6 @@ export function TaskDetailPanel({
   const voiceNotePreviews = attachmentPreviews.filter(
     (preview) => preview.attachment.attachment_type === "voice_note",
   )
-
 
   function triggerPhotoButtonFlash() {
     setShouldFlashPhotoButton(true)
@@ -266,7 +328,7 @@ export function TaskDetailPanel({
       if (error instanceof Error) {
         setAttachmentErrorMessage(error.message)
       } else {
-        setAttachmentErrorMessage("Görev fotoğrafları alınamadı.")
+        setAttachmentErrorMessage(t("task.detail.attachmentsLoadError"))
       }
     } finally {
       setIsLoadingAttachments(false)
@@ -359,7 +421,7 @@ export function TaskDetailPanel({
         if (error instanceof Error) {
           setActionErrorMessage(error.message)
         } else {
-          setActionErrorMessage("Görev başlatılamadı.")
+          setActionErrorMessage(t("task.detail.startError"))
         }
       }
 
@@ -380,7 +442,7 @@ export function TaskDetailPanel({
         if (error instanceof Error) {
           setActionErrorMessage(error.message)
         } else {
-          setActionErrorMessage("Görev tamamlanamadı.")
+          setActionErrorMessage(t("task.detail.completeError"))
         }
       }
     }
@@ -403,7 +465,7 @@ export function TaskDetailPanel({
   }
 
   async function handleDeleteAttachment(attachmentId: number) {
-    const confirmed = window.confirm("Bu kanıt fotoğrafını silmek istiyor musun?")
+    const confirmed = window.confirm(t("task.detail.confirmDeletePhoto"))
 
     if (!confirmed) {
       return
@@ -420,7 +482,7 @@ export function TaskDetailPanel({
       if (error instanceof Error) {
         setAttachmentErrorMessage(error.message)
       } else {
-        setAttachmentErrorMessage("Kanıt fotoğrafı silinemedi.")
+        setAttachmentErrorMessage(t("task.detail.photoDeleteError"))
       }
     } finally {
       setDeletingAttachmentId(null)
@@ -432,7 +494,7 @@ export function TaskDetailPanel({
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
-        aria-label="Detayı kapat"
+        aria-label={t("task.detail.closeDetail")}
         onClick={onClose}
       />
 
@@ -448,7 +510,7 @@ export function TaskDetailPanel({
               <div className="relative flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
-                    Görev detayı
+                    {t("task.detail.title")}
                   </p>
 
                   <h2 className="mt-2 text-3xl font-black leading-tight tracking-tight">
@@ -456,7 +518,7 @@ export function TaskDetailPanel({
                   </h2>
 
                   <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-                    {task.taskType === "routine" ? "Rutin görev" : "Tek seferlik görev"} · {task.time}
+                    {getTaskTypeDetailLabel(task, t)} · {taskTimeLabel}
                   </p>
                 </div>
 
@@ -464,7 +526,7 @@ export function TaskDetailPanel({
                   type="button"
                   onClick={onClose}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white"
-                  aria-label="Kapat"
+                  aria-label={t("task.detail.close")}
                 >
                   <X size={20} />
                 </button>
@@ -472,15 +534,15 @@ export function TaskDetailPanel({
 
               <div className="relative mt-4 flex flex-wrap gap-2">
                 <span className="rounded-full bg-cyan-300 px-3 py-1.5 text-xs font-black text-slate-950">
-                  {getDetailStatusLabel(task)}
+                  {getDetailStatusLabel(task, t)}
                 </span>
 
                 <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-slate-200">
-                  {getPriorityLabel(task.priority)}
+                  {t(getPriorityTranslationKey(task.priority))}
                 </span>
 
                 <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-slate-200">
-                  {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
+                  {getTaskTypeLabel(task, t)}
                 </span>
               </div>
             </div>
@@ -493,9 +555,9 @@ export function TaskDetailPanel({
               </div>
 
               <div>
-                <h3 className="text-sm font-black">İşlem durumu</h3>
+                <h3 className="text-sm font-black">{t("task.detail.operationStatus")}</h3>
                 <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-                  {getDetailGuidance(task)}
+                  {getDetailGuidance(task, t)}
                 </p>
               </div>
             </div>
@@ -512,15 +574,15 @@ export function TaskDetailPanel({
 
                 <div className="min-w-0">
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-200">
-                    Yapılacak iş
+                    {t("task.detail.workToDo")}
                   </p>
 
                   <h3 className="mt-1 text-base font-black text-slate-950 dark:text-white">
-                    Görev açıklaması
+                    {t("task.detail.descriptionTitle")}
                   </h3>
 
                   <p className="mt-2 text-base font-bold leading-7 text-slate-700 dark:text-slate-200">
-                    {task.description || "Bu görev için açıklama girilmemiş."}
+                    {task.description || t("task.detail.noDescription")}
                   </p>
                 </div>
               </div>
@@ -536,10 +598,10 @@ export function TaskDetailPanel({
 
                 <div>
                   <h3 className="text-sm font-black text-slate-950 dark:text-white">
-                    Referans görsel
+                    {t("task.detail.referenceImage")}
                   </h3>
                   <p className="mt-1 text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">
-                    Görevi veren kişinin eklediği örnek / hedef görsel.
+                    {t("task.detail.referenceImageDescription")}
                   </p>
                 </div>
               </div>
@@ -576,10 +638,10 @@ export function TaskDetailPanel({
 
                 <div>
                   <h3 className="text-sm font-black text-slate-950 dark:text-white">
-                    Sesli görev notu
+                    {t("task.detail.voiceTaskNote")}
                   </h3>
                   <p className="mt-1 text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">
-                    Görevi veren kişinin kaydettiği sesli açıklama.
+                    {t("task.detail.voiceTaskNoteDescription")}
                   </p>
                 </div>
               </div>
@@ -592,10 +654,10 @@ export function TaskDetailPanel({
                   >
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <p className="truncate text-xs font-black text-slate-950 dark:text-white">
-                        Sesli not
+                        {t("task.detail.voiceNote")}
                       </p>
                       <p className="shrink-0 text-[0.65rem] font-bold text-slate-500 dark:text-slate-400">
-                        {formatFileSize(preview.attachment.file_size)}
+                        {formatFileSize(preview.attachment.file_size, t)}
                       </p>
                     </div>
 
@@ -613,37 +675,37 @@ export function TaskDetailPanel({
           <div className="mb-4 grid grid-cols-1 gap-3">
             <DetailInfoRow
               icon={<Clock3 size={19} />}
-              label="Görev saati"
-              value={task.time}
+              label={t("task.detail.taskTime")}
+              value={taskTimeLabel}
             />
 
             <DetailInfoRow
               icon={<Flag size={19} />}
-              label="Öncelik"
-              value={getPriorityLabel(task.priority)}
+              label={t("task.detail.priority")}
+              value={t(getPriorityTranslationKey(task.priority))}
             />
           </div>
 
           <div className="mb-4 rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4">
-            <h3 className="text-sm font-black">Görev gereksinimleri</h3>
+            <h3 className="text-sm font-black">{t("task.detail.requirements")}</h3>
 
             <div className="mt-3 flex flex-wrap gap-2">
               {task.requiresPhoto ? (
-                <DetailChip icon={<Camera size={14} />} label="Kanıt fotoğrafı zorunlu" />
+                <DetailChip icon={<Camera size={14} />} label={t("task.detail.photoRequired")} />
               ) : (
-                <DetailChip icon={<Camera size={14} />} label="Kanıt fotoğrafı zorunlu değil" />
+                <DetailChip icon={<Camera size={14} />} label={t("task.detail.photoNotRequired")} />
               )}
 
               {task.requiresLocation ? (
-                <DetailChip icon={<MapPin size={14} />} label="Konum zorunlu" />
+                <DetailChip icon={<MapPin size={14} />} label={t("task.detail.locationRequired")} />
               ) : (
-                <DetailChip icon={<MapPin size={14} />} label="Konum zorunlu değil" />
+                <DetailChip icon={<MapPin size={14} />} label={t("task.detail.locationNotRequired")} />
               )}
 
               {task.requiresManagerApproval ? (
-                <DetailChip icon={<FileCheck2 size={14} />} label="Yönetici onayı gerekli" />
+                <DetailChip icon={<FileCheck2 size={14} />} label={t("task.detail.managerApprovalRequired")} />
               ) : (
-                <DetailChip icon={<FileCheck2 size={14} />} label="Onay gerekmiyor" />
+                <DetailChip icon={<FileCheck2 size={14} />} label={t("task.detail.managerApprovalNotRequired")} />
               )}
             </div>
           </div>
@@ -657,11 +719,11 @@ export function TaskDetailPanel({
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-black">Kanıt fotoğrafı</h3>
+                    <h3 className="text-sm font-black">{t("task.detail.evidencePhoto")}</h3>
                     <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
                       {evidenceAttachmentPreviews.length > 0
-                        ? `${evidenceAttachmentPreviews.length} kanıt fotoğrafı eklendi.`
-                        : "Henüz kanıt fotoğrafı eklenmedi."}
+                        ? `${evidenceAttachmentPreviews.length} ${t("task.detail.evidencePhotoAdded")}`
+                        : t("task.detail.evidencePhotoNotAdded")}
                     </p>
                   </div>
                 </div>
@@ -680,7 +742,7 @@ export function TaskDetailPanel({
               {!isLoadingAttachments && !attachmentErrorMessage && evidenceAttachmentPreviews.length === 0 && (
                 <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-muted)]">
                   <ImageIcon size={19} />
-                  Kanıt fotoğrafı eklendiğinde burada görünecek.
+                  {t("task.detail.evidencePhotoPlaceholder")}
                 </div>
               )}
 
@@ -712,7 +774,7 @@ export function TaskDetailPanel({
                           {preview.attachment.file_name}
                         </p>
                         <p className="text-[0.58rem] font-bold text-[var(--missio-text-muted)]">
-                          {formatFileSize(preview.attachment.file_size)}
+                          {formatFileSize(preview.attachment.file_size, t)}
                         </p>
 
                         {canDeleteAttachments && (
@@ -727,7 +789,7 @@ export function TaskDetailPanel({
                             ) : (
                               <Trash2 size={12} />
                             )}
-                            Sil
+                            {t("task.detail.delete")}
                           </button>
                         )}
                       </div>
@@ -746,9 +808,9 @@ export function TaskDetailPanel({
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-black">Tamamlama açıklaması</h3>
+                  <h3 className="text-sm font-black">{t("task.detail.completionNote")}</h3>
                   <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                    Yaptığın işle ilgili kısa açıklama yazabilirsin. Bu not yönetici onay ekranında görünecek.
+                    {t("task.detail.completionNoteDescription")}
                   </p>
                 </div>
               </div>
@@ -756,7 +818,7 @@ export function TaskDetailPanel({
               <textarea
                 value={completionNote}
                 onChange={(event) => setCompletionNote(event.target.value)}
-                placeholder="Örn: Raf düzenlendi, eksik ürünler tamamlandı..."
+                placeholder={t("task.detail.completionNotePlaceholder")}
                 maxLength={5000}
                 className="min-h-24 w-full resize-none rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
               />
@@ -773,9 +835,7 @@ export function TaskDetailPanel({
             {task.requiresPhoto && !isClosedTask && evidenceAttachmentPreviews.length < 1 && (
               <div className="mb-3 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
                 <AlertCircle className="mt-0.5 shrink-0" size={17} />
-                <span>
-                  Bu görev kanıt fotoğrafı istiyor. Tamamlamadan önce fotoğraf eklemelisin.
-                </span>
+                <span>{t("task.detail.photoRequiredWarning")}</span>
               </div>
             )}
 
@@ -792,13 +852,13 @@ export function TaskDetailPanel({
               className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black text-[var(--missio-text-main)] active:scale-[0.99]"
             >
               <ArrowLeft size={18} />
-              Listeye dön
+              {t("task.detail.backToList")}
             </button>
 
             {isClosedTask ? (
               <div className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black text-[var(--missio-text-muted)]">
                 <CheckCircle2 size={18} />
-                {getClosedTaskLabel(task)}
+                {getClosedTaskLabel(task, t)}
               </div>
             ) : (
               <div className="flex gap-3">
@@ -823,7 +883,7 @@ export function TaskDetailPanel({
                       }
                     >
                       <Camera size={18} />
-                      Kanıt fotoğrafı ekle
+                      {t("task.detail.addEvidencePhoto")}
                     </button>
                   </>
                 )}
@@ -837,12 +897,12 @@ export function TaskDetailPanel({
                   {isBusy ? (
                     <>
                       <Loader2 className="animate-spin" size={18} />
-                      İşleniyor...
+                      {t("task.detail.processing")}
                     </>
                   ) : (
                     <>
                       <PlayCircle size={18} />
-                      {getActionButtonLabel(task)}
+                      {getActionButtonLabel(task, t)}
                     </>
                   )}
                 </button>
@@ -858,14 +918,14 @@ export function TaskDetailPanel({
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
                 {selectedPreview.attachment.attachment_type === "reference"
-                  ? "Referans fotoğrafı"
-                  : "Kanıt fotoğrafı"}
+                  ? t("task.detail.referencePhoto")
+                  : t("task.detail.evidencePhotoPreview")}
               </p>
               <h3 className="mt-1 truncate text-base font-black">
                 {selectedPreview.attachment.file_name}
               </h3>
               <p className="mt-1 text-xs font-bold text-slate-400">
-                {formatFileSize(selectedPreview.attachment.file_size)}
+                {formatFileSize(selectedPreview.attachment.file_size, t)}
               </p>
             </div>
 
@@ -873,7 +933,7 @@ export function TaskDetailPanel({
               type="button"
               onClick={closePhotoPreview}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white"
-              aria-label="Fotoğrafı kapat"
+              aria-label={t("task.detail.closePhoto")}
             >
               <X size={20} />
             </button>
@@ -894,7 +954,7 @@ export function TaskDetailPanel({
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 active:scale-[0.99]"
             >
               <ArrowLeft size={18} />
-              Detaya dön
+              {t("task.detail.returnToDetail")}
             </button>
           </div>
         </div>
@@ -902,4 +962,3 @@ export function TaskDetailPanel({
     </div>
   )
 }
-

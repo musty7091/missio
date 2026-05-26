@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 import {
   changeBusinessUserRole,
   createBusinessUser,
@@ -128,6 +129,29 @@ function getRoleLabel(role: string) {
   return role
 }
 
+function getTranslatedRoleLabel(
+  role: string,
+  t: (key: TranslationKey) => string,
+) {
+  if (role === "boss") {
+    return t("role.boss")
+  }
+
+  if (role === "super_admin") {
+    return t("role.super_admin")
+  }
+
+  if (role === "manager") {
+    return t("role.manager")
+  }
+
+  if (role === "staff") {
+    return t("role.staff")
+  }
+
+  return role
+}
+
 function getInitials(fullName: string) {
   const words = fullName
     .trim()
@@ -219,6 +243,7 @@ function InfoRow({ icon, label, value }: InfoRowProps) {
 }
 
 function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
+  const { t } = useTranslation()
   const [users, setUsers] = useState<BusinessUser[]>([])
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [createForm, setCreateForm] = useState<CreateUserFormState>(emptyCreateForm)
@@ -658,7 +683,7 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
                       full_name: event.target.value,
                     }))
                   }
-                  placeholder="Ad soyad"
+                  placeholder={t("profile.form.fullNamePlaceholder")}
                   className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
                 />
 
@@ -682,7 +707,7 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
                       email: event.target.value,
                     }))
                   }
-                  placeholder="E-posta / isteğe bağlı"
+                  placeholder={t("profile.form.emailPlaceholder")}
                   className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
                 />
 
@@ -874,7 +899,7 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
                       full_name: event.target.value,
                     }))
                   }
-                  placeholder="Ad soyad"
+                  placeholder={t("profile.form.fullNamePlaceholder")}
                   className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
                 />
 
@@ -886,7 +911,7 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
                       email: event.target.value,
                     }))
                   }
-                  placeholder="E-posta / isteğe bağlı"
+                  placeholder={t("profile.form.emailPlaceholder")}
                   className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
                 />
 
@@ -958,7 +983,8 @@ export function ProfilePanel({
   onLogout,
   onProfileUpdated,
 }: ProfilePanelProps) {
-  const emailValue = user.email && user.email.trim() ? user.email : "E-posta tanımlı değil"
+  const { t } = useTranslation()
+  const emailValue = user.email && user.email.trim() ? user.email : t("profile.info.emailMissing")
   const initials = getInitials(user.full_name)
   const [isRequestingPushPermission, setIsRequestingPushPermission] = useState(false)
   const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null)
@@ -1001,7 +1027,7 @@ export function ProfilePanel({
     setProfileErrorMessage(null)
 
     if (!fullName) {
-      setProfileErrorMessage("Ad soyad boş olamaz.")
+      setProfileErrorMessage(t("profile.form.errorFullNameRequired"))
       return
     }
 
@@ -1009,7 +1035,7 @@ export function ProfilePanel({
       const emailDomain = email.includes("@") ? email.split("@")[1] : ""
 
       if (!email.includes("@") || !emailDomain.includes(".")) {
-        setProfileErrorMessage("Geçerli bir e-posta adresi giriniz.")
+        setProfileErrorMessage(t("profile.form.errorEmailInvalid"))
         return
       }
     }
@@ -1032,7 +1058,7 @@ export function ProfilePanel({
       if (error instanceof Error) {
         setProfileErrorMessage(error.message)
       } else {
-        setProfileErrorMessage("Profil bilgileri güncellenemedi.")
+        setProfileErrorMessage(t("profile.form.errorUpdateFailed"))
       }
     } finally {
       setIsUpdatingProfile(false)
@@ -1063,7 +1089,7 @@ export function ProfilePanel({
       if (error instanceof Error) {
         setPushErrorMessage(error.message)
       } else {
-        setPushErrorMessage("Web Push bildirimleri açılamadı.")
+        setPushErrorMessage(t("profile.push.errorEnableFailed"))
       }
     } finally {
       setIsRequestingPushPermission(false)
@@ -1085,7 +1111,7 @@ export function ProfilePanel({
       if (error instanceof Error) {
         setPushErrorMessage(error.message)
       } else {
-        setPushErrorMessage("Web Push bildirimleri kapatılamadı.")
+        setPushErrorMessage(t("profile.push.errorDisableFailed"))
       }
     } finally {
       setIsRequestingPushPermission(false)
@@ -1110,13 +1136,13 @@ export function ProfilePanel({
       const response = await sendCurrentUserWebPushTest()
 
       setPushStatusMessage(
-        `${response.message} Gönderilen: ${response.sent_count}, Başarısız: ${response.failed_count}.`,
+        `${response.message} ${t("profile.push.testSentPrefix")}: ${response.sent_count}, ${t("profile.push.testFailedPrefix")}: ${response.failed_count}.`,
       )
     } catch (error) {
       if (error instanceof Error) {
         setPushErrorMessage(error.message)
       } else {
-        setPushErrorMessage("Web Push test bildirimi gönderilemedi.")
+        setPushErrorMessage(t("profile.push.errorTestFailed"))
       }
     } finally {
       setIsSendingPushTest(false)
@@ -1133,17 +1159,17 @@ export function ProfilePanel({
     setPasswordErrorMessage(null)
 
     if (!currentPassword || !newPassword || !newPasswordRepeat) {
-      setPasswordErrorMessage("Mevcut şifre, yeni şifre ve tekrar alanları zorunludur.")
+      setPasswordErrorMessage(t("profile.security.errorRequired"))
       return
     }
 
     if (newPassword !== newPasswordRepeat) {
-      setPasswordErrorMessage("Yeni şifre ve yeni şifre tekrarı eşleşmiyor.")
+      setPasswordErrorMessage(t("profile.security.errorMismatch"))
       return
     }
 
     if (currentPassword === newPassword) {
-      setPasswordErrorMessage("Yeni şifre mevcut şifre ile aynı olamaz.")
+      setPasswordErrorMessage(t("profile.security.errorSamePassword"))
       return
     }
 
@@ -1162,7 +1188,7 @@ export function ProfilePanel({
       if (error instanceof Error) {
         setPasswordErrorMessage(error.message)
       } else {
-        setPasswordErrorMessage("Şifre değiştirilemedi.")
+        setPasswordErrorMessage(t("profile.security.errorFailed"))
       }
     } finally {
       setIsChangingPassword(false)
@@ -1187,14 +1213,14 @@ export function ProfilePanel({
 
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
-                Missio hesabı
+                {t("profile.account.badge")}
               </p>
               <h2 className="mt-1 truncate text-2xl font-black tracking-tight">
                 {user.full_name}
               </h2>
               <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-black text-cyan-100">
                 <BadgeCheck size={14} />
-                {getRoleLabel(user.role)}
+                {getTranslatedRoleLabel(user.role, t)}
               </div>
             </div>
           </div>
@@ -1203,22 +1229,22 @@ export function ProfilePanel({
         <div className="space-y-3 p-4">
           <InfoRow
             icon={<UserRound size={20} />}
-            label="Kullanıcı adı"
+            label={t("profile.info.username")}
             value={user.username}
           />
 
-          <InfoRow icon={<Mail size={20} />} label="E-posta" value={emailValue} />
+          <InfoRow icon={<Mail size={20} />} label={t("profile.info.email")} value={emailValue} />
 
           <InfoRow
             icon={<Building2 size={20} />}
-            label="İşletme ID"
-            value={user.business_id === null ? "İşletme yok" : String(user.business_id)}
+            label={t("profile.info.businessId")}
+            value={user.business_id === null ? t("profile.info.noBusiness") : String(user.business_id)}
           />
 
           <InfoRow
             icon={<ShieldCheck size={20} />}
-            label="Hesap durumu"
-            value={user.is_active ? "Aktif" : "Pasif"}
+            label={t("profile.info.accountStatus")}
+            value={user.is_active ? t("profile.status.active") : t("profile.status.passive")}
           />
         </div>
       </div>
@@ -1230,9 +1256,9 @@ export function ProfilePanel({
           </div>
 
           <div>
-            <h3 className="text-lg font-black tracking-tight">Profil bilgileri</h3>
+            <h3 className="text-lg font-black tracking-tight">{t("profile.form.title")}</h3>
             <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Ad soyad ve e-posta bilgilerini buradan güncelleyebilirsin.
+              {t("profile.form.description")}
             </p>
           </div>
         </div>
@@ -1258,7 +1284,7 @@ export function ProfilePanel({
                 full_name: event.target.value,
               }))
             }
-            placeholder="Ad soyad"
+            placeholder={t("profile.form.fullNamePlaceholder")}
             autoComplete="name"
             className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
           />
@@ -1271,7 +1297,7 @@ export function ProfilePanel({
                 email: event.target.value,
               }))
             }
-            placeholder="E-posta / isteğe bağlı"
+            placeholder={t("profile.form.emailPlaceholder")}
             type="email"
             autoComplete="email"
             className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
@@ -1284,7 +1310,7 @@ export function ProfilePanel({
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Save size={18} />
-            {isUpdatingProfile ? "Profil güncelleniyor..." : "Profil bilgilerimi kaydet"}
+            {isUpdatingProfile ? t("profile.form.saving") : t("profile.form.save")}
           </button>
         </div>
       </div>
@@ -1298,9 +1324,9 @@ export function ProfilePanel({
           </div>
 
           <div>
-            <h3 className="text-lg font-black tracking-tight">Güvenlik</h3>
+            <h3 className="text-lg font-black tracking-tight">{t("profile.security.title")}</h3>
             <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Mevcut şifreni doğrulayarak hesabının şifresini güvenli şekilde değiştirebilirsin.
+              {t("profile.security.description")}
             </p>
           </div>
         </div>
@@ -1326,7 +1352,7 @@ export function ProfilePanel({
                 current_password: event.target.value,
               }))
             }
-            placeholder="Mevcut şifre"
+            placeholder={t("profile.security.currentPassword")}
             type="password"
             autoComplete="current-password"
             className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
@@ -1340,7 +1366,7 @@ export function ProfilePanel({
                 new_password: event.target.value,
               }))
             }
-            placeholder="Yeni şifre"
+            placeholder={t("profile.security.newPassword")}
             type="password"
             autoComplete="new-password"
             className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
@@ -1354,7 +1380,7 @@ export function ProfilePanel({
                 new_password_repeat: event.target.value,
               }))
             }
-            placeholder="Yeni şifre tekrar"
+            placeholder={t("profile.security.newPasswordRepeat")}
             type="password"
             autoComplete="new-password"
             className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
@@ -1367,14 +1393,14 @@ export function ProfilePanel({
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <KeyRound size={18} />
-            {isChangingPassword ? "Şifre değiştiriliyor..." : "Şifremi değiştir"}
+            {isChangingPassword ? t("profile.security.saving") : t("profile.security.save")}
           </button>
 
           <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3">
             <div className="flex items-start gap-2">
               <Clock3 size={17} className="mt-0.5 shrink-0 text-[var(--missio-text-muted)]" />
               <p className="text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                Şifre değişikliği bu cihazdaki mevcut oturumu kapatmaz. Diğer cihazlardaki oturumları kapatma seçeneği ileride eklenecek.
+                {t("profile.security.info")}
               </p>
             </div>
           </div>
@@ -1389,9 +1415,9 @@ export function ProfilePanel({
             </div>
 
             <div className="min-w-0">
-              <h3 className="text-lg font-black tracking-tight">Push bildirimleri</h3>
+              <h3 className="text-lg font-black tracking-tight">{t("profile.push.title")}</h3>
               <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-                Kritik görev ve operasyon uyarılarını Firebase olmadan standart Web Push ile al.
+                {t("profile.push.description")}
               </p>
             </div>
           </div>
@@ -1403,7 +1429,7 @@ export function ProfilePanel({
                 : "shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-900 dark:text-slate-300"
             }
           >
-            {isPushEnabled ? "Açık" : "Kapalı"}
+            {isPushEnabled ? t("profile.push.enabled") : t("profile.push.disabled")}
           </span>
         </div>
 
@@ -1429,10 +1455,10 @@ export function ProfilePanel({
         >
           <span>
             {isRequestingPushPermission
-              ? "Bildirimler hazırlanıyor..."
+              ? t("profile.push.preparing")
               : isPushEnabled
-                ? "Web Push bildirimlerini kapat"
-                : "Web Push bildirimlerini aç"}
+                ? t("profile.push.disable")
+                : t("profile.push.enable")}
           </span>
 
           <span
@@ -1458,14 +1484,14 @@ export function ProfilePanel({
           disabled={!isPushEnabled || isSendingPushTest}
           className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSendingPushTest ? "Test bildirimi gönderiliyor..." : "Test bildirimi gönder"}
+          {isSendingPushTest ? t("profile.push.testSending") : t("profile.push.testSend")}
         </button>
       </div>
 
       <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
-        <h3 className="text-lg font-black tracking-tight">Hızlı ayarlar</h3>
+        <h3 className="text-lg font-black tracking-tight">{t("profile.quick.title")}</h3>
         <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-          Tema ve oturum işlemlerini buradan yönetebilirsin.
+          {t("profile.quick.description")}
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1475,7 +1501,7 @@ export function ProfilePanel({
             className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95"
           >
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-            Tema değiştir
+            {t("profile.quick.theme")}
           </button>
 
           <button
@@ -1484,7 +1510,7 @@ export function ProfilePanel({
             className="flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-black text-red-600 transition active:scale-95 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
           >
             <LogOut size={18} />
-            Çıkış yap
+            {t("profile.quick.logout")}
           </button>
         </div>
       </div>
@@ -1496,9 +1522,9 @@ export function ProfilePanel({
           </div>
 
           <div>
-            <h3 className="text-lg font-black tracking-tight">Mobil öncelikli kullanım</h3>
+            <h3 className="text-lg font-black tracking-tight">{t("profile.mobile.title")}</h3>
             <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              Missio; görev, kanıt fotoğrafı, konum ve gün sonu kontrolünü sahada hızlı kullanmak için tasarlanıyor.
+              {t("profile.mobile.description")}
             </p>
           </div>
         </div>

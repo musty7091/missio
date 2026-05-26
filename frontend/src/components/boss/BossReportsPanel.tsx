@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 import {
   AlertTriangle,
   CalendarDays,
@@ -23,9 +24,13 @@ type BossReportsPanelProps = {
 
 type ClosureItem = DailyOperationClosure["items"][number]
 
-function formatDate(value: string | null) {
+function formatDate(
+  value: string | null,
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   if (!value) {
-    return "Tarih yok"
+    return t("boss.report.date.none")
   }
 
   const date = new Date(value)
@@ -34,25 +39,29 @@ function formatDate(value: string | null) {
     return value
   }
 
-  return date.toLocaleDateString("tr-TR", {
+  return date.toLocaleDateString(language === "tr" ? "tr-TR" : "en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   })
 }
 
-function formatDateTime(value: string | null) {
+function formatDateTime(
+  value: string | null,
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   if (!value) {
-    return "Tarih yok"
+    return t("boss.report.date.none")
   }
 
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
-    return "Tarih yok"
+    return t("boss.report.date.none")
   }
 
-  return date.toLocaleString("tr-TR", {
+  return date.toLocaleString(language === "tr" ? "tr-TR" : "en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -61,16 +70,19 @@ function formatDateTime(value: string | null) {
   })
 }
 
-function getClosureStatusLabel(status: string) {
+function getClosureStatusLabel(
+  status: string,
+  t: (key: TranslationKey) => string,
+) {
   if (status === "closed_clean" || status === "closed") {
-    return "Temiz kapanış"
+    return t("boss.report.status.clean")
   }
 
   if (status === "closed_with_issues") {
-    return "Sorunlu kapanış"
+    return t("boss.report.status.withIssues")
   }
 
-  return "Kapanış"
+  return t("boss.report.status.default")
 }
 
 function getClosureStatusClassName(status: string) {
@@ -95,36 +107,40 @@ function getClosureIssueCount(closure: DailyOperationClosure) {
   )
 }
 
-function getTaskStatusLabel(status: string, requiresManagerApproval: boolean) {
+function getTaskStatusLabel(
+  status: string,
+  requiresManagerApproval: boolean,
+  t: (key: TranslationKey) => string,
+) {
   if (status === "assigned") {
-    return "Bekliyor"
+    return t("boss.report.task.status.assigned")
   }
 
   if (status === "in_progress") {
-    return "Devam ediyor"
+    return t("boss.report.task.status.inProgress")
   }
 
   if (status === "rejected") {
-    return "Reddedildi"
+    return t("boss.report.task.status.rejected")
   }
 
   if (status === "completed" && requiresManagerApproval) {
-    return "Onay bekliyor"
+    return t("boss.report.task.status.approvalPending")
   }
 
   if (status === "completed") {
-    return "Tamamlandı"
+    return t("boss.report.task.status.completed")
   }
 
   if (status === "approved") {
-    return "Onaylandı"
+    return t("boss.report.task.status.approved")
   }
 
   if (status === "cancelled") {
-    return "İptal"
+    return t("boss.report.task.status.cancelled")
   }
 
-  return "Durum yok"
+  return t("boss.report.task.status.none")
 }
 
 function getTaskStatusClassName(status: string, requiresManagerApproval: boolean) {
@@ -167,11 +183,14 @@ function isProblemItem(item: ClosureItem) {
   return false
 }
 
-function getAssignedPersonLabel(item: ClosureItem) {
+function getAssignedPersonLabel(
+  item: ClosureItem,
+  t: (key: TranslationKey) => string,
+) {
   return (
     item.assigned_to_user_full_name ||
     item.assigned_to_username ||
-    "Personel yok"
+    t("boss.report.task.noStaff")
   )
 }
 
@@ -186,6 +205,8 @@ function PdfDownloadButton({
   isDownloading: boolean
   onDownload: (closureId: number) => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <button
       type="button"
@@ -202,7 +223,7 @@ function PdfDownloadButton({
       ) : (
         <Download size={compact ? 15 : 17} />
       )}
-      {isDownloading ? "Hazırlanıyor" : "PDF indir"}
+      {isDownloading ? t("boss.report.pdf.preparing") : t("boss.report.pdf.download")}
     </button>
   )
 }
@@ -234,6 +255,8 @@ function ReportMetricCard({
 }
 
 function ReportTaskRow({ item }: { item: ClosureItem }) {
+  const { t } = useTranslation()
+
   return (
     <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -243,7 +266,7 @@ function ReportTaskRow({ item }: { item: ClosureItem }) {
           </p>
 
           <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-            {getAssignedPersonLabel(item)}
+            {getAssignedPersonLabel(item, t)}
           </p>
         </div>
 
@@ -253,13 +276,13 @@ function ReportTaskRow({ item }: { item: ClosureItem }) {
             item.requires_manager_approval,
           )}`}
         >
-          {getTaskStatusLabel(item.task_status, item.requires_manager_approval)}
+          {getTaskStatusLabel(item.task_status, item.requires_manager_approval, t)}
         </span>
       </div>
 
       <div className="flex flex-wrap gap-1.5 text-[0.62rem] font-black">
         <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-          {item.task_type === "routine" ? "Rutin" : "Tek seferlik"}
+          {item.task_type === "routine" ? t("boss.report.task.routine") : t("boss.report.task.oneTime")}
         </span>
 
         {item.requires_photo && (
@@ -270,19 +293,19 @@ function ReportTaskRow({ item }: { item: ClosureItem }) {
                 : "rounded-full bg-rose-100 px-2 py-1 text-rose-700 dark:bg-rose-950 dark:text-rose-200"
             }
           >
-            Fotoğraf {item.has_photo_evidence ? "var" : "yok"}
+            {item.has_photo_evidence ? t("boss.report.task.photoAvailable") : t("boss.report.task.photoMissing")}
           </span>
         )}
 
         {item.requires_location && (
           <span className="rounded-full bg-cyan-100 px-2 py-1 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
-            Konum şartı
+            {t("boss.report.task.locationRequired")}
           </span>
         )}
 
         {item.requires_manager_approval && (
           <span className="rounded-full bg-violet-100 px-2 py-1 text-violet-700 dark:bg-violet-950 dark:text-violet-200">
-            Onay şartı
+            {t("boss.report.task.approvalRequired")}
           </span>
         )}
       </div>
@@ -303,6 +326,7 @@ function ReportsDetailModal({
   onClose: () => void
   onDownloadPdf: (closureId: number) => void
 }) {
+  const { language, t } = useTranslation()
   const closureIssueCount = getClosureIssueCount(closure)
   const problemItems = closure.items.filter(isProblemItem)
 
@@ -339,15 +363,15 @@ function ReportsDetailModal({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Resmi gün sonu raporu
+              {t("boss.report.modal.eyebrow")}
             </p>
 
             <h2 className="mt-1 text-xl font-black text-[var(--missio-text-main)]">
-              {formatDate(closure.closure_date)}
+              {formatDate(closure.closure_date, language, t)}
             </h2>
 
             <p className="mt-1 text-sm font-bold text-[var(--missio-text-muted)]">
-              Kapatan: {closure.closed_by_user_full_name}
+              {t("boss.report.closedBy")}: {closure.closed_by_user_full_name}
             </p>
           </div>
 
@@ -355,7 +379,7 @@ function ReportsDetailModal({
             type="button"
             onClick={onClose}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-card-bg)] text-[var(--missio-text-main)] shadow-sm transition active:scale-95"
-            aria-label="Kapat"
+            aria-label={t("boss.report.modal.close")}
           >
             <X size={20} />
           </button>
@@ -363,7 +387,7 @@ function ReportsDetailModal({
 
         {isLoading && (
           <div className="mb-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-3 text-sm font-black text-cyan-800 dark:border-cyan-900 dark:bg-cyan-950 dark:text-cyan-200">
-            Rapor detayı yükleniyor...
+            {t("boss.report.modal.loading")}
           </div>
         )}
 
@@ -382,18 +406,18 @@ function ReportsDetailModal({
                 )}
 
                 <p className="text-sm font-black">
-                  {getClosureStatusLabel(closure.status)}
+                  {getClosureStatusLabel(closure.status, t)}
                 </p>
               </div>
 
               <p className="mt-1 text-xs font-bold opacity-80">
-                Kapanış saati: {formatDateTime(closure.closed_at_utc)}
+                {t("boss.report.modal.closingTime")}: {formatDateTime(closure.closed_at_utc, language, t)}
               </p>
             </div>
 
             <div className="rounded-2xl bg-white/70 px-3 py-2 text-center dark:bg-white/10">
               <p className="text-lg font-black">{closureIssueCount}</p>
-              <p className="text-[0.62rem] font-bold opacity-80">sorun</p>
+              <p className="text-[0.62rem] font-bold opacity-80">{t("boss.report.modal.issueUnit")}</p>
             </div>
           </div>
 
@@ -405,19 +429,19 @@ function ReportsDetailModal({
         </section>
 
         <section className="mb-3 grid grid-cols-2 gap-2">
-          <ReportMetricCard label="Toplam görev" value={closure.total_task_count} />
+          <ReportMetricCard label={t("boss.report.modal.metrics.totalTask")} value={closure.total_task_count} />
           <ReportMetricCard
-            label="Tamamlanan"
+            label={t("boss.report.modal.metrics.completed")}
             value={closure.completed_task_count}
             tone="success"
           />
           <ReportMetricCard
-            label="Onay bekleyen"
+            label={t("boss.report.modal.metrics.approvalPending")}
             value={closure.approval_pending_task_count}
             tone={closure.approval_pending_task_count > 0 ? "warning" : "success"}
           />
           <ReportMetricCard
-            label="Reddedilen"
+            label={t("boss.report.modal.metrics.rejected")}
             value={closure.rejected_task_count}
             tone={closure.rejected_task_count > 0 ? "danger" : "success"}
           />
@@ -427,11 +451,11 @@ function ReportsDetailModal({
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                Denetim gerektirenler
+                {t("boss.report.modal.reviewEyebrow")}
               </p>
 
               <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-                Sorunlu işler
+                {t("boss.report.modal.problemTitle")}
               </h3>
             </div>
 
@@ -442,7 +466,7 @@ function ReportsDetailModal({
 
           {problemItems.length === 0 ? (
             <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
-              Bu kapanışta sorunlu görev görünmüyor.
+              {t("boss.report.modal.noProblem")}
             </div>
           ) : (
             <div className="space-y-2">
@@ -456,17 +480,17 @@ function ReportsDetailModal({
         <section className="mb-3 rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
           <div className="mb-3">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Snapshot
+              {t("boss.report.modal.snapshotEyebrow")}
             </p>
 
             <h3 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-              Kapanış anındaki görev listesi
+              {t("boss.report.modal.snapshotTitle")}
             </h3>
           </div>
 
           {closure.items.length === 0 ? (
             <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3 text-sm font-bold text-[var(--missio-text-muted)]">
-              Bu raporda görev detayı bulunamadı.
+              {t("boss.report.modal.noTaskDetail")}
             </div>
           ) : (
             <div className="space-y-2">
@@ -488,6 +512,7 @@ function ReportsDetailModal({
 }
 
 export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
+  const { language, t } = useTranslation()
   const [closures, setClosures] = useState<DailyOperationClosure[]>([])
   const [selectedClosure, setSelectedClosure] =
     useState<DailyOperationClosure | null>(null)
@@ -499,7 +524,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
   async function loadReports() {
     if (!businessId) {
       setClosures([])
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage(t("boss.report.error.noBusiness"))
       return
     }
 
@@ -518,7 +543,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Gün sonu raporları yüklenemedi.")
+        setErrorMessage(t("boss.report.error.loadFailed"))
       }
     } finally {
       setIsLoading(false)
@@ -537,7 +562,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Rapor detayı yüklenemedi.")
+        setErrorMessage(t("boss.report.error.detailFailed"))
       }
     } finally {
       setIsDetailLoading(false)
@@ -564,7 +589,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("PDF indirilemedi.")
+        setErrorMessage(t("boss.report.error.pdfFailed"))
       }
     } finally {
       setDownloadingPdfClosureId(null)
@@ -590,16 +615,15 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
           <div className="min-w-0">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-100">
               <FileText size={14} />
-              İşletme Sahibi rapor arşivi
+              {t("boss.report.hero.badge")}
             </div>
 
             <h1 className="text-2xl font-black tracking-tight">
-              Gün sonu raporları
+              {t("boss.report.hero.title")}
             </h1>
 
             <p className="mt-2 max-w-sm text-sm font-bold leading-6 text-slate-300">
-              Kapanan günlerin resmi operasyon kayıtları burada saklanır.
-              Bu ekran canlı operasyon ekranı değildir.
+              {t("boss.report.hero.description")}
             </p>
           </div>
 
@@ -608,7 +632,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
             onClick={() => void loadReports()}
             disabled={isLoading}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-cyan-100 transition active:scale-95 disabled:opacity-60"
-            aria-label="Yenile"
+            aria-label={t("boss.report.refresh")}
           >
             <RefreshCw className={isLoading ? "animate-spin" : ""} size={19} />
           </button>
@@ -618,21 +642,21 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
           <div className="rounded-2xl bg-white/10 px-3 py-3">
             <p className="text-2xl font-black">{closures.length}</p>
             <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
-              Rapor
+              {t("boss.report.stat.report")}
             </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 px-3 py-3">
             <p className="text-2xl font-black">{cleanReportCount}</p>
             <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
-              Temiz
+              {t("boss.report.stat.clean")}
             </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 px-3 py-3">
             <p className="text-2xl font-black">{issueReportCount}</p>
             <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
-              Sorunlu
+              {t("boss.report.stat.issue")}
             </p>
           </div>
         </div>
@@ -648,27 +672,26 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Arşiv
+              {t("boss.report.archive.eyebrow")}
             </p>
 
             <h2 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-              Son 60 gün
+              {t("boss.report.archive.title")}
             </h2>
           </div>
 
           <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-700 dark:bg-cyan-950 dark:text-cyan-200">
-            {closures.length} kayıt
+            {closures.length} {closures.length === 1 ? t("boss.report.archive.record") : t("boss.report.archive.records")}
           </span>
         </div>
 
         {isLoading ? (
           <div className="rounded-2xl bg-[var(--missio-page-bg)] p-4 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-            Raporlar yükleniyor...
+            {t("boss.report.loading")}
           </div>
         ) : closures.length === 0 ? (
           <div className="rounded-2xl bg-[var(--missio-page-bg)] p-4 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-            Henüz gün sonu raporu oluşturulmamış. Manager günü kapattığında
-            rapor burada görünecek.
+            {t("boss.report.empty")}
           </div>
         ) : (
           <div className="space-y-2">
@@ -689,16 +712,16 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
                         />
 
                         <p className="text-base font-black text-[var(--missio-text-main)]">
-                          {formatDate(closure.closure_date)}
+                          {formatDate(closure.closure_date, language, t)}
                         </p>
                       </div>
 
                       <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-                        Kapatan: {closure.closed_by_user_full_name}
+                        {t("boss.report.closedBy")}: {closure.closed_by_user_full_name}
                       </p>
 
                       <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-                        Saat: {formatDateTime(closure.closed_at_utc)}
+                        {t("boss.report.time")}: {formatDateTime(closure.closed_at_utc, language, t)}
                       </p>
                     </div>
 
@@ -707,7 +730,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
                         closure.status,
                       )}`}
                     >
-                      {getClosureStatusLabel(closure.status)}
+                      {getClosureStatusLabel(closure.status, t)}
                     </span>
                   </div>
 
@@ -717,7 +740,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
                         {closure.total_task_count}
                       </p>
                       <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                        Toplam
+                        {t("boss.report.total")}
                       </p>
                     </div>
 
@@ -726,7 +749,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
                         {closure.completed_task_count}
                       </p>
                       <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                        Tamam
+                        {t("boss.report.done")}
                       </p>
                     </div>
 
@@ -741,7 +764,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
                         {closureIssueCount}
                       </p>
                       <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                        Sorun
+                        {t("boss.report.issue")}
                       </p>
                     </div>
                   </div>
@@ -759,7 +782,7 @@ export function BossReportsPanel({ businessId }: BossReportsPanelProps) {
                       className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-4 py-2 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition active:scale-95"
                     >
                       <Eye size={17} />
-                      Detay
+                      {t("boss.report.detail")}
                     </button>
 
                     <PdfDownloadButton

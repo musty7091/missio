@@ -1,4 +1,4 @@
-import {
+﻿import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
@@ -13,16 +13,16 @@ import {
   UsersRound,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 import {
   listBusinessUsers,
   type BusinessUser,
 } from "../../services/businessUserService"
 import { listBusinessTasks } from "../../services/taskService"
-import { TaskCard } from "../tasks/TaskCard"
-import { TaskAssignSheet } from "../tasks/TaskAssignSheet"
-import type { TodayTask } from "../../types/task"
+import type { TaskPriority, TaskStatus, TodayTask } from "../../types/task"
 import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
-import { getPriorityLabel, getStatusLabel } from "../../utils/taskLabels"
+import { TaskAssignSheet } from "../tasks/TaskAssignSheet"
+import { TaskCard } from "../tasks/TaskCard"
 
 type ManagerTasksPanelProps = {
   businessId: number | null
@@ -49,19 +49,22 @@ function getLocalTodayDateKey() {
   return `${year}-${month}-${day}`
 }
 
-
-function formatTaskTime(value: string | null) {
+function formatTaskTime(
+  value: string | null,
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   if (!value) {
-    return "Saat yok"
+    return t("manager.operations.time.none")
   }
 
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
-    return "Saat yok"
+    return t("manager.operations.time.none")
   }
 
-  return date.toLocaleTimeString("tr-TR", {
+  return date.toLocaleTimeString(language === "tr" ? "tr-TR" : "en-GB", {
     hour: "2-digit",
     minute: "2-digit",
   })
@@ -84,7 +87,39 @@ function getInitials(name: string) {
   return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase()
 }
 
-function getStaffName(task: TodayTask) {
+function getStatusTranslationKey(status: TaskStatus): TranslationKey {
+  if (status === "assigned") return "task.status.assigned"
+  if (status === "in_progress") return "task.status.inProgress"
+  if (status === "completed") return "task.status.completed"
+  if (status === "approved") return "task.status.approved"
+  if (status === "rejected") return "task.status.rejected"
+  if (status === "cancelled") return "task.status.cancelled"
+
+  return "task.status.assigned"
+}
+
+function getPriorityTranslationKey(priority: TaskPriority): TranslationKey {
+  if (priority === "urgent") return "task.priority.urgent"
+  if (priority === "high") return "task.priority.high"
+  if (priority === "normal") return "task.priority.normal"
+  if (priority === "low") return "task.priority.low"
+
+  return "task.priority.normal"
+}
+
+function getTaskTypeLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
+  return task.taskType === "routine"
+    ? t("task.type.routine")
+    : t("task.type.oneTime")
+}
+
+function getStaffName(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.assignedToUserFullName) {
     return task.assignedToUserFullName
   }
@@ -94,18 +129,21 @@ function getStaffName(task: TodayTask) {
   }
 
   if (task.assignedToUserId) {
-    return `Personel ID #${task.assignedToUserId}`
+    return `${t("manager.operations.staff.unknownIdPrefix")} #${task.assignedToUserId}`
   }
 
-  return "Personel yok"
+  return t("manager.operations.staff.unknown")
 }
 
-function getReadableStatusLabel(task: TodayTask) {
+function getReadableStatusLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.status === "completed" && !task.requiresManagerApproval) {
-    return "Tamamlandı"
+    return t("task.status.completedNoApproval")
   }
 
-  return getStatusLabel(task.status)
+  return t(getStatusTranslationKey(task.status))
 }
 
 function getStaffMetrics(tasks: TodayTask[], staffId: number): StaffMetrics {
@@ -188,6 +226,7 @@ function StaffCard({
   busyTaskId: number | null
   onOpenTaskDetails: (task: TodayTask) => void
 }) {
+  const { language, t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
   const hasTasks = staffTasks.length > 0
 
@@ -221,7 +260,7 @@ function StaffCard({
               {metrics.total}
             </p>
             <p className="mt-1 text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              görev
+              {t("manager.operations.staff.task")}
             </p>
           </div>
         </div>
@@ -232,7 +271,7 @@ function StaffCard({
               {metrics.open}
             </p>
             <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              Açık
+              {t("manager.operations.staff.open")}
             </p>
           </div>
 
@@ -241,7 +280,7 @@ function StaffCard({
               {metrics.approvalPending}
             </p>
             <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              Onay
+              {t("manager.operations.staff.approval")}
             </p>
           </div>
 
@@ -256,7 +295,7 @@ function StaffCard({
               {metrics.rejected}
             </p>
             <p className="text-[0.58rem] font-black text-[var(--missio-text-muted)]">
-              Red
+              {t("manager.operations.staff.rejected")}
             </p>
           </div>
         </div>
@@ -264,9 +303,9 @@ function StaffCard({
         <div className="mt-3 rounded-2xl bg-[var(--missio-page-bg)] px-3 py-2 text-center text-xs font-black text-[var(--missio-text-muted)]">
           {hasTasks
             ? isExpanded
-              ? "Görevleri gizle"
-              : "Görevleri göster"
-            : "Bugün görev yok"}
+              ? t("manager.operations.staff.hideTasks")
+              : t("manager.operations.staff.showTasks")
+            : t("manager.operations.staff.noTasksToday")}
         </div>
       </button>
 
@@ -282,15 +321,15 @@ function StaffCard({
             >
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                 <span className={getTaskStatusClass(task)}>
-                  {getReadableStatusLabel(task)}
+                  {getReadableStatusLabel(task, t)}
                 </span>
 
                 <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200">
-                  {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
+                  {getTaskTypeLabel(task, t)}
                 </span>
 
                 <span className="rounded-full bg-[var(--missio-card-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
-                  {getPriorityLabel(task.priority)}
+                  {t(getPriorityTranslationKey(task.priority))}
                 </span>
               </div>
 
@@ -301,27 +340,27 @@ function StaffCard({
               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[0.68rem] font-bold text-[var(--missio-text-muted)]">
                 <span className="inline-flex items-center gap-1">
                   <CalendarClock size={12} />
-                  {formatTaskTime(task.dueAtUtc)}
+                  {formatTaskTime(task.dueAtUtc, language, t)}
                 </span>
 
                 {task.requiresPhoto && (
                   <span className="inline-flex items-center gap-1">
                     <ImageIcon size={12} />
-                    Foto
+                    {t("task.card.photo")}
                   </span>
                 )}
 
                 {task.requiresLocation && (
                   <span className="inline-flex items-center gap-1">
                     <MapPin size={12} />
-                    Konum
+                    {t("task.card.location")}
                   </span>
                 )}
 
                 {task.requiresManagerApproval && (
                   <span className="inline-flex items-center gap-1">
                     <FileCheck2 size={12} />
-                    Onay
+                    {t("task.card.approval")}
                   </span>
                 )}
               </div>
@@ -334,7 +373,8 @@ function StaffCard({
 }
 
 function ManagerTaskRow({ task }: { task: TodayTask }) {
-  const staffName = getStaffName(task)
+  const { language, t } = useTranslation()
+  const staffName = getStaffName(task, t)
 
   return (
     <article className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
@@ -346,15 +386,15 @@ function ManagerTaskRow({ task }: { task: TodayTask }) {
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex flex-wrap gap-1.5">
             <span className={getTaskStatusClass(task)}>
-              {getReadableStatusLabel(task)}
+              {getReadableStatusLabel(task, t)}
             </span>
 
             <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[0.6rem] font-black text-violet-700 dark:bg-violet-950 dark:text-violet-200">
-              {task.taskType === "routine" ? "Rutin" : "Tek seferlik"}
+              {getTaskTypeLabel(task, t)}
             </span>
 
             <span className="rounded-full bg-[var(--missio-page-bg)] px-2 py-0.5 text-[0.6rem] font-black text-[var(--missio-text-muted)]">
-              {getPriorityLabel(task.priority)}
+              {t(getPriorityTranslationKey(task.priority))}
             </span>
           </div>
 
@@ -370,27 +410,27 @@ function ManagerTaskRow({ task }: { task: TodayTask }) {
 
             <span className="inline-flex items-center gap-1">
               <CalendarClock size={12} />
-              {formatTaskTime(task.dueAtUtc)}
+              {formatTaskTime(task.dueAtUtc, language, t)}
             </span>
 
             {task.requiresPhoto && (
               <span className="inline-flex items-center gap-1">
                 <ImageIcon size={12} />
-                Foto
+                {t("task.card.photo")}
               </span>
             )}
 
             {task.requiresLocation && (
               <span className="inline-flex items-center gap-1">
                 <MapPin size={12} />
-                Konum
+                {t("task.card.location")}
               </span>
             )}
 
             {task.requiresManagerApproval && (
               <span className="inline-flex items-center gap-1">
                 <FileCheck2 size={12} />
-                Onay
+                {t("task.card.approval")}
               </span>
             )}
           </div>
@@ -400,7 +440,6 @@ function ManagerTaskRow({ task }: { task: TodayTask }) {
   )
 }
 
-
 export function ManagerTasksPanel({
   businessId,
   currentUserId,
@@ -408,6 +447,7 @@ export function ManagerTasksPanel({
   onOpenOwnTaskDetails,
   onChanged,
 }: ManagerTasksPanelProps) {
+  const { t } = useTranslation()
   const [users, setUsers] = useState<BusinessUser[]>([])
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isComposerOpen, setIsComposerOpen] = useState(false)
@@ -453,10 +493,9 @@ export function ManagerTasksPanel({
     [tasks, currentUserId],
   )
 
-
   async function loadManagerData() {
     if (businessId === null) {
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage(t("manager.operations.error.noBusiness"))
       return
     }
 
@@ -480,7 +519,7 @@ export function ManagerTasksPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Yönetici görev verileri alınamadı.")
+        setErrorMessage(t("manager.operations.error.loadFailed"))
       }
     } finally {
       setIsLoading(false)
@@ -490,7 +529,6 @@ export function ManagerTasksPanel({
   useEffect(() => {
     void loadManagerData()
   }, [businessId])
-
 
   async function handleTaskCreated() {
     await loadManagerData()
@@ -504,15 +542,15 @@ export function ManagerTasksPanel({
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-200">
               <ClipboardCheck size={14} />
-              Operasyon merkezi
+              {t("manager.operations.hero.badge")}
             </div>
 
             <h2 className="mt-3 text-2xl font-black leading-tight">
-              Bugünkü görevler
+              {t("manager.operations.hero.title")}
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-5 text-slate-300">
-              Personel işleri, açık görevler ve onay bekleyen işler tek ekranda.
+              {t("manager.operations.hero.description")}
             </p>
           </div>
 
@@ -521,18 +559,18 @@ export function ManagerTasksPanel({
             onClick={() => void loadManagerData()}
             disabled={isLoading}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-cyan-200 transition active:scale-95 disabled:opacity-60"
-            aria-label="Yenile"
-            title="Yenile"
+            aria-label={t("manager.operations.refresh")}
+            title={t("manager.operations.refresh")}
           >
             <RefreshCw size={19} />
           </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <StatTile label="Toplam görev" value={operationStats.total} />
-          <StatTile label="Açık iş" value={operationStats.open} tone="warning" />
-          <StatTile label="Onay bekleyen" value={operationStats.approvalPending} />
-          <StatTile label="Tamamlanan" value={operationStats.done} tone="success" />
+          <StatTile label={t("manager.operations.stat.total")} value={operationStats.total} />
+          <StatTile label={t("manager.operations.stat.open")} value={operationStats.open} tone="warning" />
+          <StatTile label={t("manager.operations.stat.approval")} value={operationStats.approvalPending} />
+          <StatTile label={t("manager.operations.stat.done")} value={operationStats.done} tone="success" />
         </div>
       </div>
 
@@ -554,10 +592,10 @@ export function ManagerTasksPanel({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-black text-[var(--missio-text-main)]">
-              Görevlerim
+              {t("manager.operations.myTasks.title")}
             </h3>
             <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-              Yönetici olarak sana atanan işler
+              {t("manager.operations.myTasks.description")}
             </p>
           </div>
 
@@ -568,7 +606,7 @@ export function ManagerTasksPanel({
 
         {myTasks.length === 0 ? (
           <div className="rounded-[1.4rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-4 text-center text-sm font-bold text-[var(--missio-text-muted)]">
-            Bugün sana atanmış görev yok.
+            {t("manager.operations.myTasks.empty")}
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -590,17 +628,17 @@ export function ManagerTasksPanel({
         className="mb-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-[1.5rem] bg-[var(--missio-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95"
       >
         <Plus size={20} />
-        Yeni görev ata
+        {t("manager.operations.assignNew")}
       </button>
 
       <div className="mb-4">
         <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-black text-[var(--missio-text-main)]">
-              Personel durumu
+              {t("manager.operations.staff.title")}
             </h3>
             <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-              Bugünkü görev dağılımı
+              {t("manager.operations.staff.description")}
             </p>
           </div>
 
@@ -612,7 +650,7 @@ export function ManagerTasksPanel({
 
         {staffUsers.length === 0 ? (
           <div className="rounded-[1.6rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 text-center text-sm font-bold text-[var(--missio-text-muted)]">
-            Aktif personel bulunamadı.
+            {t("manager.operations.staff.empty")}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2.5">
@@ -639,10 +677,10 @@ export function ManagerTasksPanel({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-black text-[var(--missio-text-main)]">
-            Son görevler
+            {t("manager.operations.recent.title")}
           </h3>
           <p className="text-xs font-bold text-[var(--missio-text-muted)]">
-            Bugün oluşturulan veya takip edilen işler
+            {t("manager.operations.recent.description")}
           </p>
         </div>
 
@@ -653,7 +691,7 @@ export function ManagerTasksPanel({
 
       {isLoading ? (
         <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 text-sm font-black text-[var(--missio-text-muted)]">
-          Yönetici görev ekranı yükleniyor...
+          {t("manager.operations.loading")}
         </div>
       ) : tasks.length === 0 ? (
         <div className="rounded-[1.7rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-6 text-center">
@@ -661,10 +699,10 @@ export function ManagerTasksPanel({
             <ClipboardList size={28} />
           </div>
 
-          <h3 className="mt-4 text-lg font-black">Bugün atanmış görev yok</h3>
+          <h3 className="mt-4 text-lg font-black">{t("manager.operations.empty.title")}</h3>
 
           <p className="mt-2 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-            Yeni görev ata butonuyla temiz veriden ilk görevi oluşturabilirsin.
+            {t("manager.operations.empty.description")}
           </p>
         </div>
       ) : (
@@ -688,5 +726,3 @@ export function ManagerTasksPanel({
     </section>
   )
 }
-
-

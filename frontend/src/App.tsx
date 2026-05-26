@@ -30,6 +30,7 @@ import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
 import { TaskFilterTabs, type TaskListFilter } from "./components/tasks/TaskFilterTabs"
 import { TaskGroupHeader } from "./components/tasks/TaskGroupHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
+import { useTranslation } from "./i18n/language"
 import { getCurrentUser } from "./services/authService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
 import {
@@ -161,26 +162,25 @@ function getBottomNotificationCount(tasks: TodayTask[]) {
 }
 
 function ComingSoonPanel({ tab }: ComingSoonPanelProps) {
+  const { t } = useTranslation()
+
   const panelInfo = {
     notifications: {
-      eyebrow: "Bildirim merkezi",
-      title: "Bildirimler hazırlanıyor",
-      description:
-        "Görev atama, onay, ret ve gün sonu uyarıları burada toplanacak.",
+      eyebrow: t("comingSoon.notifications.eyebrow"),
+      title: t("comingSoon.notifications.title"),
+      description: t("comingSoon.notifications.description"),
       icon: Bell,
     },
     reports: {
-      eyebrow: "Operasyon raporları",
-      title: "Raporlar hazırlanıyor",
-      description:
-        "Günlük görev performansı, eksik işler ve personel özeti bu ekranda gösterilecek.",
+      eyebrow: t("comingSoon.reports.eyebrow"),
+      title: t("comingSoon.reports.title"),
+      description: t("comingSoon.reports.description"),
       icon: BarChart3,
     },
     profile: {
-      eyebrow: "Kullanıcı profili",
-      title: "Profil hazırlanıyor",
-      description:
-        "Kullanıcı bilgileri, rol, tema tercihi ve hesap ayarları burada yer alacak.",
+      eyebrow: t("comingSoon.profile.eyebrow"),
+      title: t("comingSoon.profile.title"),
+      description: t("comingSoon.profile.description"),
       icon: UserRound,
     },
   }[tab]

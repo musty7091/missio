@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+﻿import { useEffect, useMemo, useState, type ReactNode } from "react"
 import {
   AlertTriangle,
   BarChart3,
@@ -9,6 +9,7 @@ import {
   UsersRound,
   XCircle,
 } from "lucide-react"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 
 import {
   listDailyOperationClosures,
@@ -45,18 +46,22 @@ function getLocalTodayDateKey() {
   return `${year}-${month}-${day}`
 }
 
-function formatDateTime(value: string | null) {
+function formatDateTime(
+  value: string | null,
+  language: "tr" | "en",
+  t: (key: TranslationKey) => string,
+) {
   if (!value) {
-    return "Tarih yok"
+    return t("boss.summary.date.none")
   }
 
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
-    return "Tarih yok"
+    return t("boss.summary.date.none")
   }
 
-  return date.toLocaleString("tr-TR", {
+  return date.toLocaleString(language === "tr" ? "tr-TR" : "en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -65,20 +70,23 @@ function formatDateTime(value: string | null) {
   })
 }
 
-function getClosureStatusLabel(status: string) {
+function getClosureStatusLabel(
+  status: string,
+  t: (key: TranslationKey) => string,
+) {
   if (status === "closed_clean") {
-    return "Temiz kapanış"
+    return t("boss.summary.closure.clean")
   }
 
   if (status === "closed_with_issues") {
-    return "Sorunlu kapanış"
+    return t("boss.summary.closure.withIssues")
   }
 
   if (status === "closed") {
-    return "Gün kapanışııldı"
+    return t("boss.summary.closure.closed")
   }
 
-  return "Kapanış kaydı"
+  return t("boss.summary.closure.record")
 }
 
 function isTaskCompletedOrClosed(task: TodayTask) {
@@ -106,24 +114,27 @@ function isProblemTask(task: TodayTask) {
   )
 }
 
-function getProblemLabel(task: TodayTask) {
+function getProblemLabel(
+  task: TodayTask,
+  t: (key: TranslationKey) => string,
+) {
   if (task.status === "assigned") {
-    return "Bekliyor"
+    return t("boss.summary.problem.waiting")
   }
 
   if (task.status === "in_progress") {
-    return "Devam ediyor"
+    return t("boss.summary.problem.inProgress")
   }
 
   if (task.status === "rejected") {
-    return "Reddedildi"
+    return t("boss.summary.problem.rejected")
   }
 
   if (isApprovalWaiting(task)) {
-    return "Onay bekliyor"
+    return t("boss.summary.problem.approval")
   }
 
-  return "Denetim"
+  return t("boss.summary.problem.audit")
 }
 
 function getStaffRows(tasks: TodayTask[]) {
@@ -144,7 +155,7 @@ function getStaffRows(tasks: TodayTask[]) {
         name:
           task.assignedToUserFullName ||
           task.assignedToUsername ||
-          "Atanmamış personel",
+          "Unassigned staff",
         username: task.assignedToUsername,
         total: 0,
         completed: 0,
@@ -235,6 +246,7 @@ export function BossDashboardPanel({
   onOpenApprovals,
   onOpenReports,
 }: BossDashboardPanelProps) {
+  const { language, t } = useTranslation()
   const todayKey = getLocalTodayDateKey()
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [closures, setClosures] = useState<DailyOperationClosure[]>([])
@@ -245,7 +257,7 @@ export function BossDashboardPanel({
     if (!businessId) {
       setTasks([])
       setClosures([])
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage(t("boss.summary.error.noBusiness"))
       return
     }
 
@@ -273,7 +285,7 @@ export function BossDashboardPanel({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("İşletme sahibi ekranı yüklenemedi.")
+        setErrorMessage(t("boss.summary.error.loadFailed"))
       }
     } finally {
       setIsLoading(false)
@@ -296,8 +308,8 @@ export function BossDashboardPanel({
   const staffRows = useMemo(() => getStaffRows(tasks), [tasks])
 
   const closureStatusText = todayClosure
-    ? getClosureStatusLabel(todayClosure.status)
-    : "Kapanış bekliyor"
+    ? getClosureStatusLabel(todayClosure.status, t)
+    : t("boss.summary.closure.waiting")
 
   const closureStatusClassName =
     todayClosure?.status === "closed_with_issues"
@@ -313,15 +325,15 @@ export function BossDashboardPanel({
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-cyan-100">
               <ShieldCheck size={14} />
-              İşletme sahibi kontrol merkezi
+              {t("boss.summary.hero.badge")}
             </div>
 
             <h1 className="text-2xl font-black tracking-tight">
-              İşletme özeti
+              {t("boss.summary.hero.title")}
             </h1>
 
             <p className="mt-2 max-w-sm text-sm font-bold leading-6 text-slate-300">
-              Günün görev, onay, personel ve kapanış durumunu tek ekrandan takip et.
+              {t("boss.summary.hero.description")}
             </p>
           </div>
 
@@ -330,7 +342,7 @@ export function BossDashboardPanel({
             onClick={() => void loadDashboard()}
             disabled={isLoading}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-cyan-100 transition active:scale-95 disabled:opacity-60"
-            aria-label="Yenile"
+            aria-label={t("boss.summary.refresh")}
           >
             <RefreshCw className={isLoading ? "animate-spin" : ""} size={19} />
           </button>
@@ -340,14 +352,14 @@ export function BossDashboardPanel({
           <div className="rounded-2xl bg-white/10 px-3 py-3">
             <p className="text-2xl font-black">{tasks.length}</p>
             <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
-              Bugünkü görev
+              {t("boss.summary.metric.todayTask")}
             </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 px-3 py-3">
             <p className="text-2xl font-black">{completedCount}</p>
             <p className="mt-1 text-[0.68rem] font-bold text-slate-300">
-              Tamamlanan
+              {t("boss.summary.metric.completed")}
             </p>
           </div>
         </div>
@@ -356,7 +368,7 @@ export function BossDashboardPanel({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                Gün kapanışı
+                {t("boss.summary.closure.title")}
               </p>
               <p className="mt-1 text-sm font-black text-white">
                 {closureStatusText}
@@ -364,13 +376,16 @@ export function BossDashboardPanel({
             </div>
 
             <span className={`rounded-full px-3 py-1 text-xs font-black ${closureStatusClassName}`}>
-              {todayClosure ? "Rapor hazır" : "Rapor bekliyor"}
+              {todayClosure
+                ? t("boss.summary.closure.reportReady")
+                : t("boss.summary.closure.reportWaiting")}
             </span>
           </div>
 
           {todayClosure ? (
             <p className="mt-2 text-xs font-bold leading-5 text-slate-300">
-              Kapatan: {todayClosure.closed_by_user_full_name} · {formatDateTime(todayClosure.closed_at_utc)}
+              {t("boss.summary.closure.closedBy")}: {todayClosure.closed_by_user_full_name} ·{" "}
+              {formatDateTime(todayClosure.closed_at_utc, language, t)}
             </p>
           ) : (
             <button
@@ -379,7 +394,7 @@ export function BossDashboardPanel({
               className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 py-2 text-sm font-black text-slate-950 shadow-lg shadow-cyan-400/20 transition active:scale-95"
             >
               <BarChart3 size={17} />
-              Gün kapanışı raporuna git
+              {t("boss.summary.closure.goReport")}
             </button>
           )}
         </div>
@@ -398,33 +413,33 @@ export function BossDashboardPanel({
 
       <section className="grid grid-cols-2 gap-2.5">
         <MetricCard
-          label="Açık iş"
+          label={t("boss.summary.cards.open")}
           value={problemTasks.length}
-          helper="Bekleyen, işlemde, red veya onay"
+          helper={t("boss.summary.cards.openDesc")}
           icon={<AlertTriangle size={19} />}
           tone={problemTasks.length > 0 ? "amber" : "emerald"}
         />
 
         <MetricCard
-          label="Onay"
+          label={t("boss.summary.cards.approval")}
           value={approvalWaitingCount}
-          helper="Yönetici/işletme sahibi onayı bekleyen"
+          helper={t("boss.summary.cards.approvalDesc")}
           icon={<ClipboardCheck size={19} />}
           tone={approvalWaitingCount > 0 ? "amber" : "emerald"}
         />
 
         <MetricCard
-          label="Red"
+          label={t("boss.summary.cards.rejected")}
           value={rejectedCount}
-          helper="Düzeltilmesi gereken görev"
+          helper={t("boss.summary.cards.rejectedDesc")}
           icon={<XCircle size={19} />}
           tone={rejectedCount > 0 ? "rose" : "emerald"}
         />
 
         <MetricCard
-          label="Personel"
+          label={t("boss.summary.cards.staff")}
           value={staffRows.length}
-          helper="Bugün görev alan kişi"
+          helper={t("boss.summary.cards.staffDesc")}
           icon={<UsersRound size={19} />}
           tone="cyan"
         />
@@ -434,10 +449,10 @@ export function BossDashboardPanel({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Denetim
+              {t("boss.summary.audit.eyebrow")}
             </p>
             <h2 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-              İnceleme gereken işler
+              {t("boss.summary.audit.title")}
             </h2>
           </div>
 
@@ -446,7 +461,7 @@ export function BossDashboardPanel({
             onClick={onOpenApprovals}
             className="rounded-full bg-[var(--missio-page-bg)] px-3 py-1.5 text-xs font-black text-[var(--missio-text-main)]"
           >
-            Onaya git
+            {t("boss.summary.audit.goApproval")}
           </button>
         </div>
 
@@ -457,9 +472,9 @@ export function BossDashboardPanel({
             </div>
 
             <div>
-              <p className="text-sm font-black">Kritik açık iş görünmüyor</p>
+              <p className="text-sm font-black">{t("boss.summary.audit.cleanTitle")}</p>
               <p className="mt-1 text-xs font-bold">
-                Bugünkü operasyon kontrol altında.
+                {t("boss.summary.audit.cleanDescription")}
               </p>
             </div>
           </div>
@@ -476,12 +491,14 @@ export function BossDashboardPanel({
                       {task.title}
                     </p>
                     <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-                      {task.assignedToUserFullName || task.assignedToUsername || "Personel yok"}
+                      {task.assignedToUserFullName ||
+                        task.assignedToUsername ||
+                        t("boss.summary.audit.noStaff")}
                     </p>
                   </div>
 
                   <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-black text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                    {getProblemLabel(task)}
+                    {getProblemLabel(task, t)}
                   </span>
                 </div>
               </div>
@@ -494,10 +511,10 @@ export function BossDashboardPanel({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Personel
+              {t("boss.summary.staff.eyebrow")}
             </p>
             <h2 className="mt-1 text-base font-black text-[var(--missio-text-main)]">
-              Bugünkü personel özeti
+              {t("boss.summary.staff.title")}
             </h2>
           </div>
 
@@ -506,7 +523,7 @@ export function BossDashboardPanel({
 
         {staffRows.length === 0 ? (
           <div className="rounded-2xl bg-[var(--missio-page-bg)] p-4 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-            Bugün personel görevi görünmüyor.
+            {t("boss.summary.staff.empty")}
           </div>
         ) : (
           <div className="space-y-2">
@@ -518,7 +535,7 @@ export function BossDashboardPanel({
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-100 text-sm font-black text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
-                      {row.name.slice(0, 2).toLocaleUpperCase("tr-TR")}
+                      {row.name.slice(0, 2).toLocaleUpperCase(language === "tr" ? "tr-TR" : "en-GB")}
                     </div>
 
                     <div>
@@ -538,7 +555,7 @@ export function BossDashboardPanel({
                       {row.total}
                     </p>
                     <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                      görev
+                      {t("boss.summary.staff.task")}
                     </p>
                   </div>
                 </div>
@@ -549,7 +566,7 @@ export function BossDashboardPanel({
                       {row.completed}
                     </p>
                     <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                      Tamam
+                      {t("boss.summary.staff.done")}
                     </p>
                   </div>
 
@@ -558,7 +575,7 @@ export function BossDashboardPanel({
                       {row.open + row.approvalWaiting}
                     </p>
                     <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                      Denetim
+                      {t("boss.summary.staff.audit")}
                     </p>
                   </div>
 
@@ -567,7 +584,7 @@ export function BossDashboardPanel({
                       {row.rejected}
                     </p>
                     <p className="text-[0.62rem] font-bold text-[var(--missio-text-muted)]">
-                      Red
+                      {t("boss.summary.staff.rejected")}
                     </p>
                   </div>
                 </div>
@@ -576,7 +593,6 @@ export function BossDashboardPanel({
           </div>
         )}
       </section>
-
     </div>
   )
 }
