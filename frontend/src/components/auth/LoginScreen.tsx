@@ -1,4 +1,4 @@
-import {
+﻿import {
   AlertCircle,
   Building2,
   Camera,
@@ -16,11 +16,13 @@ import {
 } from "lucide-react"
 import type { FormEvent, ReactNode } from "react"
 import { useState } from "react"
+import { LanguageSelector } from "../language/LanguageSelector"
 import { getCurrentUser, loginUser } from "../../services/authService"
 import { setAccessToken } from "../../services/authTokenStorage"
 import { ApiError } from "../../services/httpClient"
 import type { UserMeResponse } from "../../types/auth"
 import type { ThemeMode } from "../../types/task"
+import { useTranslation, type TranslationKey } from "../../i18n/language"
 
 type LoginScreenProps = {
   theme: ThemeMode
@@ -94,39 +96,43 @@ function MissioLogoMark() {
   )
 }
 
-function getReadableLoginErrorMessage(error: unknown) {
+function getReadableLoginErrorMessage(
+  error: unknown,
+  t: (key: TranslationKey) => string,
+) {
   if (error instanceof ApiError) {
     if (error.status === 0) {
-      return "Sunucuya bağlanılamadı. Lütfen internet bağlantını ve uygulama adresini kontrol et."
+      return t("login.error.serverUnavailable")
     }
 
     if (error.status === 401) {
-      return "İşletme kodu, kullanıcı adı veya şifre hatalı."
+      return t("login.error.invalidCredentials")
     }
 
     if (error.status === 403) {
-      return error.message || "Bu hesapla giriş yapılamıyor."
+      return error.message || t("login.error.forbidden")
     }
 
     if (error.status === 429) {
-      return "Çok fazla giriş denemesi yapıldı. Lütfen biraz bekleyip tekrar dene."
+      return t("login.error.tooManyAttempts")
     }
 
     if (error.status >= 500) {
-      return "Sunucu tarafında geçici bir sorun oluştu. Lütfen tekrar dene."
+      return t("login.error.serverError")
     }
 
-    return error.message || "Giriş işlemi başarısız oldu."
+    return error.message || t("login.error.failed")
   }
 
   if (error instanceof Error) {
     return error.message
   }
 
-  return "Giriş işlemi başarısız oldu."
+  return t("login.error.failed")
 }
 
 export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScreenProps) {
+  const { t } = useTranslation()
   const [businessSlug, setBusinessSlug] = useState("")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -162,12 +168,12 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
     const cleanUsername = username.trim()
 
     if (!cleanUsername) {
-      setErrorMessage("Kullanıcı adı gerekli.")
+      setErrorMessage(t("login.error.usernameRequired"))
       return
     }
 
     if (!password) {
-      setErrorMessage("Şifre gerekli.")
+      setErrorMessage(t("login.error.passwordRequired"))
       return
     }
 
@@ -186,7 +192,7 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
       const currentUser = await getCurrentUser()
       onLoginSuccess(currentUser)
     } catch (error) {
-      setErrorMessage(getReadableLoginErrorMessage(error))
+      setErrorMessage(getReadableLoginErrorMessage(error, t))
     } finally {
       setIsSubmitting(false)
     }
@@ -198,15 +204,15 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
         <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-cyan-500/20 via-blue-500/10 to-transparent blur-3xl dark:from-cyan-400/20" />
         <div className="pointer-events-none absolute -right-24 top-16 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl" />
 
-        <header className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <header className="relative z-10 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <MissioLogoMark />
 
-            <div>
-              <p className="text-2xl font-black leading-none tracking-tight text-[var(--missio-text-main)]">
+            <div className="min-w-0">
+              <p className="truncate text-2xl font-black leading-none tracking-tight text-[var(--missio-text-main)]">
                 Missio
               </p>
-              <p className="mt-1 text-sm font-bold tracking-wide text-cyan-500">
+              <p className="mt-1 truncate text-sm font-bold tracking-wide text-cyan-500">
                 Mission is possible.
               </p>
             </div>
@@ -215,14 +221,19 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
           <button
             type="button"
             onClick={onToggleTheme}
-            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm transition active:scale-95"
-            aria-label="Tema değiştir"
+            className="shrink-0 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm transition active:scale-95"
+            aria-label={t("theme.toggle")}
+            title={t("theme.toggle")}
           >
             {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
           </button>
         </header>
 
-        <section className="relative z-10 mt-4 overflow-hidden rounded-[1.8rem] border border-cyan-300/20 bg-slate-950 p-4 text-white shadow-xl shadow-cyan-950/20">
+        <div className="relative z-10 mt-3 flex justify-end">
+          <LanguageSelector />
+        </div>
+
+        <section className="relative z-10 mt-3 overflow-hidden rounded-[1.8rem] border border-cyan-300/20 bg-slate-950 p-4 text-white shadow-xl shadow-cyan-950/20">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.24),transparent_32%),linear-gradient(135deg,rgba(15,23,42,1),rgba(2,6,23,1))]" />
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full border border-cyan-300/20" />
           <div className="absolute right-7 top-16 h-3 w-3 rounded-full bg-cyan-300 shadow-lg shadow-cyan-300/50" />
@@ -230,31 +241,39 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
           <div className="relative">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[0.7rem] font-black text-cyan-200">
               <ShieldCheck size={13} />
-              Mobil operasyon kontrolü
+              {t("login.heroBadge")}
             </div>
 
-            <h1 className="whitespace-nowrap text-xl font-black leading-tight tracking-tight min-[380px]:text-[1.35rem]">
-              Görev ver. <span className="text-cyan-300">Takip et.</span> Kanıt iste.
+            <h1 className="text-xl font-black leading-tight tracking-tight min-[380px]:text-[1.35rem]">
+              {t("login.heroTitleStart")}{" "}
+              <span className="text-cyan-300">{t("login.heroTitleMiddle")}</span>{" "}
+              {t("login.heroTitleEnd")}
             </h1>
 
             <p className="mt-3 text-sm font-medium leading-5 text-slate-300">
-              Görev, fotoğraflı kanıt, konum ve gün sonu kontrolü tek ekranda.
+              {t("login.heroDescription")}
             </p>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 backdrop-blur">
                 <ClipboardCheck className="mb-1.5 text-cyan-300" size={18} />
-                <p className="text-[0.68rem] font-black leading-4">Görev Takibi</p>
+                <p className="text-[0.68rem] font-black leading-4">
+                  {t("login.featureTaskTracking")}
+                </p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 backdrop-blur">
                 <Camera className="mb-1.5 text-cyan-300" size={18} />
-                <p className="text-[0.68rem] font-black leading-4">Fotoğraflı Kanıt</p>
+                <p className="text-[0.68rem] font-black leading-4">
+                  {t("login.featurePhotoProof")}
+                </p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 backdrop-blur">
                 <MapPin className="mb-1.5 text-cyan-300" size={18} />
-                <p className="text-[0.68rem] font-black leading-4">Konum Kaydı</p>
+                <p className="text-[0.68rem] font-black leading-4">
+                  {t("login.featureLocationRecord")}
+                </p>
               </div>
             </div>
           </div>
@@ -266,9 +285,9 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
         >
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-black tracking-tight">Giriş yap</h2>
+              <h2 className="text-xl font-black tracking-tight">{t("login.title")}</h2>
               <p className="mt-1 text-sm font-medium leading-5 text-[var(--missio-text-muted)]">
-                İşletme hesabınla Missio paneline bağlan.
+                {t("login.description")}
               </p>
             </div>
 
@@ -279,10 +298,10 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
 
           <div className="space-y-3.5">
             <LoginInput
-              label="İşletme kodu"
+              label={t("login.businessCode")}
               value={businessSlug}
               onChange={handleBusinessSlugChange}
-              placeholder="işletme-kodu"
+              placeholder={t("login.businessCodePlaceholder")}
               autoComplete="organization"
               autoCapitalize="none"
               spellCheck={false}
@@ -290,10 +309,10 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
             />
 
             <LoginInput
-              label="Kullanıcı adı"
+              label={t("login.username")}
               value={username}
               onChange={handleUsernameChange}
-              placeholder="ahmet"
+              placeholder={t("login.usernamePlaceholder")}
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -301,10 +320,10 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
             />
 
             <LoginInput
-              label="Şifre"
+              label={t("login.password")}
               value={password}
               onChange={handlePasswordChange}
-              placeholder="Şifreni gir"
+              placeholder={t("login.passwordPlaceholder")}
               autoComplete="current-password"
               autoCapitalize="none"
               spellCheck={false}
@@ -315,7 +334,8 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
                   type="button"
                   onClick={() => setShowPassword((currentValue) => !currentValue)}
                   className="rounded-xl p-1 text-[var(--missio-text-muted)] transition hover:text-[var(--missio-text-main)]"
-                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+                  aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
+                  title={showPassword ? t("login.hidePassword") : t("login.showPassword")}
                 >
                   {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
                 </button>
@@ -338,12 +358,12 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
             {isSubmitting ? (
               <>
                 <Loader2 className="animate-spin" size={19} />
-                Giriş yapılıyor...
+                {t("login.submitting")}
               </>
             ) : (
               <>
                 <LogIn size={19} />
-                Missio’ya giriş yap
+                {t("login.submit")}
               </>
             )}
           </button>
