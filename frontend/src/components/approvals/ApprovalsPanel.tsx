@@ -562,15 +562,30 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
     [approvalTasks],
   )
 
-  async function loadApprovals() {
+  async function loadApprovals(
+    options: {
+      showLoading?: boolean
+      showError?: boolean
+      keepExistingOnError?: boolean
+    } = {},
+  ) {
+    const showLoading = options.showLoading ?? true
+    const showError = options.showError ?? true
+    const keepExistingOnError = options.keepExistingOnError ?? false
+
     if (!businessId) {
       setApprovalTasks([])
       setErrorMessage(t("approval.error.noBusiness"))
       return
     }
 
-    setIsLoading(true)
-    setErrorMessage(null)
+    if (showLoading) {
+      setIsLoading(true)
+    }
+
+    if (showError) {
+      setErrorMessage(null)
+    }
 
     try {
       const response = await listBusinessTasks({
@@ -584,21 +599,55 @@ export function ApprovalsPanel({ businessId, onChanged }: ApprovalsPanelProps) {
         .filter((task) => task.requiresManagerApproval && task.status === "completed")
 
       setApprovalTasks(tasks)
+      setErrorMessage(null)
     } catch (error) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message)
-      } else {
-        setErrorMessage(t("approval.error.loadFailed"))
+      if (showError) {
+        if (error instanceof Error) {
+          setErrorMessage(error.message)
+        } else {
+          setErrorMessage(t("approval.error.loadFailed"))
+        }
       }
 
-      setApprovalTasks([])
+      if (!keepExistingOnError) {
+        setApprovalTasks([])
+      }
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
     void loadApprovals()
+  }, [businessId])
+
+  useEffect(() => {
+    if (!businessId) {
+      return
+    }
+
+    function refreshApprovalsWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void loadApprovals({
+          showLoading: false,
+          showError: false,
+          keepExistingOnError: true,
+        })
+      }
+    }
+
+    const intervalId = window.setInterval(refreshApprovalsWhenVisible, 10000)
+
+    window.addEventListener("focus", refreshApprovalsWhenVisible)
+    document.addEventListener("visibilitychange", refreshApprovalsWhenVisible)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener("focus", refreshApprovalsWhenVisible)
+      document.removeEventListener("visibilitychange", refreshApprovalsWhenVisible)
+    }
   }, [businessId])
 
   async function handleApprove(task: TodayTask) {

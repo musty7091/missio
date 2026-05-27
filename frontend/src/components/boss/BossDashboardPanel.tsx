@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import {
   AlertTriangle,
   BarChart3,
@@ -253,7 +253,15 @@ export function BossDashboardPanel({
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  async function loadDashboard() {
+  async function loadDashboard(
+    options: {
+      showLoading?: boolean
+      showError?: boolean
+    } = {},
+  ) {
+    const showLoading = options.showLoading ?? true
+    const showError = options.showError ?? true
+
     if (!businessId) {
       setTasks([])
       setClosures([])
@@ -261,8 +269,13 @@ export function BossDashboardPanel({
       return
     }
 
-    setIsLoading(true)
-    setErrorMessage(null)
+    if (showLoading) {
+      setIsLoading(true)
+    }
+
+    if (showError) {
+      setErrorMessage(null)
+    }
 
     try {
       const [taskResponse, closureResponse] = await Promise.all([
@@ -281,20 +294,51 @@ export function BossDashboardPanel({
 
       setTasks(taskResponse.tasks.map(mapApiTaskToTodayTask))
       setClosures(closureResponse.closures)
+      setErrorMessage(null)
     } catch (error) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message)
-      } else {
-        setErrorMessage(t("boss.summary.error.loadFailed"))
+      if (showError) {
+        if (error instanceof Error) {
+          setErrorMessage(error.message)
+        } else {
+          setErrorMessage(t("boss.summary.error.loadFailed"))
+        }
       }
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
     void loadDashboard()
   }, [businessId])
+
+  useEffect(() => {
+    if (!businessId) {
+      return
+    }
+
+    function refreshDashboardWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void loadDashboard({
+          showLoading: false,
+          showError: false,
+        })
+      }
+    }
+
+    const intervalId = window.setInterval(refreshDashboardWhenVisible, 10000)
+
+    window.addEventListener("focus", refreshDashboardWhenVisible)
+    document.addEventListener("visibilitychange", refreshDashboardWhenVisible)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener("focus", refreshDashboardWhenVisible)
+      document.removeEventListener("visibilitychange", refreshDashboardWhenVisible)
+    }
+  }, [businessId, todayKey])
 
   const todayClosure = useMemo(
     () => closures.find((closure) => closure.closure_date === todayKey) ?? null,

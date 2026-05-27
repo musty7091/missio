@@ -425,23 +425,55 @@ export default function App() {
       })
   }, [])
 
-  async function loadTodayTasks() {
-    setIsLoadingTasks(true)
-    setTasksErrorMessage(null)
+  async function loadTodayTasks(
+    options: {
+      showLoading?: boolean
+      showError?: boolean
+      keepExistingOnError?: boolean
+    } = {},
+  ) {
+    const showLoading = options.showLoading ?? true
+    const showError = options.showError ?? true
+    const keepExistingOnError = options.keepExistingOnError ?? false
+
+    if (showLoading) {
+      setIsLoadingTasks(true)
+    }
+
+    if (showError) {
+      setTasksErrorMessage(null)
+    }
 
     try {
       const response = await getMyTodayTasks()
-      setTasks(mapMyTodayTasksResponseToTodayTasks(response))
+      const mappedTasks = mapMyTodayTasksResponseToTodayTasks(response)
+
+      setTasks(mappedTasks)
+      setTasksErrorMessage(null)
+
+      setSelectedTaskSnapshot((currentSnapshot) => {
+        if (!currentSnapshot) {
+          return currentSnapshot
+        }
+
+        return mappedTasks.find((task) => task.id === currentSnapshot.id) ?? currentSnapshot
+      })
     } catch (error) {
-      if (error instanceof Error) {
-        setTasksErrorMessage(error.message)
-      } else {
-        setTasksErrorMessage("Bugünkü görevler alınamadı.")
+      if (showError) {
+        if (error instanceof Error) {
+          setTasksErrorMessage(error.message)
+        } else {
+          setTasksErrorMessage("Bugünkü görevler alınamadı.")
+        }
       }
 
-      setTasks([])
+      if (!keepExistingOnError) {
+        setTasks([])
+      }
     } finally {
-      setIsLoadingTasks(false)
+      if (showLoading) {
+        setIsLoadingTasks(false)
+      }
     }
   }
 
@@ -479,6 +511,41 @@ export default function App() {
     }
 
     void loadTodayTasks()
+  }, [currentUser])
+
+  useEffect(() => {
+    if (!currentUser) {
+      return
+    }
+
+    if (currentUser.role === "super_admin") {
+      return
+    }
+
+    if (currentUser.subscription_access_status !== "active") {
+      return
+    }
+
+    function refreshTodayTasksWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void loadTodayTasks({
+          showLoading: false,
+          showError: false,
+          keepExistingOnError: true,
+        })
+      }
+    }
+
+    const intervalId = window.setInterval(refreshTodayTasksWhenVisible, 10000)
+
+    window.addEventListener("focus", refreshTodayTasksWhenVisible)
+    document.addEventListener("visibilitychange", refreshTodayTasksWhenVisible)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener("focus", refreshTodayTasksWhenVisible)
+      document.removeEventListener("visibilitychange", refreshTodayTasksWhenVisible)
+    }
   }, [currentUser])
 
   useEffect(() => {
