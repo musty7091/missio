@@ -1,5 +1,7 @@
+
 from __future__ import annotations
 
+import os
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -181,7 +183,7 @@ def build_daily_operation_closure_response(
 
 
 def verify_system_job_secret(x_missio_system_job_secret: str | None) -> None:
-    configured_secret = settings.system_job_secret.strip()
+    configured_secret = os.getenv("MISSIO_SYSTEM_JOB_SECRET", "").strip()
 
     if not configured_secret:
         raise HTTPException(
@@ -189,7 +191,13 @@ def verify_system_job_secret(x_missio_system_job_secret: str | None) -> None:
             detail="Sistem işi gizli anahtarı tanımlı değil.",
         )
 
-    if x_missio_system_job_secret != configured_secret:
+    if not x_missio_system_job_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sistem işi yetkisi doğrulanamadı.",
+        )
+
+    if x_missio_system_job_secret.strip() != configured_secret:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sistem işi yetkisi doğrulanamadı.",
