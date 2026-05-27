@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
@@ -100,6 +101,8 @@ from app.services.task_service import (
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
+logger = logging.getLogger(__name__)
+
 
 def get_client_ip(request: Request) -> str | None:
     """Return best-effort client IP address."""
@@ -189,6 +192,7 @@ def send_task_assigned_web_push_notification_safely(
     """Send Web Push notification when an extra task is assigned.
 
     Notification failures must never block task creation.
+    Every delivery attempt is logged so production notification problems are traceable.
     """
 
     attempted_count = 0
@@ -199,6 +203,7 @@ def send_task_assigned_web_push_notification_safely(
         subscriptions = (
             db.query(WebPushSubscription)
             .filter(
+                WebPushSubscription.business_id == task.business_id,
                 WebPushSubscription.user_id == assigned_to_user.id,
                 WebPushSubscription.is_active.is_(True),
             )
@@ -209,6 +214,12 @@ def send_task_assigned_web_push_notification_safely(
         attempted_count = len(subscriptions)
 
         if attempted_count == 0:
+            logger.warning(
+                "MISSIO_WEB_PUSH_TASK_ASSIGNED_NO_SUBSCRIPTION task_id=%s target_user_id=%s business_id=%s",
+                task.id,
+                assigned_to_user.id,
+                task.business_id,
+            )
             return {
                 "attempted_count": attempted_count,
                 "sent_count": sent_count,
@@ -249,21 +260,68 @@ def send_task_assigned_web_push_notification_safely(
                     },
                 )
                 sent_count += 1
-            except WebPushSendError:
+                logger.info(
+                    "MISSIO_WEB_PUSH_TASK_ASSIGNED_SENT task_id=%s target_user_id=%s subscription_id=%s device_type=%s browser=%s platform=%s",
+                    task.id,
+                    assigned_to_user.id,
+                    subscription.id,
+                    subscription.device_type,
+                    subscription.browser_name,
+                    subscription.platform,
+                )
+            except WebPushSendError as exc:
                 failed_count += 1
+                logger.warning(
+                    "MISSIO_WEB_PUSH_TASK_ASSIGNED_FAILED task_id=%s target_user_id=%s subscription_id=%s error=%s",
+                    task.id,
+                    assigned_to_user.id,
+                    subscription.id,
+                    exc,
+                )
+            except Exception as exc:
+                failed_count += 1
+                logger.warning(
+                    "MISSIO_WEB_PUSH_TASK_ASSIGNED_UNEXPECTED_ERROR task_id=%s target_user_id=%s subscription_id=%s error=%s",
+                    task.id,
+                    assigned_to_user.id,
+                    subscription.id,
+                    exc,
+                )
+
+        logger.info(
+            "MISSIO_WEB_PUSH_TASK_ASSIGNED_RESULT task_id=%s target_user_id=%s business_id=%s attempted=%s sent=%s failed=%s",
+            task.id,
+            assigned_to_user.id,
+            task.business_id,
+            attempted_count,
+            sent_count,
+            failed_count,
+        )
 
         return {
             "attempted_count": attempted_count,
             "sent_count": sent_count,
             "failed_count": failed_count,
         }
-    except WebPushConfigurationError:
+    except WebPushConfigurationError as exc:
+        logger.warning(
+            "MISSIO_WEB_PUSH_TASK_ASSIGNED_CONFIGURATION_ERROR task_id=%s target_user_id=%s error=%s",
+            task.id,
+            assigned_to_user.id,
+            exc,
+        )
         return {
             "attempted_count": attempted_count,
             "sent_count": sent_count,
             "failed_count": failed_count,
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "MISSIO_WEB_PUSH_TASK_ASSIGNED_ROUTE_ERROR task_id=%s target_user_id=%s error=%s",
+            task.id,
+            assigned_to_user.id,
+            exc,
+        )
         return {
             "attempted_count": attempted_count,
             "sent_count": sent_count,
