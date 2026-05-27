@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="local", alias="MISSIO_ENVIRONMENT")
     debug: bool = Field(default=True, alias="MISSIO_DEBUG")
     default_timezone: str = Field(
-        default="Europe/Istanbul",
+        default="Asia/Nicosia",
         alias="MISSIO_DEFAULT_TIMEZONE",
     )
     database_url: str = Field(
@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = Field(
         default="",
         alias="MISSIO_CORS_ALLOWED_ORIGINS",
+    )
+    system_job_secret: str = Field(
+        default="",
+        alias="MISSIO_SYSTEM_JOB_SECRET",
     )
 
     web_push_enabled: bool = Field(

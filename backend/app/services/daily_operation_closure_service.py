@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from app.models.task import Task
 from app.models.task_attachment import TaskAttachment
 from app.models.user import User
 from app.schemas.task import (
+    TASK_ATTACHMENT_TYPE_EVIDENCE,
     TASK_STATUS_APPROVED,
     TASK_STATUS_ASSIGNED,
     TASK_STATUS_CANCELLED,
@@ -52,6 +54,25 @@ class DailyOperationClosureNoteRequiredError(DailyOperationClosureServiceError):
 class DailyOperationClosureListResult:
     closures: list[DailyOperationClosure]
     total_count: int
+
+
+@dataclass(frozen=True)
+class AutomaticDailyClosureBusinessResult:
+    business_id: int
+    business_name: str
+    closure_date: date | None
+    status: str
+    message: str
+    closure_id: int | None = None
+
+
+@dataclass(frozen=True)
+class AutomaticDailyClosureRunResult:
+    checked_count: int
+    closed_count: int
+    skipped_count: int
+    failed_count: int
+    results: list[AutomaticDailyClosureBusinessResult]
 
 
 DAILY_OPERATION_CLOSURE_STATUS_CLEAN = "closed_clean"
@@ -181,10 +202,49 @@ def ensure_can_view_daily_operation_closure(current_user: User, *, business_id: 
         )
 
 
-def get_business_today(business: Business) -> date:
-    # İlk sürümde server tarihini kullanıyoruz.
-    # İşletme timezone detayı rapor/PDF adımında ayrıca genişletilecek.
-    return get_utc_now().date()
+def get_business_timezone(business: Business) -> ZoneInfo:
+    timezone_name = (business.timezone or "Asia/Nicosia").strip() or "Asia/Nicosia"
+
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Asia/Nicosia")
+
+
+def get_business_now(business: Business, *, now_utc: datetime | None = None) -> datetime:
+    source_now = now_utc or get_utc_now()
+
+    if source_now.tzinfo is None:
+        source_now = source_now.replace(tzinfo=timezone.utc)
+
+    return source_now.astimezone(get_business_timezone(business))
+
+
+def get_business_today(business: Business, *, now_utc: datetime | None = None) -> date:
+    return get_business_now(business, now_utc=now_utc).date()
+
+
+def parse_daily_closing_time(value: str | None) -> time:
+    normalized_value = (value or "23:45").strip() or "23:45"
+    hour_text, minute_text = normalized_value.split(":", maxsplit=1)
+    hour = int(hour_text)
+    minute = int(minute_text)
+
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        raise ValueError("Otomatik kapanış saati geçersiz.")
+
+    return time(hour=hour, minute=minute)
+
+
+def is_business_ready_for_automatic_closure(
+    business: Business,
+    *,
+    now_utc: datetime | None = None,
+) -> bool:
+    business_now = get_business_now(business, now_utc=now_utc)
+    closing_time = parse_daily_closing_time(business.daily_closing_time)
+
+    return business_now.time().replace(second=0, microsecond=0) >= closing_time
 
 
 def get_daily_operation_closure_or_error(
@@ -243,7 +303,10 @@ def get_photo_evidence_task_ids(db: Session, *, task_ids: list[int]) -> set[int]
     return set(
         db.execute(
             select(TaskAttachment.task_id)
-            .where(TaskAttachment.task_id.in_(task_ids))
+            .where(
+                TaskAttachment.task_id.in_(task_ids),
+                TaskAttachment.attachment_type == TASK_ATTACHMENT_TYPE_EVIDENCE,
+            )
             .group_by(TaskAttachment.task_id)
         )
         .scalars()
@@ -324,12 +387,20 @@ def validate_problematic_closure_note(
 def create_daily_operation_closure(
     db: Session,
     *,
-    current_user: User,
+    current_user: User | None,
     business: Business,
     closure_date: date | None = None,
     manager_note: str | None = None,
+    created_by_system: bool = False,
+    allow_empty_day: bool = False,
 ) -> DailyOperationClosure:
-    ensure_can_create_daily_operation_closure(current_user, business_id=business.id)
+    if not created_by_system:
+        if current_user is None:
+            raise DailyOperationClosurePermissionError(
+                "Manuel gün kapanışı için kullanıcı bilgisi gereklidir."
+            )
+
+        ensure_can_create_daily_operation_closure(current_user, business_id=business.id)
 
     selected_closure_date = closure_date or get_business_today(business)
 
@@ -350,7 +421,7 @@ def create_daily_operation_closure(
         closure_date=selected_closure_date,
     )
 
-    if not tasks:
+    if not tasks and not allow_empty_day:
         raise DailyOperationClosureNotReadyError(
             "Bugün kapatılacak görev bulunamadı."
         )
@@ -380,21 +451,25 @@ def create_daily_operation_closure(
         photo_evidence_task_count=photo_evidence_task_count,
     )
 
-    validate_problematic_closure_note(
-        closure_status=closure_status,
-        manager_note=manager_note,
-    )
+    if not created_by_system:
+        validate_problematic_closure_note(
+            closure_status=closure_status,
+            manager_note=manager_note,
+        )
 
     closure = DailyOperationClosure(
         business_id=business.id,
         closure_date=selected_closure_date,
-        closed_by_user_id=current_user.id,
-        closed_by_user_full_name=current_user.full_name,
-        closed_by_username=current_user.username,
-        closed_by_role=current_user.role,
+        closed_by_user_id=current_user.id if current_user is not None else None,
+        closed_by_user_full_name=(
+            current_user.full_name if current_user is not None else "Missio Otomatik Sistem"
+        ),
+        closed_by_username=current_user.username if current_user is not None else "system",
+        closed_by_role=current_user.role if current_user is not None else "system",
         closed_at_utc=now,
         status=closure_status,
         manager_note=manager_note,
+        closed_by_system=created_by_system,
         total_task_count=total_task_count,
         completed_task_count=completed_task_count,
         approved_task_count=approved_task_count,
@@ -446,6 +521,116 @@ def create_daily_operation_closure(
 
     return closure
 
+
+def create_automatic_daily_operation_closure_for_business(
+    db: Session,
+    *,
+    business: Business,
+    now_utc: datetime | None = None,
+) -> AutomaticDailyClosureBusinessResult:
+    selected_closure_date = get_business_today(business, now_utc=now_utc)
+
+    existing_closure = get_existing_closure_for_date(
+        db=db,
+        business_id=business.id,
+        closure_date=selected_closure_date,
+    )
+
+    if existing_closure is not None:
+        return AutomaticDailyClosureBusinessResult(
+            business_id=business.id,
+            business_name=business.name,
+            closure_date=selected_closure_date,
+            status="skipped_already_closed",
+            message="Bu işletmenin günü zaten kapatılmış.",
+            closure_id=existing_closure.id,
+        )
+
+    if not is_business_ready_for_automatic_closure(business, now_utc=now_utc):
+        return AutomaticDailyClosureBusinessResult(
+            business_id=business.id,
+            business_name=business.name,
+            closure_date=selected_closure_date,
+            status="skipped_before_closing_time",
+            message="İşletmenin yerel otomatik kapanış saati henüz gelmedi.",
+        )
+
+    closure = create_daily_operation_closure(
+        db=db,
+        current_user=None,
+        business=business,
+        closure_date=selected_closure_date,
+        manager_note="Bu gün, otomatik gün kapanışı ayarı açık olduğu için Missio tarafından sistemsel olarak kapatılmıştır.",
+        created_by_system=True,
+        allow_empty_day=True,
+    )
+
+    return AutomaticDailyClosureBusinessResult(
+        business_id=business.id,
+        business_name=business.name,
+        closure_date=selected_closure_date,
+        status="closed",
+        message="Gün otomatik olarak kapatıldı ve rapor oluşturuldu.",
+        closure_id=closure.id,
+    )
+
+
+def auto_close_enabled_businesses(
+    db: Session,
+    *,
+    now_utc: datetime | None = None,
+) -> AutomaticDailyClosureRunResult:
+    businesses = (
+        db.execute(
+            select(Business).where(
+                Business.is_active.is_(True),
+                Business.auto_daily_closing_enabled.is_(True),
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    results: list[AutomaticDailyClosureBusinessResult] = []
+    closed_count = 0
+    failed_count = 0
+
+    for business in businesses:
+        try:
+            result = create_automatic_daily_operation_closure_for_business(
+                db=db,
+                business=business,
+                now_utc=now_utc,
+            )
+            results.append(result)
+
+            if result.status == "closed":
+                closed_count += 1
+                db.commit()
+            else:
+                db.rollback()
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            failed_count += 1
+            results.append(
+                AutomaticDailyClosureBusinessResult(
+                    business_id=business.id,
+                    business_name=business.name,
+                    closure_date=None,
+                    status="failed",
+                    message=str(exc) or "Otomatik gün kapanışı başarısız oldu.",
+                )
+            )
+
+    skipped_count = len(results) - closed_count - failed_count
+
+    return AutomaticDailyClosureRunResult(
+        checked_count=len(businesses),
+        closed_count=closed_count,
+        skipped_count=skipped_count,
+        failed_count=failed_count,
+        results=results,
+    )
 
 def list_daily_operation_closures(
     db: Session,

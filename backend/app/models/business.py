@@ -22,9 +22,19 @@ class Business(Base):
     timezone: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
-        default="Europe/Istanbul",
+        default="Asia/Nicosia",
     )
     default_theme: Mapped[str] = mapped_column(String(30), nullable=False, default="dark")
+    auto_daily_closing_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+    daily_closing_time: Mapped[str] = mapped_column(
+        String(5),
+        nullable=False,
+        default="23:45",
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

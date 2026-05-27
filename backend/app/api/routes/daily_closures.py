@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.business import Business
 from app.models.daily_operation_closure import DailyOperationClosure
 from app.models.daily_operation_closure_item import DailyOperationClosureItem
 from app.models.user import User
 from app.schemas.daily_operation_closure import (
+    AutomaticDailyClosureBusinessResultResponse,
+    AutomaticDailyClosureRunResponse,
     CreateDailyOperationClosureRequest,
     DailyOperationClosureCreatedResponse,
     DailyOperationClosureItemResponse,
@@ -24,6 +27,7 @@ from app.services.daily_operation_closure_service import (
     DailyOperationClosurePermissionError,
     DailyOperationClosureServiceError,
     cleanup_old_daily_operation_closures,
+    auto_close_enabled_businesses,
     create_daily_operation_closure,
     get_daily_operation_closure_detail,
     list_daily_operation_closures,
@@ -159,6 +163,7 @@ def build_daily_operation_closure_response(
         closed_at_utc=closure.closed_at_utc,
         status=closure.status,
         manager_note=closure.manager_note,
+        closed_by_system=closure.closed_by_system,
         total_task_count=closure.total_task_count,
         completed_task_count=closure.completed_task_count,
         approved_task_count=closure.approved_task_count,
@@ -171,6 +176,55 @@ def build_daily_operation_closure_response(
         items=[
             build_daily_operation_closure_item_response(item)
             for item in (items or [])
+        ],
+    )
+
+
+def verify_system_job_secret(x_missio_system_job_secret: str | None) -> None:
+    configured_secret = settings.system_job_secret.strip()
+
+    if not configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sistem işi gizli anahtarı tanımlı değil.",
+        )
+
+    if x_missio_system_job_secret != configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sistem işi yetkisi doğrulanamadı.",
+        )
+
+
+@router.post(
+    "/system/auto-close-all",
+    response_model=AutomaticDailyClosureRunResponse,
+)
+def auto_close_all_enabled_businesses_endpoint(
+    x_missio_system_job_secret: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> AutomaticDailyClosureRunResponse:
+    """Automatically close all enabled businesses whose local closing time has arrived."""
+
+    verify_system_job_secret(x_missio_system_job_secret)
+
+    result = auto_close_enabled_businesses(db=db)
+
+    return AutomaticDailyClosureRunResponse(
+        checked_count=result.checked_count,
+        closed_count=result.closed_count,
+        skipped_count=result.skipped_count,
+        failed_count=result.failed_count,
+        results=[
+            AutomaticDailyClosureBusinessResultResponse(
+                business_id=item.business_id,
+                business_name=item.business_name,
+                closure_date=item.closure_date,
+                status=item.status,
+                message=item.message,
+                closure_id=item.closure_id,
+            )
+            for item in result.results
         ],
     )
 

@@ -65,13 +65,14 @@ class DailyOperationClosureResponse(BaseModel):
     id: int
     business_id: int
     closure_date: date
-    closed_by_user_id: int
+    closed_by_user_id: int | None
     closed_by_user_full_name: str
     closed_by_username: str
     closed_by_role: str
     closed_at_utc: datetime
     status: str
     manager_note: str | None
+    closed_by_system: bool
     total_task_count: int
     completed_task_count: int
     approved_task_count: int
@@ -96,3 +97,25 @@ class DailyOperationClosureListResponse(BaseModel):
 
     closures: list[DailyOperationClosureResponse]
     total_count: int
+
+
+
+class AutomaticDailyClosureBusinessResultResponse(BaseModel):
+    """One business result returned by the system auto-close endpoint."""
+
+    business_id: int
+    business_name: str
+    closure_date: date | None
+    status: str
+    message: str
+    closure_id: int | None = None
+
+
+class AutomaticDailyClosureRunResponse(BaseModel):
+    """Summary returned by the system auto-close endpoint."""
+
+    checked_count: int
+    closed_count: int
+    skipped_count: int
+    failed_count: int
+    results: list[AutomaticDailyClosureBusinessResultResponse]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from app.models.user import User
 from app.schemas.business import (
     BusinessOwnerUserResponse,
     BusinessResponse,
+    BusinessDailyClosingSettingsResponse,
     BusinessSubscriptionPlanChangedResponse,
     BusinessSubscriptionOverviewResponse,
     BusinessSubscriptionResponse,
@@ -22,6 +24,7 @@ from app.schemas.business import (
     ChangeBusinessSubscriptionPlanRequest,
     ChangeBusinessPlanRequest,
     CreateBusinessWithOwnerRequest,
+    UpdateBusinessDailyClosingSettingsRequest,
     ExtendBusinessSubscriptionRequest,
     UpdateBusinessSubscriptionStatusRequest,
     SubscriptionPlanResponse,
@@ -110,6 +113,8 @@ def build_business_response(
         timezone=business.timezone,
         default_theme=business.default_theme,
         is_active=business.is_active,
+        auto_daily_closing_enabled=business.auto_daily_closing_enabled,
+        daily_closing_time=business.daily_closing_time,
         created_at=business.created_at,
         updated_at=business.updated_at,
         subscription_status=subscription.status if subscription is not None else None,
@@ -270,6 +275,103 @@ def list_businesses_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bu işlem için yetkiniz yok.",
         ) from exc
+
+
+def ensure_current_user_can_manage_business_daily_closing_settings(
+    current_user: User,
+) -> None:
+    if current_user.role != UserRole.BOSS.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Otomatik gün kapanışı ayarını sadece işletme sahibi değiştirebilir.",
+        )
+
+    if current_user.business_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu kullanıcı bir işletmeye bağlı değil.",
+        )
+
+
+def validate_timezone_name(value: str) -> str:
+    normalized_value = value.strip()
+
+    try:
+        ZoneInfo(normalized_value)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Saat dilimi geçersiz.",
+        ) from exc
+
+    return normalized_value
+
+
+def build_business_daily_closing_settings_response(
+    business: Business,
+) -> BusinessDailyClosingSettingsResponse:
+    return BusinessDailyClosingSettingsResponse(
+        business_id=business.id,
+        business_name=business.name,
+        timezone=business.timezone,
+        auto_daily_closing_enabled=business.auto_daily_closing_enabled,
+        daily_closing_time=business.daily_closing_time,
+    )
+
+
+@router.get(
+    "/me/daily-closing-settings",
+    response_model=BusinessDailyClosingSettingsResponse,
+)
+def get_my_business_daily_closing_settings_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BusinessDailyClosingSettingsResponse:
+    """Return current business daily closing automation settings."""
+
+    ensure_current_user_can_manage_business_daily_closing_settings(current_user)
+
+    business = db.get(Business, current_user.business_id)
+
+    if business is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="İşletme bulunamadı.",
+        )
+
+    return build_business_daily_closing_settings_response(business)
+
+
+@router.patch(
+    "/me/daily-closing-settings",
+    response_model=BusinessDailyClosingSettingsResponse,
+)
+def update_my_business_daily_closing_settings_endpoint(
+    payload: UpdateBusinessDailyClosingSettingsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BusinessDailyClosingSettingsResponse:
+    """Update current business daily closing automation settings."""
+
+    ensure_current_user_can_manage_business_daily_closing_settings(current_user)
+
+    business = db.get(Business, current_user.business_id)
+
+    if business is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="İşletme bulunamadı.",
+        )
+
+    business.auto_daily_closing_enabled = payload.auto_daily_closing_enabled
+    business.daily_closing_time = payload.daily_closing_time
+    business.timezone = validate_timezone_name(payload.timezone)
+    business.updated_at = get_utc_now_for_route()
+
+    db.commit()
+    db.refresh(business)
+
+    return build_business_daily_closing_settings_response(business)
 
 
 @router.get("/subscription-plans", response_model=list[SubscriptionPlanResponse])

@@ -30,6 +30,8 @@ export type BusinessResponse = {
   timezone: string
   default_theme: string
   is_active: boolean
+  auto_daily_closing_enabled: boolean
+  daily_closing_time: string
   created_at: string
   updated_at: string
 
@@ -138,3 +140,18 @@ export type ChangeBusinessSubscriptionPlanRequest = {
 
 export type BusinessSubscriptionPlanChangedResponse =
   BusinessSubscriptionOperationResponse
+
+
+export type BusinessDailyClosingSettingsResponse = {
+  business_id: number
+  business_name: string
+  timezone: string
+  auto_daily_closing_enabled: boolean
+  daily_closing_time: string
+}
+
+export type UpdateBusinessDailyClosingSettingsRequest = {
+  auto_daily_closing_enabled: boolean
+  daily_closing_time: string
+  timezone: string
+}

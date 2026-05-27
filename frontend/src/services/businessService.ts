@@ -1,5 +1,6 @@
 ﻿import type {
   BusinessResponse,
+  BusinessDailyClosingSettingsResponse,
   BusinessSubscriptionOperationResponse,
   BusinessSubscriptionOverviewResponse,
   BusinessSubscriptionPlanChangedResponse,
@@ -10,6 +11,7 @@
   ExtendBusinessSubscriptionRequest,
   SubscriptionPlanResponse,
   UpdateBusinessSubscriptionStatusRequest,
+  UpdateBusinessDailyClosingSettingsRequest,
 } from "../types/business"
 import { apiRequest } from "./httpClient"
 
@@ -100,6 +102,30 @@ export async function changeBusinessSubscriptionPlan(
     `/businesses/${businessId}/subscription/change-plan`,
     {
       method: "POST",
+      body: payload,
+      requiresAuth: true,
+    },
+  )
+}
+
+
+export async function getMyBusinessDailyClosingSettings() {
+  return apiRequest<BusinessDailyClosingSettingsResponse>(
+    "/businesses/me/daily-closing-settings",
+    {
+      method: "GET",
+      requiresAuth: true,
+    },
+  )
+}
+
+export async function updateMyBusinessDailyClosingSettings(
+  payload: UpdateBusinessDailyClosingSettingsRequest,
+) {
+  return apiRequest<BusinessDailyClosingSettingsResponse>(
+    "/businesses/me/daily-closing-settings",
+    {
+      method: "PATCH",
       body: payload,
       requiresAuth: true,
     },

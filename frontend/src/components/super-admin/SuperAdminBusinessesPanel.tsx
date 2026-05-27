@@ -215,7 +215,7 @@ function buildPayload(formState: CreateBusinessFormState): CreateBusinessWithOwn
     owner_password: formState.ownerPassword.trim(),
     owner_email: optionalText(formState.ownerEmail)?.toLocaleLowerCase("tr-TR") ?? null,
     owner_role: "boss",
-    timezone: "Europe/Istanbul",
+    timezone: "Asia/Nicosia",
     default_theme: "dark",
   }
 }

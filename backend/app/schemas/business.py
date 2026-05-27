@@ -25,7 +25,7 @@ class CreateBusinessWithOwnerRequest(BaseModel):
     owner_email: str | None = Field(default=None, max_length=255)
     owner_role: str = Field(default=UserRole.BOSS.value, min_length=3, max_length=50)
 
-    timezone: str = Field(default="Europe/Istanbul", min_length=3, max_length=100)
+    timezone: str = Field(default="Asia/Nicosia", min_length=3, max_length=100)
     default_theme: str = Field(default="dark", min_length=2, max_length=30)
 
     @field_validator(
@@ -123,6 +123,8 @@ class BusinessResponse(BaseModel):
     timezone: str
     default_theme: str
     is_active: bool
+    auto_daily_closing_enabled: bool
+    daily_closing_time: str
     created_at: datetime
     updated_at: datetime
     subscription_status: str | None = None
@@ -132,6 +134,59 @@ class BusinessResponse(BaseModel):
     subscription_ends_at_utc: datetime | None = None
     subscription_max_users: int | None = None
     subscription_remaining_days: int | None = None
+
+
+class BusinessDailyClosingSettingsResponse(BaseModel):
+    """Business-level daily closing settings visible to the business owner."""
+
+    business_id: int
+    business_name: str
+    timezone: str
+    auto_daily_closing_enabled: bool
+    daily_closing_time: str
+
+
+class UpdateBusinessDailyClosingSettingsRequest(BaseModel):
+    """Request payload for updating daily closing automation settings."""
+
+    auto_daily_closing_enabled: bool
+    daily_closing_time: str = Field(default="23:45", min_length=5, max_length=5)
+    timezone: str = Field(default="Asia/Nicosia", min_length=3, max_length=100)
+
+    @field_validator("daily_closing_time", mode="before")
+    @classmethod
+    def normalize_daily_closing_time(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+
+        return value
+
+    @field_validator("daily_closing_time")
+    @classmethod
+    def validate_daily_closing_time(cls, value: str) -> str:
+        parts = value.split(":")
+
+        if len(parts) != 2:
+            raise ValueError("Otomatik kapanış saati HH:MM formatında olmalıdır.")
+
+        try:
+            hour = int(parts[0])
+            minute = int(parts[1])
+        except ValueError as exc:
+            raise ValueError("Otomatik kapanış saati HH:MM formatında olmalıdır.") from exc
+
+        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+            raise ValueError("Otomatik kapanış saati geçersiz.")
+
+        return f"{hour:02d}:{minute:02d}"
+
+    @field_validator("timezone", mode="before")
+    @classmethod
+    def normalize_timezone(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+
+        return value
 
 
 class BusinessOwnerUserResponse(BaseModel):

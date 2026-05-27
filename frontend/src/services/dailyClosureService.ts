@@ -31,13 +31,14 @@ export type DailyOperationClosure = {
   id: number
   business_id: number
   closure_date: string
-  closed_by_user_id: number
+  closed_by_user_id: number | null
   closed_by_user_full_name: string
   closed_by_username: string
   closed_by_role: string
   closed_at_utc: string
   status: string
   manager_note: string | null
+  closed_by_system: boolean
   total_task_count: number
   completed_task_count: number
   approved_task_count: number

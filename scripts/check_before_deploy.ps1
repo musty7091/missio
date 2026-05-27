@@ -83,7 +83,7 @@ class Settings:
     debug = True
     secret_key = "change-this-secret-key-before-production"
     database_url = "sqlite:///./missio_local.db"
-    default_timezone = "Europe/Istanbul"
+    default_timezone = "Asia/Nicosia"
     cors_allowed_origins = "http://localhost:5175"
 
 try:

@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   BadgeCheck,
+  CalendarCheck2,
   Building2,
   Camera,
   ChevronDown,
@@ -39,6 +40,11 @@ import {
   type BusinessUser,
   type BusinessUserRole,
 } from "../../services/businessUserService"
+import {
+  getMyBusinessDailyClosingSettings,
+  updateMyBusinessDailyClosingSettings,
+} from "../../services/businessService"
+import type { BusinessDailyClosingSettingsResponse } from "../../types/business"
 import {
   deactivateCurrentWebPushSubscription,
   isWebPushLocallyEnabled,
@@ -93,6 +99,12 @@ type PasswordFormState = {
 type ProfileFormState = {
   full_name: string
   email: string
+}
+
+type DailyClosingSettingsFormState = {
+  auto_daily_closing_enabled: boolean
+  daily_closing_time: string
+  timezone: string
 }
 
 const emptyCreateForm: CreateUserFormState = {
@@ -183,6 +195,20 @@ function getAllowedCreateRoles(currentRole: string): BusinessUserRole[] {
 
 function canShowUserManagement(user: UserMeResponse) {
   return user.business_id !== null && (user.role === "super_admin" || user.role === "boss")
+}
+
+function canShowDailyClosingSettings(user: UserMeResponse) {
+  return user.business_id !== null && user.role === "boss"
+}
+
+function buildDailyClosingSettingsForm(
+  settings: BusinessDailyClosingSettingsResponse | null,
+): DailyClosingSettingsFormState {
+  return {
+    auto_daily_closing_enabled: settings?.auto_daily_closing_enabled ?? false,
+    daily_closing_time: settings?.daily_closing_time ?? "23:45",
+    timezone: settings?.timezone ?? "Asia/Nicosia",
+  }
 }
 
 function canEditTargetUser(currentUser: UserMeResponse, targetUser: BusinessUser) {
@@ -1004,6 +1030,16 @@ export function ProfilePanel({
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [passwordStatusMessage, setPasswordStatusMessage] = useState<string | null>(null)
   const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null)
+  const [dailyClosingSettings, setDailyClosingSettings] =
+    useState<BusinessDailyClosingSettingsResponse | null>(null)
+  const [dailyClosingForm, setDailyClosingForm] =
+    useState<DailyClosingSettingsFormState>(() =>
+      buildDailyClosingSettingsForm(null),
+    )
+  const [isLoadingDailyClosingSettings, setIsLoadingDailyClosingSettings] = useState(false)
+  const [isSavingDailyClosingSettings, setIsSavingDailyClosingSettings] = useState(false)
+  const [dailyClosingStatusMessage, setDailyClosingStatusMessage] = useState<string | null>(null)
+  const [dailyClosingErrorMessage, setDailyClosingErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setProfileForm({
@@ -1011,6 +1047,36 @@ export function ProfilePanel({
       email: user.email ?? "",
     })
   }, [user.full_name, user.email])
+
+  async function loadDailyClosingSettings() {
+    if (!canShowDailyClosingSettings(user)) {
+      setDailyClosingSettings(null)
+      setDailyClosingForm(buildDailyClosingSettingsForm(null))
+      return
+    }
+
+    setIsLoadingDailyClosingSettings(true)
+    setDailyClosingErrorMessage(null)
+
+    try {
+      const response = await getMyBusinessDailyClosingSettings()
+
+      setDailyClosingSettings(response)
+      setDailyClosingForm(buildDailyClosingSettingsForm(response))
+    } catch (error) {
+      if (error instanceof Error) {
+        setDailyClosingErrorMessage(error.message)
+      } else {
+        setDailyClosingErrorMessage("Gün kapanışı ayarları alınamadı.")
+      }
+    } finally {
+      setIsLoadingDailyClosingSettings(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadDailyClosingSettings()
+  }, [user.id, user.business_id, user.role])
 
   function rememberPushEnabledState(enabled: boolean) {
     localStorage.setItem(
@@ -1146,6 +1212,38 @@ export function ProfilePanel({
       }
     } finally {
       setIsSendingPushTest(false)
+    }
+  }
+
+
+  async function handleSaveDailyClosingSettings() {
+    if (!canShowDailyClosingSettings(user)) {
+      setDailyClosingErrorMessage("Bu ayarı sadece işletme sahibi değiştirebilir.")
+      return
+    }
+
+    setIsSavingDailyClosingSettings(true)
+    setDailyClosingStatusMessage(null)
+    setDailyClosingErrorMessage(null)
+
+    try {
+      const response = await updateMyBusinessDailyClosingSettings({
+        auto_daily_closing_enabled: dailyClosingForm.auto_daily_closing_enabled,
+        daily_closing_time: dailyClosingForm.daily_closing_time,
+        timezone: dailyClosingForm.timezone,
+      })
+
+      setDailyClosingSettings(response)
+      setDailyClosingForm(buildDailyClosingSettingsForm(response))
+      setDailyClosingStatusMessage("Gün kapanışı ayarları kaydedildi.")
+    } catch (error) {
+      if (error instanceof Error) {
+        setDailyClosingErrorMessage(error.message)
+      } else {
+        setDailyClosingErrorMessage("Gün kapanışı ayarları kaydedilemedi.")
+      }
+    } finally {
+      setIsSavingDailyClosingSettings(false)
     }
   }
 
@@ -1314,6 +1412,135 @@ export function ProfilePanel({
           </button>
         </div>
       </div>
+
+      {canShowDailyClosingSettings(user) && (
+        <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+              <CalendarCheck2 size={22} />
+            </div>
+
+            <div className="min-w-0">
+              <h3 className="text-lg font-black tracking-tight">Gün Kapanışı Ayarları</h3>
+              <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
+                Otomatik gün kapanışı açıksa, gün manuel kapatılmadığında sistem belirlenen saatte raporu oluşturur.
+              </p>
+            </div>
+          </div>
+
+          {dailyClosingStatusMessage && (
+            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+              {dailyClosingStatusMessage}
+            </div>
+          )}
+
+          {dailyClosingErrorMessage && (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+              {dailyClosingErrorMessage}
+            </div>
+          )}
+
+          <div className="mt-4 grid gap-3">
+            <label className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-4">
+              <span className="min-w-0">
+                <span className="block text-sm font-black text-[var(--missio-text-main)]">
+                  Otomatik gün kapanışı
+                </span>
+                <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+                  Kapalıysa gün sadece manuel kapanır. Açıkken sistem 23:45 ve sonrasında kapanmamış günü kapatır.
+                </span>
+              </span>
+
+              <input
+                type="checkbox"
+                checked={dailyClosingForm.auto_daily_closing_enabled}
+                disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+                onChange={(event) =>
+                  setDailyClosingForm((currentForm) => ({
+                    ...currentForm,
+                    auto_daily_closing_enabled: event.target.checked,
+                  }))
+                }
+                className="h-6 w-6 shrink-0 accent-cyan-500 disabled:opacity-50"
+              />
+            </label>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="grid gap-1.5">
+                <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
+                  Kapanış Saati
+                </span>
+                <input
+                  type="time"
+                  value={dailyClosingForm.daily_closing_time}
+                  disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+                  onChange={(event) =>
+                    setDailyClosingForm((currentForm) => ({
+                      ...currentForm,
+                      daily_closing_time: event.target.value || "23:45",
+                    }))
+                  }
+                  className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400 disabled:opacity-50"
+                />
+              </label>
+
+              <label className="grid gap-1.5">
+                <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
+                  Saat Dilimi
+                </span>
+                <select
+                  value={dailyClosingForm.timezone}
+                  disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+                  onChange={(event) =>
+                    setDailyClosingForm((currentForm) => ({
+                      ...currentForm,
+                      timezone: event.target.value,
+                    }))
+                  }
+                  className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400 disabled:opacity-50"
+                >
+                  <option value="Asia/Nicosia">Asia/Nicosia</option>
+                  <option value="Europe/Istanbul">Europe/Istanbul</option>
+                  <option value="Europe/London">Europe/London</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3">
+              <p className="text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+                Gün kapanışı raporu tamamlanan, onay bekleyen, reddedilen ve yapılmayan görevleri kayda alır. Görevler ertesi güne otomatik devretmez. Patron veya yönetici rapora göre ertesi gün yeniden görev verebilir.
+              </p>
+              {dailyClosingSettings && (
+                <p className="mt-2 text-xs font-black text-[var(--missio-text-main)]">
+                  İşletme: {dailyClosingSettings.business_name}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => void loadDailyClosingSettings()}
+                disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw size={18} />
+                Yenile
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleSaveDailyClosingSettings()}
+                disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:opacity-50"
+              >
+                <Save size={18} />
+                {isSavingDailyClosingSettings ? "Kaydediliyor" : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {canShowUserManagement(user) && <UserManagementPanel currentUser={user} />}
 
