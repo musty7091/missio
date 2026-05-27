@@ -562,15 +562,63 @@ export default function App() {
       return
     }
 
-    registerCurrentDeviceWebPushSubscription()
-      .then((result) => {
-        if (result.status !== "registered") {
-          console.info("MISSIO_WEB_PUSH_REGISTRATION_SKIPPED", result)
-        }
-      })
-      .catch((error) => {
-        console.warn("MISSIO_WEB_PUSH_REGISTRATION_FAILED", error)
-      })
+    let lastRegistrationAttemptAt = 0
+
+    function registerWebPushForCurrentUser(reason: string) {
+      const now = Date.now()
+      const minimumRetryIntervalMs = 60 * 1000
+
+      if (now - lastRegistrationAttemptAt < minimumRetryIntervalMs) {
+        return
+      }
+
+      lastRegistrationAttemptAt = now
+
+      registerCurrentDeviceWebPushSubscription()
+        .then((result) => {
+          if (result.status !== "registered") {
+            console.info("MISSIO_WEB_PUSH_REGISTRATION_SKIPPED", {
+              reason,
+              result,
+            })
+          }
+        })
+        .catch((error) => {
+          console.warn("MISSIO_WEB_PUSH_REGISTRATION_FAILED", {
+            reason,
+            error,
+          })
+        })
+    }
+
+    function registerWhenVisible(reason: string) {
+      if (document.visibilityState === "visible") {
+        registerWebPushForCurrentUser(reason)
+      }
+    }
+
+    registerWhenVisible("current_user_ready")
+
+    const intervalId = window.setInterval(() => {
+      registerWhenVisible("periodic_refresh")
+    }, 5 * 60 * 1000)
+
+    const handleFocus = () => {
+      registerWhenVisible("window_focus")
+    }
+
+    const handleVisibilityChange = () => {
+      registerWhenVisible("visibility_change")
+    }
+
+    window.addEventListener("focus", handleFocus)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener("focus", handleFocus)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
   }, [currentUser])
   useEffect(() => {
     if (!currentUser) {
