@@ -32,7 +32,11 @@ import { TaskGroupHeader } from "./components/tasks/TaskGroupHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { useTranslation } from "./i18n/language"
 import { getCurrentUser } from "./services/authService"
-import { registerCurrentDeviceWebPushSubscription } from "./services/webPushService"
+import { clearMissioAppBadge } from "./services/appBadgeService"
+import {
+  deactivateCurrentDeviceWebPushSubscription,
+  registerCurrentDeviceWebPushSubscription,
+} from "./services/webPushService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
 import {
   completeTask,
@@ -801,7 +805,19 @@ export default function App() {
 
   const bottomNotificationCount = useMemo(() => getBottomNotificationCount(tasks), [tasks])
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await deactivateCurrentDeviceWebPushSubscription()
+    } catch (error) {
+      console.warn("MISSIO_WEB_PUSH_DEACTIVATE_ON_LOGOUT_FAILED", error)
+    }
+
+    try {
+      await clearMissioAppBadge()
+    } catch (error) {
+      console.warn("MISSIO_APP_BADGE_CLEAR_ON_LOGOUT_FAILED", error)
+    }
+
     clearAccessToken()
     setCurrentUser(null)
     setTasks([])

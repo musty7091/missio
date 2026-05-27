@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+from app.core.security_config import is_production_environment
+
 
 DEFAULT_DEVELOPMENT_SECRET_KEY = "change-this-secret-key-before-production"
 
@@ -9,7 +11,7 @@ def validate_production_settings(settings: object) -> None:
 
     environment = str(getattr(settings, "environment", "") or "").strip().lower()
 
-    if environment not in {"production", "prod"}:
+    if not is_production_environment(environment):
         return
 
     errors: list[str] = []

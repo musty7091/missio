@@ -33,6 +33,9 @@ type WebPushRegistrationResult = {
 
 let inFlightRegistration: Promise<WebPushRegistrationResult> | null = null
 
+const WEB_PUSH_ENDPOINT_STORAGE_KEY = "missio-web-push-endpoint"
+const WEB_PUSH_DISABLED_STORAGE_KEY = "missio-web-push-notifications-disabled"
+
 function getBrowserName() {
   const userAgent = navigator.userAgent.toLowerCase()
 
@@ -125,6 +128,36 @@ async function resolveNotificationPermission() {
   return Notification.requestPermission()
 }
 
+async function unregisterLegacyFirebaseMessagingServiceWorkers() {
+  if (!("serviceWorker" in navigator)) {
+    return
+  }
+
+  const registrations = await navigator.serviceWorker.getRegistrations()
+
+  await Promise.all(
+    registrations.map(async (registration) => {
+      const scriptUrl =
+        registration.active?.scriptURL ||
+        registration.waiting?.scriptURL ||
+        registration.installing?.scriptURL ||
+        ""
+
+      if (scriptUrl.includes("/firebase-messaging-sw.js")) {
+        await registration.unregister()
+      }
+    }),
+  )
+}
+
+function rememberWebPushEndpoint(subscription: PushSubscription) {
+  localStorage.setItem(WEB_PUSH_ENDPOINT_STORAGE_KEY, subscription.endpoint)
+}
+
+function rememberWebPushEnabledState(enabled: boolean) {
+  localStorage.setItem(WEB_PUSH_DISABLED_STORAGE_KEY, enabled ? "false" : "true")
+}
+
 async function registerCurrentDeviceWebPushSubscriptionInternal(): Promise<WebPushRegistrationResult> {
   if (!isWebPushSupported()) {
     return {
@@ -132,6 +165,8 @@ async function registerCurrentDeviceWebPushSubscriptionInternal(): Promise<WebPu
       message: "Bu cihaz Web Push bildirimlerini desteklemiyor.",
     }
   }
+
+  await unregisterLegacyFirebaseMessagingServiceWorkers()
 
   const publicKeyResponse = await getWebPushPublicKey()
 
@@ -193,6 +228,9 @@ async function registerCurrentDeviceWebPushSubscriptionInternal(): Promise<WebPu
     requiresAuth: true,
   })
 
+  rememberWebPushEndpoint(subscription)
+  rememberWebPushEnabledState(true)
+
   return {
     status: "registered",
     message: "Web Push cihazı kaydedildi.",
@@ -208,4 +246,52 @@ export async function registerCurrentDeviceWebPushSubscription() {
   }
 
   return inFlightRegistration
+}
+
+export async function deactivateCurrentDeviceWebPushSubscription() {
+  if (!isWebPushSupported()) {
+    rememberWebPushEnabledState(false)
+    localStorage.removeItem(WEB_PUSH_ENDPOINT_STORAGE_KEY)
+    return
+  }
+
+  const registrations = await navigator.serviceWorker.getRegistrations()
+  const endpoints = new Set<string>()
+  const subscriptions: PushSubscription[] = []
+
+  await Promise.all(
+    registrations.map(async (registration) => {
+      const subscription = await registration.pushManager.getSubscription()
+
+      if (subscription) {
+        endpoints.add(subscription.endpoint)
+        subscriptions.push(subscription)
+      }
+    }),
+  )
+
+  const storedEndpoint = localStorage.getItem(WEB_PUSH_ENDPOINT_STORAGE_KEY)
+
+  if (storedEndpoint) {
+    endpoints.add(storedEndpoint)
+  }
+
+  for (const endpoint of endpoints) {
+    await apiRequest("/push/web/subscriptions/deactivate", {
+      method: "POST",
+      body: { endpoint },
+      requiresAuth: true,
+    })
+  }
+
+  await Promise.all(
+    subscriptions.map(async (subscription) => {
+      await subscription.unsubscribe()
+    }),
+  )
+
+  await unregisterLegacyFirebaseMessagingServiceWorkers()
+
+  rememberWebPushEnabledState(false)
+  localStorage.removeItem(WEB_PUSH_ENDPOINT_STORAGE_KEY)
 }

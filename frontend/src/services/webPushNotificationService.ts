@@ -55,7 +55,6 @@ export type MissioWebPushEnableResult = {
   subscription?: PushSubscription
 }
 
-const WEB_PUSH_SERVICE_WORKER_PATH = "/missio-web-push-sw.js"
 const WEB_PUSH_DISABLED_STORAGE_KEY = "missio-web-push-notifications-disabled"
 const WEB_PUSH_ENDPOINT_STORAGE_KEY = "missio-web-push-endpoint"
 
@@ -200,11 +199,7 @@ async function getReadyWebPushRegistration() {
     throw new Error("Bu tarayıcı Web Push desteklemiyor.")
   }
 
-  const registration = await navigator.serviceWorker.register(
-    WEB_PUSH_SERVICE_WORKER_PATH,
-  )
-
-  return registration
+  return navigator.serviceWorker.ready
 }
 
 async function getExistingOrNewSubscription(

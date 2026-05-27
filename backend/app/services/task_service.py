@@ -25,6 +25,7 @@ from app.schemas.task import (
     TASK_STATUS_COMPLETED,
     TASK_STATUS_IN_PROGRESS,
     TASK_STATUS_REJECTED,
+    TASK_ATTACHMENT_TYPE_EVIDENCE,
     TASK_TYPE_EXTRA,
     TASK_TYPE_ROUTINE,
 )
@@ -328,14 +329,20 @@ def ensure_template_belongs_to_business(
         raise TaskPermissionError("Bu rutin görev şablonu ilgili işletmeye ait değil.")
 
 
-def count_task_attachments(db: Session, *, task_id: int) -> int:
-    """Return attachment count for task."""
+def count_task_attachments(
+    db: Session,
+    *,
+    task_id: int,
+    attachment_type: str | None = None,
+) -> int:
+    """Return attachment count for task, optionally filtered by attachment type."""
 
-    return int(
-        db.execute(
-            select(func.count(TaskAttachment.id)).where(TaskAttachment.task_id == task_id)
-        ).scalar_one()
-    )
+    query = select(func.count(TaskAttachment.id)).where(TaskAttachment.task_id == task_id)
+
+    if attachment_type is not None:
+        query = query.where(TaskAttachment.attachment_type == attachment_type)
+
+    return int(db.execute(query).scalar_one())
 
 
 def create_task_event(
@@ -848,11 +855,9 @@ def create_extra_task(
         user_agent=user_agent,
     )
 
-    notify_task_assigned(
-        db=db,
-        task=task,
-        assigned_to_user=assigned_to_user,
-    )
+    # Ekstra görev bildirimi route katmanında, ana işlem commit edildikten sonra
+    # tek kez gönderilir. Böylece çift bildirim ve bildirim hatasının görev
+    # oluşturmayı bozması engellenir.
 
     return task
 
@@ -1501,8 +1506,14 @@ def complete_task(
     if task.requires_location and (latitude is None or longitude is None):
         raise TaskLocationRequiredError("Bu görevi tamamlamak için konum bilgisi gereklidir.")
 
-    if task.requires_photo and count_task_attachments(db, task_id=task.id) < 1:
-        raise TaskEvidenceRequiredError("Bu görevi tamamlamak için en az bir fotoğraf/ek gereklidir.")
+    if task.requires_photo and count_task_attachments(
+        db,
+        task_id=task.id,
+        attachment_type=TASK_ATTACHMENT_TYPE_EVIDENCE,
+    ) < 1:
+        raise TaskEvidenceRequiredError(
+            "Bu görevi tamamlamak için en az bir kanıt fotoğrafı gereklidir."
+        )
 
     old_status = task.status
 

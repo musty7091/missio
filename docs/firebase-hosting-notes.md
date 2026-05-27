@@ -1,3 +1,11 @@
+﻿# Eski Firebase Hosting Notu
+
+> Güncel karar: Missio artık Firebase Hosting veya Firebase Cloud Messaging ile ilerlemiyor.
+> Aktif yayın stratejisi Cloud Run frontend + Cloud Run backend + standart Web Push / VAPID altyapısıdır.
+> Bu dosya yalnızca geçmiş kararları anlamak için tutulmuştur; yeni deploy adımlarında kullanılmamalıdır.
+
+---
+
 ﻿# Missio Firebase Hosting Notes
 
 ## Amaç

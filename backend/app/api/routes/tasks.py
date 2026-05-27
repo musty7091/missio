@@ -423,6 +423,20 @@ def send_task_badge_update_web_push_safely(
         }
 
 
+def commit_notification_side_effects_safely(db: Session, *, context: str) -> None:
+    """Persist best-effort notification side effects without blocking the main workflow."""
+
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "MISSIO_NOTIFICATION_SIDE_EFFECT_COMMIT_FAILED context=%s error=%s",
+            context,
+            exc,
+        )
+
+
 def map_task_service_error(exc: Exception) -> HTTPException:
     """Map task and attachment service exceptions to HTTP exceptions."""
 
@@ -913,10 +927,10 @@ def create_extra_task_endpoint(
             assigned_to_user=assigned_to_user,
         )
 
-        try:
-            db.commit()
-        except Exception:
-            db.rollback()
+        commit_notification_side_effects_safely(
+            db=db,
+            context="task_assigned_notification",
+        )
 
         return TaskCreatedResponse(
             task=task_response,
@@ -1474,6 +1488,7 @@ def complete_task_endpoint(
         db.commit()
         db.refresh(completed_task)
         send_task_badge_update_web_push_safely(db=db, task=completed_task)
+        commit_notification_side_effects_safely(db=db, context="task_complete_badge_update")
 
         return TaskStatusChangedResponse(
             task=build_task_response(completed_task, db=db),
@@ -1512,6 +1527,7 @@ def approve_task_endpoint(
         db.commit()
         db.refresh(approved_task)
         send_task_badge_update_web_push_safely(db=db, task=approved_task)
+        commit_notification_side_effects_safely(db=db, context="task_approve_badge_update")
 
         return TaskStatusChangedResponse(
             task=build_task_response(approved_task, db=db),
@@ -1550,6 +1566,7 @@ def reject_task_endpoint(
         db.commit()
         db.refresh(rejected_task)
         send_task_badge_update_web_push_safely(db=db, task=rejected_task)
+        commit_notification_side_effects_safely(db=db, context="task_reject_badge_update")
 
         return TaskStatusChangedResponse(
             task=build_task_response(rejected_task, db=db),
@@ -1588,6 +1605,7 @@ def cancel_task_endpoint(
         db.commit()
         db.refresh(cancelled_task)
         send_task_badge_update_web_push_safely(db=db, task=cancelled_task)
+        commit_notification_side_effects_safely(db=db, context="task_cancel_badge_update")
 
         return TaskStatusChangedResponse(
             task=build_task_response(cancelled_task, db=db),
@@ -1626,6 +1644,7 @@ def delete_task_endpoint(
         db.commit()
         db.refresh(deleted_task)
         send_task_badge_update_web_push_safely(db=db, task=deleted_task)
+        commit_notification_side_effects_safely(db=db, context="task_delete_badge_update")
 
         return TaskStatusChangedResponse(
             task=build_task_response(deleted_task, db=db),

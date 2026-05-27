@@ -432,6 +432,14 @@ def ensure_task_allows_attachment_upload(
             "Onaylanmış veya iptal edilmiş göreve artık fotoğraf eklenemez."
         )
 
+    if (
+        attachment_type == TASK_ATTACHMENT_TYPE_EVIDENCE
+        and task.assigned_to_user_id != current_user.id
+    ):
+        raise TaskAttachmentPermissionError(
+            "Kanıt fotoğrafını sadece görevin atandığı kullanıcı yükleyebilir."
+        )
+
     max_allowed_count = (
         MAX_VOICE_NOTES_PER_TASK
         if attachment_type == TASK_ATTACHMENT_TYPE_VOICE_NOTE

@@ -31,11 +31,6 @@ class Settings(BaseSettings):
         alias="MISSIO_CORS_ALLOWED_ORIGINS",
     )
 
-    firebase_service_account_file: str = Field(
-        default="",
-        alias="MISSIO_FIREBASE_SERVICE_ACCOUNT_FILE",
-    )
-
     web_push_enabled: bool = Field(
         default=False,
         alias="MISSIO_WEB_PUSH_ENABLED",
