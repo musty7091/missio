@@ -14,7 +14,23 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.database_url)
+
+def escape_configparser_value(value: str) -> str:
+    """Escape percent signs for ConfigParser-backed Alembic values.
+
+    Alembic stores main options through Python's ConfigParser. Database URLs can
+    legitimately contain percent-encoded characters such as %2C in passwords.
+    ConfigParser treats percent signs as interpolation markers, so they must be
+    doubled before calling set_main_option.
+    """
+
+    return value.replace("%", "%%")
+
+
+config.set_main_option(
+    "sqlalchemy.url",
+    escape_configparser_value(settings.database_url),
+)
 
 target_metadata = Base.metadata
 
