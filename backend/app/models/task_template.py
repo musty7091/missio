@@ -1,7 +1,7 @@
 from datetime import datetime, time
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, Time
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.db.base import Base
 
@@ -60,3 +60,29 @@ class TaskTemplate(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    @validates("requires_photo", "requires_location", "requires_manager_approval")
+    def validate_manager_approval_requirement(self, key: str, value: object) -> bool:
+        """Force manager approval when template needs photo proof or location proof."""
+
+        normalized_value = bool(value)
+
+        if key == "requires_manager_approval":
+            if bool(self.requires_photo) or bool(self.requires_location):
+                return True
+
+            return normalized_value
+
+        if key == "requires_photo":
+            if normalized_value or bool(self.requires_location):
+                self.requires_manager_approval = True
+
+            return normalized_value
+
+        if key == "requires_location":
+            if normalized_value or bool(self.requires_photo):
+                self.requires_manager_approval = True
+
+            return normalized_value
+
+        return normalized_value
