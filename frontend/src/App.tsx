@@ -32,6 +32,7 @@ import { TaskGroupHeader } from "./components/tasks/TaskGroupHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
 import { useTranslation } from "./i18n/language"
 import { getCurrentUser } from "./services/authService"
+import { registerCurrentDeviceWebPushSubscription } from "./services/webPushService"
 import { clearAccessToken, getAccessToken } from "./services/authTokenStorage"
 import {
   completeTask,
@@ -548,6 +549,29 @@ export default function App() {
     }
   }, [currentUser])
 
+  useEffect(() => {
+    if (!currentUser) {
+      return
+    }
+
+    if (currentUser.role === "super_admin") {
+      return
+    }
+
+    if (currentUser.subscription_access_status !== "active") {
+      return
+    }
+
+    registerCurrentDeviceWebPushSubscription()
+      .then((result) => {
+        if (result.status !== "registered") {
+          console.info("MISSIO_WEB_PUSH_REGISTRATION_SKIPPED", result)
+        }
+      })
+      .catch((error) => {
+        console.warn("MISSIO_WEB_PUSH_REGISTRATION_FAILED", error)
+      })
+  }, [currentUser])
   useEffect(() => {
     if (!currentUser) {
       return
