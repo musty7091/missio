@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -14,6 +15,7 @@ from app.models.task_attachment import TaskAttachment
 from app.models.task_event import TaskEvent
 from app.models.task_template import TaskTemplate
 from app.models.user import User
+from app.models.web_push_subscription import WebPushSubscription
 from app.schemas.task import (
     RECURRENCE_TYPE_DAILY,
     TASK_PRIORITY_NORMAL,
@@ -29,6 +31,10 @@ from app.schemas.task import (
 from app.services.access_control_service import (
     ensure_business_scope,
     ensure_staff_task_access,
+)
+from app.services.web_push_service import (
+    WebPushServiceError,
+    send_web_push_to_subscription,
 )
 
 
@@ -117,6 +123,13 @@ TASK_MANAGER_ROLES = {
 BOSS_LEVEL_ROLES = {
     UserRole.BOSS.value,
 }
+
+WEB_PUSH_APPROVER_ROLES = {
+    UserRole.BOSS.value,
+    UserRole.MANAGER.value,
+}
+
+logger = logging.getLogger(__name__)
 
 
 def get_utc_now() -> datetime:
@@ -363,6 +376,226 @@ def create_task_event(
     return event
 
 
+def build_task_web_push_url(task: Task) -> str:
+    """Return frontend deep-link URL for a task notification."""
+
+    return f"/?missioOpen=task&missioTaskId={task.id}"
+
+
+def get_task_push_title(task: Task) -> str:
+    """Return safe task title for notification body."""
+
+    title = (task.title or "").strip()
+
+    if not title:
+        return f"Görev #{task.id}"
+
+    if len(title) > 80:
+        return f"{title[:77]}..."
+
+    return title
+
+
+def get_active_web_push_subscriptions_for_user_ids(
+    db: Session,
+    *,
+    user_ids: list[int],
+    business_id: int,
+) -> list[WebPushSubscription]:
+    """Return active Web Push subscriptions for target users."""
+
+    unique_user_ids = sorted({user_id for user_id in user_ids if user_id > 0})
+
+    if not unique_user_ids:
+        return []
+
+    return (
+        db.query(WebPushSubscription)
+        .filter(
+            WebPushSubscription.business_id == business_id,
+            WebPushSubscription.user_id.in_(unique_user_ids),
+            WebPushSubscription.is_active.is_(True),
+        )
+        .order_by(WebPushSubscription.id.desc())
+        .all()
+    )
+
+
+def send_task_web_push_to_user_ids(
+    db: Session,
+    *,
+    business_id: int,
+    user_ids: list[int],
+    task: Task,
+    title: str,
+    body: str,
+    event_type: str,
+) -> None:
+    """Best-effort task Web Push delivery. It must never block task workflow."""
+
+    subscriptions = get_active_web_push_subscriptions_for_user_ids(
+        db=db,
+        user_ids=user_ids,
+        business_id=business_id,
+    )
+
+    if not subscriptions:
+        return
+
+    for subscription in subscriptions:
+        try:
+            send_web_push_to_subscription(
+                db=db,
+                subscription=subscription,
+                title=title,
+                body=body,
+                url=build_task_web_push_url(task),
+                tag=f"missio-task-{task.id}-{event_type}",
+                data={
+                    "type": event_type,
+                    "task_id": str(task.id),
+                    "business_id": str(task.business_id),
+                    "url": build_task_web_push_url(task),
+                },
+            )
+        except WebPushServiceError as exc:
+            logger.warning(
+                "MISSIO_WEB_PUSH_SEND_FAILED subscription_id=%s user_id=%s task_id=%s event_type=%s error=%s",
+                subscription.id,
+                subscription.user_id,
+                task.id,
+                event_type,
+                exc,
+            )
+        except Exception as exc:
+            logger.warning(
+                "MISSIO_WEB_PUSH_UNEXPECTED_ERROR subscription_id=%s user_id=%s task_id=%s event_type=%s error=%s",
+                subscription.id,
+                subscription.user_id,
+                task.id,
+                event_type,
+                exc,
+            )
+
+
+def get_task_approval_notification_user_ids(
+    db: Session,
+    *,
+    task: Task,
+    exclude_user_id: int | None = None,
+) -> list[int]:
+    """Return boss/manager users who should be notified about task approval flow."""
+
+    query = (
+        db.query(User.id)
+        .filter(
+            User.business_id == task.business_id,
+            User.is_active.is_(True),
+            User.role.in_(WEB_PUSH_APPROVER_ROLES),
+        )
+    )
+
+    if exclude_user_id is not None:
+        query = query.filter(User.id != exclude_user_id)
+
+    return [int(row[0]) for row in query.all()]
+
+
+def notify_task_assigned(
+    db: Session,
+    *,
+    task: Task,
+    assigned_to_user: User,
+) -> None:
+    """Notify assigned user that a new task is available."""
+
+    send_task_web_push_to_user_ids(
+        db=db,
+        business_id=task.business_id,
+        user_ids=[assigned_to_user.id],
+        task=task,
+        title="Yeni görev atandı",
+        body=f"Sana yeni bir görev atandı: {get_task_push_title(task)}",
+        event_type="task_assigned",
+    )
+
+
+def notify_task_completed(
+    db: Session,
+    *,
+    task: Task,
+    completed_by_user: User,
+) -> None:
+    """Notify boss/manager users when a task is completed."""
+
+    recipient_user_ids = get_task_approval_notification_user_ids(
+        db=db,
+        task=task,
+        exclude_user_id=completed_by_user.id,
+    )
+
+    if task.requires_manager_approval:
+        title = "Görev onay bekliyor"
+        body = f"{completed_by_user.full_name} görevi tamamladı, onay bekliyor: {get_task_push_title(task)}"
+        event_type = "task_waiting_approval"
+    else:
+        title = "Görev tamamlandı"
+        body = f"{completed_by_user.full_name} görevi tamamladı: {get_task_push_title(task)}"
+        event_type = "task_completed"
+
+    send_task_web_push_to_user_ids(
+        db=db,
+        business_id=task.business_id,
+        user_ids=recipient_user_ids,
+        task=task,
+        title=title,
+        body=body,
+        event_type=event_type,
+    )
+
+
+def notify_task_approved(
+    db: Session,
+    *,
+    task: Task,
+) -> None:
+    """Notify assigned user that the task was approved."""
+
+    if task.assigned_to_user_id is None:
+        return
+
+    send_task_web_push_to_user_ids(
+        db=db,
+        business_id=task.business_id,
+        user_ids=[task.assigned_to_user_id],
+        task=task,
+        title="Görev onaylandı",
+        body=f"Görevin onaylandı: {get_task_push_title(task)}",
+        event_type="task_approved",
+    )
+
+
+def notify_task_rejected(
+    db: Session,
+    *,
+    task: Task,
+) -> None:
+    """Notify assigned user that the task was rejected."""
+
+    if task.assigned_to_user_id is None:
+        return
+
+    send_task_web_push_to_user_ids(
+        db=db,
+        business_id=task.business_id,
+        user_ids=[task.assigned_to_user_id],
+        task=task,
+        title="Görev reddedildi",
+        body=f"Görevin düzeltme için geri gönderildi: {get_task_push_title(task)}",
+        event_type="task_rejected",
+    )
+
+
 def create_routine_task_template(
     db: Session,
     *,
@@ -591,6 +824,12 @@ def create_extra_task(
         user_agent=user_agent,
     )
 
+    notify_task_assigned(
+        db=db,
+        task=task,
+        assigned_to_user=assigned_to_user,
+    )
+
     return task
 
 
@@ -708,6 +947,12 @@ def generate_daily_routine_tasks(
             note="Günlük rutin görev üretildi.",
             ip_address=ip_address,
             user_agent=user_agent,
+        )
+
+        notify_task_assigned(
+            db=db,
+            task=task,
+            assigned_to_user=assigned_user,
         )
 
         created_tasks.append(task)
@@ -1259,6 +1504,12 @@ def complete_task(
         user_agent=user_agent,
     )
 
+    notify_task_completed(
+        db=db,
+        task=task,
+        completed_by_user=current_user,
+    )
+
     return task
 
 
@@ -1299,6 +1550,11 @@ def approve_task(
         user_agent=user_agent,
     )
 
+    notify_task_approved(
+        db=db,
+        task=task,
+    )
+
     return task
 
 
@@ -1336,6 +1592,11 @@ def reject_task(
         note=note,
         ip_address=ip_address,
         user_agent=user_agent,
+    )
+
+    notify_task_rejected(
+        db=db,
+        task=task,
     )
 
     return task
