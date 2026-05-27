@@ -484,21 +484,45 @@ def get_task_approval_notification_user_ids(
     task: Task,
     exclude_user_id: int | None = None,
 ) -> list[int]:
-    """Return boss/manager users who should be notified about task approval flow."""
+    """
+    Return users who must be notified when a task is completed.
 
-    query = (
+    Business rule:
+    - Business boss users must be informed.
+    - The user who created/assigned the task must be informed.
+    - The user who completed the task must not receive a self-notification.
+    - Unrelated managers must not receive noise notifications.
+    """
+
+    recipient_user_ids: set[int] = set()
+
+    boss_user_rows = (
         db.query(User.id)
         .filter(
             User.business_id == task.business_id,
             User.is_active.is_(True),
-            User.role.in_(WEB_PUSH_APPROVER_ROLES),
+            User.role == UserRole.BOSS.value,
         )
+        .all()
     )
 
-    if exclude_user_id is not None:
-        query = query.filter(User.id != exclude_user_id)
+    for row in boss_user_rows:
+        recipient_user_ids.add(int(row[0]))
 
-    return [int(row[0]) for row in query.all()]
+    if task.created_by_user_id is not None:
+        creator = db.get(User, task.created_by_user_id)
+
+        if (
+            creator is not None
+            and creator.is_active
+            and creator.business_id == task.business_id
+        ):
+            recipient_user_ids.add(creator.id)
+
+    if exclude_user_id is not None:
+        recipient_user_ids.discard(exclude_user_id)
+
+    return sorted(recipient_user_ids)
 
 
 def notify_task_assigned(
