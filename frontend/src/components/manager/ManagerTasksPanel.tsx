@@ -1,4 +1,4 @@
-﻿import {
+import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
@@ -372,12 +372,22 @@ function StaffCard({
   )
 }
 
-function ManagerTaskRow({ task }: { task: TodayTask }) {
+function ManagerTaskRow({
+  task,
+  onOpenTaskDetails,
+}: {
+  task: TodayTask
+  onOpenTaskDetails: (task: TodayTask) => void
+}) {
   const { language, t } = useTranslation()
   const staffName = getStaffName(task, t)
 
   return (
-    <article className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 shadow-sm">
+    <button
+      type="button"
+      onClick={() => onOpenTaskDetails(task)}
+      className="w-full rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3 text-left shadow-sm transition active:scale-[0.99]"
+    >
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-sm font-black text-cyan-800 dark:text-cyan-200">
           {getInitials(staffName)}
@@ -436,7 +446,7 @@ function ManagerTaskRow({ task }: { task: TodayTask }) {
           </div>
         </div>
       </div>
-    </article>
+    </button>
   )
 }
 
@@ -493,13 +503,18 @@ export function ManagerTasksPanel({
     [tasks, currentUserId],
   )
 
-  async function loadManagerData() {
+  async function loadManagerData(options: { showLoading?: boolean } = {}) {
+    const showLoading = options.showLoading ?? true
+
     if (businessId === null) {
       setErrorMessage(t("manager.operations.error.noBusiness"))
       return
     }
 
-    setIsLoading(true)
+    if (showLoading) {
+      setIsLoading(true)
+    }
+
     setErrorMessage(null)
 
     try {
@@ -522,12 +537,37 @@ export function ManagerTasksPanel({
         setErrorMessage(t("manager.operations.error.loadFailed"))
       }
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
     void loadManagerData()
+  }, [businessId])
+
+  useEffect(() => {
+    if (businessId === null) {
+      return
+    }
+
+    function refreshManagerDataWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void loadManagerData({ showLoading: false })
+      }
+    }
+
+    const intervalId = window.setInterval(refreshManagerDataWhenVisible, 10000)
+
+    window.addEventListener("focus", refreshManagerDataWhenVisible)
+    document.addEventListener("visibilitychange", refreshManagerDataWhenVisible)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener("focus", refreshManagerDataWhenVisible)
+      document.removeEventListener("visibilitychange", refreshManagerDataWhenVisible)
+    }
   }, [businessId])
 
   async function handleTaskCreated() {
@@ -708,7 +748,11 @@ export function ManagerTasksPanel({
       ) : (
         <div className="space-y-2.5">
           {recentTasks.map((task) => (
-            <ManagerTaskRow key={task.id} task={task} />
+            <ManagerTaskRow
+              key={task.id}
+              task={task}
+              onOpenTaskDetails={onOpenOwnTaskDetails}
+            />
           ))}
         </div>
       )}
