@@ -379,6 +379,7 @@ export default function App() {
     return "tasks"
   })
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
+  const [selectedTaskSnapshot, setSelectedTaskSnapshot] = useState<TodayTask | null>(null)
   const taskDetailHistoryTokenRef = useRef<string | null>(null)
   const [taskListFilter, setTaskListFilter] = useState<TaskListFilter>("all")
   const [tasks, setTasks] = useState<TodayTask[]>([])
@@ -444,6 +445,20 @@ export default function App() {
     }
   }
 
+  function upsertTaskInList(updatedTask: TodayTask) {
+    setTasks((currentTasks) => {
+      const exists = currentTasks.some((task) => task.id === updatedTask.id)
+
+      if (exists) {
+        return currentTasks.map((task) =>
+          task.id === updatedTask.id ? updatedTask : task,
+        )
+      }
+
+      return [updatedTask, ...currentTasks]
+    })
+  }
+
   useEffect(() => {
     if (!currentUser) {
       setTasks([])
@@ -490,18 +505,8 @@ export default function App() {
       .then((apiTask) => {
         const mappedTask = mapApiTaskToTodayTask(apiTask)
 
-        setTasks((currentTasks) => {
-          const exists = currentTasks.some((task) => task.id === mappedTask.id)
-
-          if (exists) {
-            return currentTasks.map((task) =>
-              task.id === mappedTask.id ? mappedTask : task,
-            )
-          }
-
-          return [mappedTask, ...currentTasks]
-        })
-
+        upsertTaskInList(mappedTask)
+        setSelectedTaskSnapshot(mappedTask)
         setSelectedTaskId(mappedTask.id)
         clearMissioTaskUrlParams()
       })
@@ -521,8 +526,18 @@ export default function App() {
       return null
     }
 
-    return tasks.find((task) => task.id === selectedTaskId) ?? null
-  }, [selectedTaskId, tasks])
+    const taskFromList = tasks.find((task) => task.id === selectedTaskId)
+
+    if (taskFromList) {
+      return taskFromList
+    }
+
+    if (selectedTaskSnapshot?.id === selectedTaskId) {
+      return selectedTaskSnapshot
+    }
+
+    return null
+  }, [selectedTaskId, selectedTaskSnapshot, tasks])
 
   function openTaskDetails(task: TodayTask) {
     const historyToken = `missio-task-detail-${task.id}-${Date.now()}`
@@ -537,7 +552,23 @@ export default function App() {
       window.location.href,
     )
 
+    setSelectedTaskSnapshot(task)
     setSelectedTaskId(task.id)
+    setTasksErrorMessage(null)
+
+    getTaskDetail(task.id)
+      .then((apiTask) => {
+        const mappedTask = mapApiTaskToTodayTask(apiTask)
+
+        upsertTaskInList(mappedTask)
+        setSelectedTaskSnapshot(mappedTask)
+      })
+      .catch(() => {
+        /*
+         * Detay paneli tıklanan görev snapshot'ı ile zaten açılır.
+         * Canlı detay yenilemesi başarısız olursa kullanıcıyı boş ekranda bırakmayız.
+         */
+      })
   }
 
   function closeTaskDetails() {
@@ -551,6 +582,7 @@ export default function App() {
     }
 
     taskDetailHistoryTokenRef.current = null
+    setSelectedTaskSnapshot(null)
     setSelectedTaskId(null)
   }
 
@@ -569,6 +601,7 @@ export default function App() {
       }
 
       taskDetailHistoryTokenRef.current = null
+      setSelectedTaskSnapshot(null)
       setSelectedTaskId(null)
     }
 
@@ -633,6 +666,7 @@ export default function App() {
     clearAccessToken()
     setCurrentUser(null)
     setTasks([])
+    setSelectedTaskSnapshot(null)
     setSelectedTaskId(null)
     taskDetailHistoryTokenRef.current = null
     setTaskListFilter("all")
