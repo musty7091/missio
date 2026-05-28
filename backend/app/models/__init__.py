@@ -1,4 +1,4 @@
-﻿from app.models.app_setting import AppSetting
+from app.models.app_setting import AppSetting
 from app.models.audit_log import AuditLog
 from app.models.business import Business
 from app.models.business_feature import BusinessFeature
@@ -14,6 +14,7 @@ from app.models.login_attempt import LoginAttempt
 from app.models.module import Module
 from app.models.notification import Notification
 from app.models.package import Package
+from app.models.password_reset_request import PasswordResetRequest
 from app.models.push_notification_log import PushNotificationLog
 from app.models.push_notification_token import PushNotificationToken
 from app.models.setup_state import SetupState
@@ -44,6 +45,7 @@ __all__ = [
     "Module",
     "Notification",
     "Package",
+    "PasswordResetRequest",
     "PushNotificationLog",
     "PushNotificationToken",
     "SetupState",
