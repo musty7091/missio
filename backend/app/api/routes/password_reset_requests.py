@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.core.roles import UserRole
+from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.business import Business
 from app.models.password_reset_request import PasswordResetRequest
 from app.models.user import User
+from app.services.audit_log_service import create_audit_log
 
 
 router = APIRouter(
@@ -35,6 +38,56 @@ class PasswordResetRequestResponse(BaseModel):
     requested_at_utc: datetime
     resolved_at_utc: datetime | None
     resolved_by_user_id: int | None
+
+
+
+def get_client_ip(request: Request) -> str | None:
+    """Return best-effort client IP address."""
+
+    forwarded_for = request.headers.get("x-forwarded-for")
+
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()[:100]
+
+    if request.client is None:
+        return None
+
+    return request.client.host[:100]
+
+
+def get_user_agent(request: Request) -> str | None:
+    """Return normalized user agent from request headers."""
+
+    user_agent = request.headers.get("user-agent")
+
+    if not user_agent:
+        return None
+
+    return user_agent.strip()[:1000]
+
+
+def get_utc_now_for_password_reset_route() -> datetime:
+    """Return current UTC datetime."""
+
+    return datetime.now(timezone.utc)
+
+
+def generate_temporary_password() -> str:
+    """Generate a temporary password compatible with the password policy."""
+
+    number = secrets.randbelow(900000) + 100000
+    return f"Missio.{number}!"
+
+
+class PasswordResetRequestResetResponse(BaseModel):
+    """Response returned after an authorized password reset."""
+
+    request_id: int
+    target_user_id: int
+    target_username: str
+    temporary_password: str
+    must_change_password: bool
+    message: str
 
 
 def can_current_user_see_password_reset_request(
@@ -149,3 +202,89 @@ def list_password_reset_requests_endpoint(
         )
 
     return response_items
+
+@router.post("/{request_id}/reset", response_model=PasswordResetRequestResetResponse)
+def reset_password_request_endpoint(
+    request_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PasswordResetRequestResetResponse:
+    """Reset a user's password from a visible pending password reset request."""
+
+    reset_request = db.get(PasswordResetRequest, request_id)
+
+    if reset_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="?ifre s?f?rlama talebi bulunamad?.",
+        )
+
+    if reset_request.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bu ?ifre s?f?rlama talebi art?k beklemede de?il.",
+        )
+
+    target_user = db.get(User, reset_request.target_user_id)
+
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Talebe ba?l? kullan?c? bulunamad?.",
+        )
+
+    if not can_current_user_see_password_reset_request(
+        current_user=current_user,
+        target_user=target_user,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu ?ifre s?f?rlama talebi i?in yetkiniz yok.",
+        )
+
+    temporary_password = generate_temporary_password()
+    now = get_utc_now_for_password_reset_route()
+
+    target_user.password_hash = hash_password(temporary_password)
+    target_user.must_change_password = True
+    target_user.updated_at = now
+
+    reset_request.status = "resolved"
+    reset_request.resolved_at_utc = now
+    reset_request.resolved_by_user_id = current_user.id
+    reset_request.resolution_note = "password_reset_completed"
+    reset_request.updated_at_utc = now
+
+    create_audit_log(
+        db=db,
+        action="auth.password_reset_completed",
+        business_id=target_user.business_id,
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=str(target_user.id),
+        detail={
+            "request_id": reset_request.id,
+            "target_username": target_user.username,
+            "target_role": target_user.role,
+            "must_change_password": True,
+        },
+        ip_address=get_client_ip(request),
+        user_agent=get_user_agent(request),
+    )
+
+    db.add(target_user)
+    db.add(reset_request)
+    db.commit()
+    db.refresh(target_user)
+    db.refresh(reset_request)
+
+    return PasswordResetRequestResetResponse(
+        request_id=reset_request.id,
+        target_user_id=target_user.id,
+        target_username=target_user.username,
+        temporary_password=temporary_password,
+        must_change_password=target_user.must_change_password,
+        message="Ge?ici ?ifre olu?turuldu. Kullan?c? ilk giri?te ?ifresini de?i?tirmelidir.",
+    )
+
