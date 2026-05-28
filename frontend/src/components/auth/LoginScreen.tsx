@@ -1,4 +1,4 @@
-﻿import {
+import {
   AlertCircle,
   Building2,
   Camera,
@@ -209,11 +209,14 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
             <MissioLogoMark />
 
             <div className="min-w-0">
-              <p className="truncate text-2xl font-black leading-none tracking-tight text-[var(--missio-text-main)]">
+              <p
+                className="truncate text-[1.55rem] leading-none tracking-tight text-[var(--missio-text-main)]"
+                style={{ fontWeight: 900 }}
+              >
                 Missio
               </p>
               <p className="mt-1 truncate text-sm font-bold tracking-wide text-cyan-500">
-                Mission is possible.
+                Mission is possible...
               </p>
             </div>
           </div>
@@ -249,10 +252,6 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
               <span className="text-cyan-300">{t("login.heroTitleMiddle")}</span>{" "}
               {t("login.heroTitleEnd")}
             </h1>
-
-            <p className="mt-3 text-sm font-medium leading-5 text-slate-300">
-              {t("login.heroDescription")}
-            </p>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 backdrop-blur">
