@@ -139,6 +139,9 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false)
+  const [isForgotPasswordSubmitting, setIsForgotPasswordSubmitting] = useState(false)
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string | null>(null)
 
   function clearErrorMessage() {
     if (errorMessage) {
@@ -161,6 +164,47 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
     setPassword(value)
   }
 
+  async function handleForgotPasswordRequest() {
+    const cleanBusinessSlug = businessSlug.trim().toLowerCase()
+    const cleanUsername = username.trim()
+
+    if (!cleanBusinessSlug || !cleanUsername) {
+      setForgotPasswordMessage("İşletme Kodu ve Kullanıcı Adı alanlarını doldur.")
+      return
+    }
+
+    setIsForgotPasswordSubmitting(true)
+    setForgotPasswordMessage(null)
+
+    try {
+      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")
+      const response = await fetch(`${apiBaseUrl}/auth/forgot-password/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          business_slug: cleanBusinessSlug,
+          username: cleanUsername,
+        }),
+      })
+
+      const data = (await response.json().catch(() => null)) as { message?: string } | null
+
+      if (!response.ok) {
+        throw new Error("forgot_password_request_failed")
+      }
+
+      setForgotPasswordMessage(
+        data?.message ??
+          "Talebin yetkili kişiye iletildi. Şifren sıfırlandığında işletme yetkilinden bilgi alabilirsin.",
+      )
+    } catch {
+      setForgotPasswordMessage("Talep gönderilemedi. Lütfen daha sonra tekrar deneyin.")
+    } finally {
+      setIsForgotPasswordSubmitting(false)
+    }
+  }
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -348,9 +392,42 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
               <p>{errorMessage}</p>
             </div>
           )}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForgotPasswordOpen((currentValue) => !currentValue)
+                  setForgotPasswordMessage(null)
+                }}
+                className="text-sm font-bold text-cyan-400 transition hover:text-cyan-300"
+              >
+                Şifremi unuttum
+              </button>
 
-          <button
-            type="submit"
+              {isForgotPasswordOpen ? (
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs font-medium leading-5 text-[var(--missio-text-muted)]">
+                    İşletme Kodu ve Kullanıcı Adı alanlarını doldurup talep gönder.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleForgotPasswordRequest}
+                    disabled={isForgotPasswordSubmitting}
+                    className="w-full rounded-xl bg-cyan-500 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isForgotPasswordSubmitting ? "Gönderiliyor..." : "Talep Gönder"}
+                  </button>
+
+                  {forgotPasswordMessage ? (
+                    <p className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-semibold leading-5 text-[var(--missio-text-main)]">
+                      {forgotPasswordMessage}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          <button type="submit"
             disabled={isSubmitting}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 py-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
           >
