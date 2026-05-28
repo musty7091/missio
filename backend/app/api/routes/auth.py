@@ -9,8 +9,9 @@ from app.api.dependencies import get_current_user
 from app.core.security import hash_password, validate_password_strength, verify_password
 from app.db.session import get_db
 from app.models.user import User
+from app.models.password_reset_request import PasswordResetRequest
 from app.repositories.business_repository import get_business_by_slug
-from app.repositories.user_repository import normalize_email
+from app.repositories.user_repository import normalize_email, normalize_username
 from app.schemas.auth import LoginRequest, TokenResponse, UserMeResponse
 from app.services.audit_log_service import create_audit_log
 from app.services.subscription_service import get_current_business_subscription
@@ -29,6 +30,18 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 
+
+class ForgotPasswordRequest(BaseModel):
+    """Request payload for public forgot-password request."""
+
+    business_slug: str = Field(min_length=1, max_length=120)
+    username: str = Field(min_length=1, max_length=100)
+
+
+class ForgotPasswordResponse(BaseModel):
+    """Safe response returned after forgot-password request."""
+
+    message: str
 
 class UpdateMyProfileRequest(BaseModel):
     """Request payload for updating the authenticated user's own profile."""
@@ -83,6 +96,109 @@ def get_user_agent(request: Request) -> str | None:
 
     return user_agent.strip()[:1000]
 
+
+def create_safe_forgot_password_response() -> ForgotPasswordResponse:
+    """Return generic forgot-password response without leaking user existence."""
+
+    return ForgotPasswordResponse(
+        message=(
+            "Talebin yetkili kişiye iletildi. "
+            "Şifren sıfırlandığında işletme yetkilinden bilgi alabilirsin."
+        ),
+    )
+
+
+def create_password_reset_request_if_user_exists(
+    db: Session,
+    *,
+    business_slug: str,
+    username: str,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> None:
+    """Create pending password reset request only if business and user exist."""
+
+    normalized_username = normalize_username(username)
+    normalized_business_slug = business_slug.strip().lower()
+
+    if not normalized_business_slug or not normalized_username:
+        return
+
+    business = get_business_by_slug(db=db, slug=normalized_business_slug)
+
+    if business is None or not business.is_active:
+        return
+
+    user = (
+        db.query(User)
+        .filter(
+            User.business_id == business.id,
+            User.username == normalized_username,
+            User.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+
+    if user is None:
+        return
+
+    now = get_utc_now_for_auth_route()
+
+    existing_pending_request = (
+        db.query(PasswordResetRequest)
+        .filter(
+            PasswordResetRequest.business_id == business.id,
+            PasswordResetRequest.target_user_id == user.id,
+            PasswordResetRequest.status == "pending",
+        )
+        .order_by(PasswordResetRequest.id.desc())
+        .first()
+    )
+
+    if existing_pending_request is not None:
+        existing_pending_request.requested_at_utc = now
+        existing_pending_request.updated_at_utc = now
+        existing_pending_request.ip_address = ip_address
+        existing_pending_request.user_agent = user_agent
+        db.add(existing_pending_request)
+        return
+
+    reset_request = PasswordResetRequest(
+        business_id=business.id,
+        target_user_id=user.id,
+        requested_username=normalized_username,
+        status="pending",
+        notification_status="not_attempted",
+        notification_attempted_count=0,
+        notification_sent_count=0,
+        notification_failed_count=0,
+        last_notification_attempt_at_utc=None,
+        requested_at_utc=now,
+        resolved_at_utc=None,
+        resolved_by_user_id=None,
+        resolution_note=None,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        created_at_utc=now,
+        updated_at_utc=now,
+    )
+
+    db.add(reset_request)
+
+    create_audit_log(
+        db=db,
+        action="auth.password_reset_requested",
+        business_id=business.id,
+        user_id=user.id,
+        entity_type="password_reset_request",
+        entity_id=None,
+        detail={
+            "username": normalized_username,
+            "business_slug": normalized_business_slug,
+        },
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
 
 def raise_safe_login_error() -> None:
     """Raise generic safe login error without leaking business or user existence."""
@@ -228,6 +344,28 @@ def build_subscription_access_info(
         "subscription_lock_reason": lock_reason,
     }
 
+
+@router.post("/forgot-password/request", response_model=ForgotPasswordResponse)
+def forgot_password_request(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> ForgotPasswordResponse:
+    """Create a safe public password reset request."""
+
+    try:
+        create_password_reset_request_if_user_exists(
+            db=db,
+            business_slug=payload.business_slug,
+            username=payload.username,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return create_safe_forgot_password_response()
 
 @router.post("/login", response_model=TokenResponse)
 def login(
