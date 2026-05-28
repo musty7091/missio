@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+﻿from fastapi import APIRouter
 
 from app.api.routes import (
     auth,
@@ -7,6 +7,7 @@ from app.api.routes import (
     daily_closures,
     db_health,
     health,
+    location_checks,
     push_notifications,
     tasks,
 )
@@ -19,4 +20,5 @@ api_router.include_router(push_notifications.router)
 api_router.include_router(businesses.router)
 api_router.include_router(business_users.router)
 api_router.include_router(daily_closures.router)
+api_router.include_router(location_checks.router)
 api_router.include_router(tasks.router)

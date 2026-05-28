@@ -30,6 +30,8 @@ import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
 import { TaskFilterTabs, type TaskListFilter } from "./components/tasks/TaskFilterTabs"
 import { TaskGroupHeader } from "./components/tasks/TaskGroupHeader"
 import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
+import { StaffLocationCheckPanel } from "./components/location-checks/StaffLocationCheckPanel"
+import { LocationCheckRequestPanel } from "./components/location-checks/LocationCheckRequestPanel"
 import { useTranslation } from "./i18n/language"
 import { getCurrentUser } from "./services/authService"
 import { clearMissioAppBadge } from "./services/appBadgeService"
@@ -949,6 +951,16 @@ export default function App() {
               remainingCount={taskStats.remainingCount}
             />
 
+            <StaffLocationCheckPanel
+              onChanged={() =>
+                void loadTodayTasks({
+                  showLoading: false,
+                  showError: false,
+                  keepExistingOnError: true,
+                })
+              }
+            />
+
             {tasks.length > 0 && (
               <TaskFilterTabs
                 activeFilter={taskListFilter}
@@ -1029,19 +1041,30 @@ export default function App() {
             </section>
           </>
           ) : currentUser.role === "boss" ? (
-            <BossDashboardPanel
-              businessId={currentUser.business_id}
-              onOpenApprovals={() => setActiveTab("notifications")}
-              onOpenReports={() => setActiveTab("reports")}
-            />
+            <>
+              <LocationCheckRequestPanel businessId={currentUser.business_id} />
+
+              <BossDashboardPanel
+                businessId={currentUser.business_id}
+                onOpenApprovals={() => setActiveTab("notifications")}
+                onOpenReports={() => setActiveTab("reports")}
+              />
+            </>
           ) : (
-            <ManagerTasksPanel
-              businessId={currentUser.business_id}
-              currentUserId={currentUser.id}
-              busyTaskId={busyTaskId}
-              onOpenOwnTaskDetails={openTaskDetails}
-              onChanged={() => void loadTodayTasks()}
-            />
+            <>
+              <LocationCheckRequestPanel
+                businessId={currentUser.business_id}
+                allowedTargetRoles={["staff"]}
+              />
+
+              <ManagerTasksPanel
+                businessId={currentUser.business_id}
+                currentUserId={currentUser.id}
+                busyTaskId={busyTaskId}
+                onOpenOwnTaskDetails={openTaskDetails}
+                onChanged={() => void loadTodayTasks()}
+              />
+            </>
           )
         ) : activeTab === "notifications" ? (
           currentUser.role === "super_admin" ? (

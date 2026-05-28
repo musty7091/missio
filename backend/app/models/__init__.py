@@ -9,6 +9,7 @@ from app.models.daily_report import DailyReport
 from app.models.daily_operation_closure import DailyOperationClosure
 from app.models.daily_operation_closure_item import DailyOperationClosureItem
 from app.models.license import License
+from app.models.location_check import LocationCheck
 from app.models.login_attempt import LoginAttempt
 from app.models.module import Module
 from app.models.notification import Notification
@@ -38,6 +39,7 @@ __all__ = [
     "DailyOperationClosure",
     "DailyOperationClosureItem",
     "License",
+    "LocationCheck",
     "LoginAttempt",
     "Module",
     "Notification",
