@@ -105,56 +105,56 @@ type UserManagementTexts = {
 
 const textsByLanguage: Record<AppLanguage, UserManagementTexts> = {
   tr: {
-    title: "Kullanıcı Y?netimi",
-    description: "Kullanıcı olu?turma, d?zenleme, aktif-pasif ve Şifre s?f?rlama i?lemleri.",
+    title: "Kullanıcı Yönetimi",
+    description: "Kullanıcı oluşturma, düzenleme, aktif-pasif ve şifre sıfırlama işlemleri.",
     statUsers: "kullanıcı",
     statActive: "aktif",
     statPassive: "pasif",
-    openManagement: "Y?netimi a?",
-    closeManagement: "Y?netimi kapat",
+    openManagement: "Yönetimi aç",
+    closeManagement: "Yönetimi kapat",
     refresh: "Yenile",
     searchAndFilter: "Arama ve filtre",
-    searchPlaceholder: "Ad, kullanıcı ad? veya e-posta ara",
+    searchPlaceholder: "Ad, kullanıcı adı veya e-posta ara",
     allRoles: "Tüm roller",
     allStatuses: "Tüm durumlar",
-    createUser: "Yeni kullanıcı olu?tur",
+    createUser: "Yeni kullanıcı oluştur",
     closeCreateForm: "Yeni kullanıcı formunu kapat",
     fullNamePlaceholder: "Ad soyad",
-    usernamePlaceholder: "Kullanıcı ad?",
+    usernamePlaceholder: "Kullanıcı adı",
     emailPlaceholder: "E-posta",
-    temporaryPasswordPlaceholder: "Ge?ici Şifre",
-    saveUser: "Kullanıcıy? kaydet",
+    temporaryPasswordPlaceholder: "Geçici şifre",
+    saveUser: "Kullanıcıyı kaydet",
     userList: "Kullanıcı listesi",
-    showing: "g?steriliyor",
-    loadingUsers: "Kullanıcılar y?kleniyor...",
-    noUsers: "Bu filtreye uygun kullanıcı bulunamad?.",
-    edit: "D?zenle",
+    showing: "gösteriliyor",
+    loadingUsers: "Kullanıcılar yükleniyor...",
+    noUsers: "Bu filtreye uygun kullanıcı bulunamadı.",
+    edit: "Düzenle",
     deactivate: "Pasife al",
     activate: "Aktif yap",
     roleLocked: "Rol kilitli",
-    editUser: "Kullanıcı d?zenle",
+    editUser: "Kullanıcı düzenle",
     accountActiveQuestion: "Hesap aktif mi?",
-    saveChanges: "De?i?iklikleri kaydet",
-    resetPasswordTitle: "Şifre s?f?rla",
-    newTemporaryPassword: "Yeni ge?ici Şifre",
-    resetPasswordButton: "Şifreyi s?f?rla",
+    saveChanges: "Değişiklikleri kaydet",
+    resetPasswordTitle: "Şifre sıfırla",
+    newTemporaryPassword: "Yeni geçici şifre",
+    resetPasswordButton: "Şifreyi sıfırla",
     roleBoss: "İşletme Sahibi",
-    roleSuperAdmin: "S?per Admin",
+    roleSuperAdmin: "Süper Admin",
     roleManager: "Yönetici",
     roleStaff: "Personel",
     statusActive: "Aktif",
     statusPassive: "Pasif",
     loadError: "Kullanıcı listesi alınamadı.",
-    createError: "Kullanıcı olu?turulamad?.",
+    createError: "Kullanıcı oluşturulamadı.",
     updateError: "Kullanıcı güncellenemedi.",
-    statusError: "Kullanıcı durumu de?i?tirilemedi.",
-    resetError: "Şifre s?f?rlanamad?.",
-    roleError: "Rol de?i?tirilemedi.",
-    cannotDeactivateSelf: "Kendi kullanıcın?z? pasif hale getiremezsiniz.",
-    createSuccess: "Kullanıcı olu?turuldu.",
+    statusError: "Kullanıcı durumu değiştirilemedi.",
+    resetError: "Şifre sıfırlanamadı.",
+    roleError: "Rol değiştirilemedi.",
+    cannotDeactivateSelf: "Kendi kullanıcınızı pasif hale getiremezsiniz.",
+    createSuccess: "Kullanıcı oluşturuldu.",
     updateSuccess: "Kullanıcı güncellendi.",
     statusSuccess: "Kullanıcı durumu güncellendi.",
-    resetSuccess: "Şifre s?f?rland?.",
+    resetSuccess: "Şifre sıfırlandı.",
     roleSuccess: "Rol güncellendi.",
   },
   en: {
@@ -798,7 +798,7 @@ export function BilingualUserManagementPanel({
                           </div>
 
                           <p className="mt-1 truncate text-xs font-bold text-[var(--missio-text-muted)]">
-                            @{businessUser.username} ? {getRoleLabel(businessUser.role, texts)}
+                            @{businessUser.username}{" • "}{getRoleLabel(businessUser.role, texts)}
                           </p>
                         </div>
 
@@ -866,7 +866,7 @@ export function BilingualUserManagementPanel({
                   </div>
 
                   <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-                    {selectedUser.username} ? {getRoleLabel(selectedUser.role, texts)}
+                    {selectedUser.username}{" • "}{getRoleLabel(selectedUser.role, texts)}
                   </p>
                 </div>
 
