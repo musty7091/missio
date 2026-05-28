@@ -34,6 +34,7 @@ from app.services.location_check_service import (
     list_pending_location_checks_for_staff,
     mark_location_check_seen,
     send_location_check_notifications_safely,
+    send_location_check_response_notification_safely,
     share_location_check,
 )
 
@@ -366,6 +367,18 @@ def share_location_check_endpoint(
         db.commit()
         db.refresh(check)
 
+        send_location_check_response_notification_safely(
+            db=db,
+            location_check=check,
+        )
+
+        commit_location_check_notification_side_effects_safely(
+            db=db,
+            context="location_check_shared_response_notification",
+        )
+
+        db.refresh(check)
+
         return LocationCheckUpdatedResponse(
             check=build_location_check_response(check, db=db),
             message="Konum başarıyla paylaşıldı.",
@@ -400,6 +413,18 @@ def fail_location_check_endpoint(
         )
 
         db.commit()
+        db.refresh(check)
+
+        send_location_check_response_notification_safely(
+            db=db,
+            location_check=check,
+        )
+
+        commit_location_check_notification_side_effects_safely(
+            db=db,
+            context="location_check_failed_response_notification",
+        )
+
         db.refresh(check)
 
         return LocationCheckUpdatedResponse(

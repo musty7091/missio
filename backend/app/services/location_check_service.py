@@ -548,6 +548,146 @@ def send_location_check_notifications_safely(
             )
 
 
+
+def build_location_check_response_notification_url(location_check: LocationCheck) -> str:
+    """Return frontend URL for requester response notification."""
+
+    return f"/?missioOpen=location-checks&missioLocationCheckId={location_check.id}"
+
+
+def get_location_check_target_display_name(
+    db: Session,
+    *,
+    location_check: LocationCheck,
+) -> str:
+    """Return target user display name for notifications."""
+
+    target_user = db.get(User, location_check.target_user_id)
+
+    if target_user is None:
+        return f"Kullanıcı #{location_check.target_user_id}"
+
+    if target_user.full_name:
+        return target_user.full_name
+
+    return target_user.username
+
+
+def send_location_check_response_notification_safely(
+    db: Session,
+    *,
+    location_check: LocationCheck,
+) -> None:
+    """Best-effort notification to requester after staff responds."""
+
+    if location_check.requested_by_user_id is None:
+        logger.info(
+            "MISSIO_LOCATION_CHECK_RESPONSE_NOTIFICATION_NO_REQUESTER location_check_id=%s",
+            location_check.id,
+        )
+        return
+
+    subscriptions = get_active_web_push_subscriptions_for_user(
+        db=db,
+        business_id=location_check.business_id,
+        user_id=location_check.requested_by_user_id,
+    )
+
+    target_name = get_location_check_target_display_name(
+        db=db,
+        location_check=location_check,
+    )
+
+    if location_check.status == LOCATION_CHECK_STATUS_SHARED:
+        title = "Konum paylaşıldı"
+        body = f"{target_name} konumunu paylaştı."
+        event_type = "location_check_shared"
+    elif location_check.status == LOCATION_CHECK_STATUS_PERMISSION_DENIED:
+        title = "Konum izni kapalı"
+        body = f"{target_name} konum izni kapalı olduğu için konum paylaşamadı."
+        event_type = "location_check_permission_denied"
+    else:
+        title = "Konum yoklama yanıtı"
+        body = f"{target_name} konum yoklamasına yanıt verdi."
+        event_type = "location_check_failed"
+
+    if not subscriptions:
+        logger.warning(
+            "MISSIO_LOCATION_CHECK_RESPONSE_PUSH_NO_SUBSCRIPTION location_check_id=%s requester_user_id=%s business_id=%s status=%s",
+            location_check.id,
+            location_check.requested_by_user_id,
+            location_check.business_id,
+            location_check.status,
+        )
+        return
+
+    sent_count = 0
+    failed_count = 0
+    notification_url = build_location_check_response_notification_url(location_check)
+
+    for subscription in subscriptions:
+        try:
+            send_web_push_to_subscription(
+                db=db,
+                subscription=subscription,
+                title=title,
+                body=body,
+                url=notification_url,
+                tag=f"missio-location-check-response-{location_check.id}",
+                data={
+                    "type": event_type,
+                    "location_check_id": str(location_check.id),
+                    "locationCheckId": str(location_check.id),
+                    "business_id": str(location_check.business_id),
+                    "businessId": str(location_check.business_id),
+                    "target_user_id": str(location_check.target_user_id),
+                    "targetUserId": str(location_check.target_user_id),
+                    "status": location_check.status,
+                    "url": notification_url,
+                },
+            )
+            sent_count += 1
+        except WebPushConfigurationError as exc:
+            failed_count += 1
+            logger.warning(
+                "MISSIO_LOCATION_CHECK_RESPONSE_PUSH_CONFIGURATION_ERROR location_check_id=%s subscription_id=%s requester_user_id=%s error=%s",
+                location_check.id,
+                subscription.id,
+                subscription.user_id,
+                exc,
+            )
+        except WebPushServiceError as exc:
+            failed_count += 1
+            logger.warning(
+                "MISSIO_LOCATION_CHECK_RESPONSE_PUSH_FAILED location_check_id=%s subscription_id=%s requester_user_id=%s error=%s",
+                location_check.id,
+                subscription.id,
+                subscription.user_id,
+                exc,
+            )
+        except Exception as exc:
+            failed_count += 1
+            logger.warning(
+                "MISSIO_LOCATION_CHECK_RESPONSE_PUSH_UNEXPECTED_ERROR location_check_id=%s subscription_id=%s requester_user_id=%s error=%s",
+                location_check.id,
+                subscription.id,
+                subscription.user_id,
+                exc,
+            )
+
+    logger.info(
+        "MISSIO_LOCATION_CHECK_RESPONSE_PUSH_RESULT location_check_id=%s requester_user_id=%s status=%s attempted=%s sent=%s failed=%s",
+        location_check.id,
+        location_check.requested_by_user_id,
+        location_check.status,
+        len(subscriptions),
+        sent_count,
+        failed_count,
+    )
+
+    db.flush()
+
+
 def list_location_checks_for_business(
     db: Session,
     *,
