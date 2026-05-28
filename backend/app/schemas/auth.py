@@ -63,6 +63,7 @@ class UserMeResponse(BaseModel):
     role: str
     is_active: bool
     theme_preference: str | None
+    must_change_password: bool = False
     subscription_access_status: str = "active"
     subscription_status: str | None = None
     subscription_ends_at_utc: datetime | None = None
@@ -82,5 +83,6 @@ class UserSessionResponse(BaseModel):
     role: str
     is_active: bool
     theme_preference: str | None
+    must_change_password: bool = False
     dashboard_path: str
     is_super_admin: bool

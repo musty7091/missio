@@ -1,4 +1,4 @@
-﻿import {
+import {
   AlertCircle,
   CheckCircle2,
   Clock3,
@@ -8,6 +8,7 @@
   ShieldAlert,
 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useTranslation, type AppLanguage } from "../../i18n/language"
 import {
   failLocationCheck,
   listMyPendingLocationChecks,
@@ -30,7 +31,98 @@ type ActionMessage = {
   text: string
 }
 
-function formatDateTime(value: string | null) {
+type StaffPanelTexts = {
+  authorizedUser: string
+  notificationSent: string
+  notificationPartialFailed: string
+  notificationNoSubscription: string
+  notificationFailed: string
+  notificationConfigurationError: string
+  notificationPending: string
+  loadError: string
+  shareSuccess: string
+  shareErrorPermissionDenied: string
+  shareErrorPositionUnavailable: string
+  shareErrorTimeout: string
+  shareErrorUnsupported: string
+  shareErrorDefault: string
+  loadingTitle: string
+  loadingDescription: string
+  badge: string
+  title: string
+  description: string
+  refreshAria: string
+  errorTitle: string
+  resultTitle: string
+  requestedAt: string
+  statusSeen: string
+  statusWaiting: string
+  gettingLocation: string
+  shareButton: string
+}
+
+const staffPanelTexts: Record<AppLanguage, StaffPanelTexts> = {
+  tr: {
+    authorizedUser: "Yetkili kullan?c?",
+    notificationSent: "Bildirim g?nderildi",
+    notificationPartialFailed: "Bildirim k?smen g?nderildi",
+    notificationNoSubscription: "Cihaz bildirime kay?tl? de?il",
+    notificationFailed: "Bildirim g?nderilemedi",
+    notificationConfigurationError: "Bildirim ayar? eksik",
+    notificationPending: "Bildirim beklemede",
+    loadError: "Konum yoklama istekleri al?namad?.",
+    shareSuccess: "Konumun ba?ar?yla payla??ld?.",
+    shareErrorPermissionDenied: "Konum izni kapal?. Taray?c? veya cihaz ayarlar?ndan konum iznini a?mal?s?n.",
+    shareErrorPositionUnavailable: "Konum bilgisi al?namad?. L?tfen konum servislerini kontrol et.",
+    shareErrorTimeout: "Konum al?n?rken zaman a??m? oldu. L?tfen tekrar dene.",
+    shareErrorUnsupported: "Bu cihaz veya taray?c? konum payla??m?n? desteklemiyor.",
+    shareErrorDefault: "Konum payla??lamad?. L?tfen tekrar dene.",
+    loadingTitle: "Konum yoklamas? kontrol ediliyor",
+    loadingDescription: "Bekleyen konum istekleri haz?rlan?yor.",
+    badge: "Konum yoklamas?",
+    title: "Bekleyen konum iste?i",
+    description: "Yetkili ki?i konumunu payla?man? istiyor.",
+    refreshAria: "Konum yoklamalar?n? yenile",
+    errorTitle: "Konum istekleri al?namad?",
+    resultTitle: "??lem sonucu",
+    requestedAt: "?stek zaman?",
+    statusSeen: "G?r?ld?",
+    statusWaiting: "Bekliyor",
+    gettingLocation: "Konum al?n?yor",
+    shareButton: "Konumumu Payla?",
+  },
+  en: {
+    authorizedUser: "Authorized user",
+    notificationSent: "Notification sent",
+    notificationPartialFailed: "Notification partially sent",
+    notificationNoSubscription: "Device is not registered for notifications",
+    notificationFailed: "Notification could not be sent",
+    notificationConfigurationError: "Notification configuration missing",
+    notificationPending: "Notification pending",
+    loadError: "Location check requests could not be loaded.",
+    shareSuccess: "Your location has been shared successfully.",
+    shareErrorPermissionDenied: "Location permission is disabled. Enable location permission from your browser or device settings.",
+    shareErrorPositionUnavailable: "Location information could not be retrieved. Please check location services.",
+    shareErrorTimeout: "Location request timed out. Please try again.",
+    shareErrorUnsupported: "This device or browser does not support location sharing.",
+    shareErrorDefault: "Location could not be shared. Please try again.",
+    loadingTitle: "Checking location requests",
+    loadingDescription: "Preparing pending location requests.",
+    badge: "Location check",
+    title: "Pending location request",
+    description: "An authorized user is asking you to share your location.",
+    refreshAria: "Refresh location checks",
+    errorTitle: "Location requests could not be loaded",
+    resultTitle: "Action result",
+    requestedAt: "Requested at",
+    statusSeen: "Seen",
+    statusWaiting: "Waiting",
+    gettingLocation: "Getting location",
+    shareButton: "Share My Location",
+  },
+}
+
+function formatDateTime(value: string | null, language: AppLanguage) {
   if (!value) {
     return "-"
   }
@@ -41,7 +133,7 @@ function formatDateTime(value: string | null) {
     return "-"
   }
 
-  return date.toLocaleString("tr-TR", {
+  return date.toLocaleString(language === "tr" ? "tr-TR" : "en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -50,36 +142,36 @@ function formatDateTime(value: string | null) {
   })
 }
 
-function getRequestSourceLabel(check: LocationCheck) {
+function getRequestSourceLabel(check: LocationCheck, texts: StaffPanelTexts) {
   if (check.requested_by_user_full_name) {
     return check.requested_by_user_full_name
   }
 
-  return "Yetkili kullanıcı"
+  return texts.authorizedUser
 }
 
-function getNotificationLabel(check: LocationCheck) {
+function getNotificationLabel(check: LocationCheck, texts: StaffPanelTexts) {
   if (check.notification_status === "sent") {
-    return "Bildirim gönderildi"
+    return texts.notificationSent
   }
 
   if (check.notification_status === "partial_failed") {
-    return "Bildirim kısmen gönderildi"
+    return texts.notificationPartialFailed
   }
 
   if (check.notification_status === "no_subscription") {
-    return "Cihaz bildirime kayıtlı değil"
+    return texts.notificationNoSubscription
   }
 
   if (check.notification_status === "failed") {
-    return "Bildirim gönderilemedi"
+    return texts.notificationFailed
   }
 
   if (check.notification_status === "configuration_error") {
-    return "Bildirim ayarı eksik"
+    return texts.notificationConfigurationError
   }
 
-  return "Bildirim beklemede"
+  return texts.notificationPending
 }
 
 function getActionMessageClass(tone: ActionMessage["tone"]) {
@@ -94,7 +186,30 @@ function getActionMessageClass(tone: ActionMessage["tone"]) {
   return "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100"
 }
 
+function getShareFailureMessage(errorCode: string, texts: StaffPanelTexts) {
+  if (errorCode === "permission_denied") {
+    return texts.shareErrorPermissionDenied
+  }
+
+  if (errorCode === "position_unavailable") {
+    return texts.shareErrorPositionUnavailable
+  }
+
+  if (errorCode === "timeout") {
+    return texts.shareErrorTimeout
+  }
+
+  if (errorCode === "unsupported") {
+    return texts.shareErrorUnsupported
+  }
+
+  return texts.shareErrorDefault
+}
+
 export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelProps) {
+  const { language } = useTranslation()
+  const texts = staffPanelTexts[language]
+
   const [checks, setChecks] = useState<LocationCheck[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -118,18 +233,14 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
       try {
         const response = await listMyPendingLocationChecks()
         setChecks(response.checks)
-      } catch (error) {
-        if (error instanceof Error) {
-          setErrorMessage(error.message)
-        } else {
-          setErrorMessage("Konum yoklama istekleri alınamadı.")
-        }
+      } catch {
+        setErrorMessage(texts.loadError)
       } finally {
         setIsLoading(false)
         setIsRefreshing(false)
       }
     },
-    [],
+    [texts.loadError],
   )
 
   useEffect(() => {
@@ -212,7 +323,7 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
 
       setActionMessage({
         tone: "success",
-        text: "Konumun başarıyla paylaşıldı.",
+        text: texts.shareSuccess,
       })
 
       await loadPendingChecks(false)
@@ -232,7 +343,7 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
 
       setActionMessage({
         tone: responseErrorCode === "permission_denied" ? "warning" : "error",
-        text: responseErrorMessage,
+        text: getShareFailureMessage(responseErrorCode, texts),
       })
 
       await loadPendingChecks(false)
@@ -251,9 +362,9 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
           </div>
 
           <div>
-            <p className="text-sm font-black">Konum yoklaması kontrol ediliyor</p>
+            <p className="text-sm font-black">{texts.loadingTitle}</p>
             <p className="mt-1 text-xs font-semibold text-[var(--missio-text-muted)]">
-              Bekleyen konum istekleri hazırlanıyor.
+              {texts.loadingDescription}
             </p>
           </div>
         </div>
@@ -275,13 +386,13 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
 
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-200">
-              Konum yoklaması
+              {texts.badge}
             </p>
             <h2 className="mt-1 text-base font-black text-slate-950 dark:text-white">
-              Bekleyen konum isteği
+              {texts.title}
             </h2>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-700 dark:text-slate-200">
-              Yetkili kişi konumunu paylaşmanı istiyor.
+              {texts.description}
             </p>
           </div>
         </div>
@@ -291,7 +402,7 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
           onClick={() => void loadPendingChecks(false)}
           disabled={isRefreshing}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-cyan-700 shadow-sm transition active:scale-95 disabled:cursor-wait disabled:opacity-60 dark:bg-slate-900 dark:text-cyan-100"
-          aria-label="Konum yoklamalarını yenile"
+          aria-label={texts.refreshAria}
         >
           {isRefreshing ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
         </button>
@@ -301,7 +412,7 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
         <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs font-bold leading-5 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
           <div className="mb-1 flex items-center gap-2 font-black">
             <AlertCircle size={16} />
-            Konum istekleri alınamadı
+            {texts.errorTitle}
           </div>
           {errorMessage}
         </div>
@@ -311,7 +422,7 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
         <div className={`mb-3 rounded-2xl border p-3 text-xs font-bold leading-5 ${getActionMessageClass(actionMessage.tone)}`}>
           <div className="mb-1 flex items-center gap-2 font-black">
             {actionMessage.tone === "success" ? <CheckCircle2 size={16} /> : <ShieldAlert size={16} />}
-            İşlem sonucu
+            {texts.resultTitle}
           </div>
           {actionMessage.text}
         </div>
@@ -327,15 +438,15 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-black text-slate-950 dark:text-white">
-                    {getRequestSourceLabel(check)}
+                    {getRequestSourceLabel(check, texts)}
                   </p>
                   <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
-                    İstek zamanı: {formatDateTime(check.requested_at_utc)}
+                    {texts.requestedAt}: {formatDateTime(check.requested_at_utc, language)}
                   </p>
                 </div>
 
                 <span className="rounded-full bg-cyan-100 px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:bg-cyan-950 dark:text-cyan-100">
-                  {check.status === "seen" ? "Görüldü" : "Bekliyor"}
+                  {check.status === "seen" ? texts.statusSeen : texts.statusWaiting}
                 </span>
               </div>
 
@@ -348,7 +459,7 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
               <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.7rem] font-bold text-[var(--missio-text-muted)]">
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-900">
                   <Clock3 size={12} />
-                  {getNotificationLabel(check)}
+                  {getNotificationLabel(check, texts)}
                 </span>
               </div>
 
@@ -361,12 +472,12 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
                 {busyCheckId === check.id ? (
                   <>
                     <Loader2 className="animate-spin" size={18} />
-                    Konum alınıyor
+                    {texts.gettingLocation}
                   </>
                 ) : (
                   <>
                     <MapPin size={18} />
-                    Konumumu Paylaş
+                    {texts.shareButton}
                   </>
                 )}
               </button>

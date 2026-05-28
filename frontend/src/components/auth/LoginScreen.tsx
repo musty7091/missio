@@ -17,7 +17,7 @@ import {
 import type { FormEvent, ReactNode } from "react"
 import { useState } from "react"
 import { LanguageSelector } from "../language/LanguageSelector"
-import { getCurrentUser, loginUser } from "../../services/authService"
+import { getCurrentUser, loginUser, requestForgotPassword } from "../../services/authService"
 import { setAccessToken } from "../../services/authTokenStorage"
 import { ApiError } from "../../services/httpClient"
 import type { UserMeResponse } from "../../types/auth"
@@ -169,7 +169,7 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
     const cleanUsername = username.trim()
 
     if (!cleanBusinessSlug || !cleanUsername) {
-      setForgotPasswordMessage("İşletme Kodu ve Kullanıcı Adı alanlarını doldur.")
+      setForgotPasswordMessage(t("login.forgotPasswordRequired"))
       return
     }
 
@@ -177,34 +177,19 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
     setForgotPasswordMessage(null)
 
     try {
-      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")
-      const response = await fetch(`${apiBaseUrl}/auth/forgot-password/request`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          business_slug: cleanBusinessSlug,
-          username: cleanUsername,
-        }),
+      await requestForgotPassword({
+        business_slug: cleanBusinessSlug,
+        username: cleanUsername,
       })
 
-      const data = (await response.json().catch(() => null)) as { message?: string } | null
-
-      if (!response.ok) {
-        throw new Error("forgot_password_request_failed")
-      }
-
-      setForgotPasswordMessage(
-        data?.message ??
-          "Talebin yetkili kişiye iletildi. Şifren sıfırlandığında işletme yetkilinden bilgi alabilirsin.",
-      )
+      setForgotPasswordMessage(t("login.forgotPasswordSuccess"))
     } catch {
-      setForgotPasswordMessage("Talep gönderilemedi. Lütfen daha sonra tekrar deneyin.")
+      setForgotPasswordMessage(t("login.forgotPasswordFailed"))
     } finally {
       setIsForgotPasswordSubmitting(false)
     }
   }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -401,13 +386,13 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
                 }}
                 className="text-sm font-bold text-cyan-400 transition hover:text-cyan-300"
               >
-                Şifremi unuttum
+                {t("login.forgotPassword")}
               </button>
 
               {isForgotPasswordOpen ? (
                 <div className="mt-3 space-y-3">
                   <p className="text-xs font-medium leading-5 text-[var(--missio-text-muted)]">
-                    İşletme Kodu ve Kullanıcı Adı alanlarını doldurup talep gönder.
+                    {t("login.forgotPasswordDescription")}
                   </p>
 
                   <button
@@ -416,8 +401,10 @@ export function LoginScreen({ theme, onToggleTheme, onLoginSuccess }: LoginScree
                     disabled={isForgotPasswordSubmitting}
                     className="w-full rounded-xl bg-cyan-500 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isForgotPasswordSubmitting ? "Gönderiliyor..." : "Talep Gönder"}
-                  </button>
+                {isForgotPasswordSubmitting
+                  ? t("login.forgotPasswordSubmitting")
+                  : t("login.forgotPasswordSubmit")}
+              </button>
 
                   {forgotPasswordMessage ? (
                     <p className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-semibold leading-5 text-[var(--missio-text-main)]">

@@ -19,6 +19,7 @@ export type UserMeResponse = {
   role: string
   is_active: boolean
   theme_preference: string | null
+  must_change_password: boolean
   subscription_access_status: string
   subscription_status: string | null
   subscription_ends_at_utc: string | null

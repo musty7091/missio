@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ApprovalsPanel } from "./components/approvals/ApprovalsPanel"
 import { LoginScreen } from "./components/auth/LoginScreen"
+import { ForcedPasswordChangePanel } from "./components/auth/ForcedPasswordChangePanel"
 import {
   AppStatePanel,
   FullScreenStatus,
@@ -505,6 +506,10 @@ export default function App() {
       return
     }
 
+    if (currentUser.must_change_password) {
+      return
+    }
+
     if (currentUser.role === "super_admin") {
       setTasks([])
       setTasksErrorMessage(null)
@@ -522,6 +527,10 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) {
+      return
+    }
+
+    if (currentUser.must_change_password) {
       return
     }
 
@@ -557,6 +566,10 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) {
+      return
+    }
+
+    if (currentUser.must_change_password) {
       return
     }
 
@@ -912,6 +925,18 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
         onLoginSuccess={setCurrentUser}
+      />
+    )
+  }
+
+  if (currentUser.must_change_password) {
+    return (
+      <ForcedPasswordChangePanel
+        user={currentUser}
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+        onLogout={handleLogout}
+        onPasswordChanged={setCurrentUser}
       />
     )
   }

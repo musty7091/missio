@@ -451,6 +451,7 @@ def me(
         role=current_user.role,
         is_active=current_user.is_active,
         theme_preference=current_user.theme_preference,
+        must_change_password=current_user.must_change_password,
         **subscription_access_info,
     )
 
@@ -510,6 +511,7 @@ def change_my_password(
             )
 
         current_user.password_hash = hash_password(payload.new_password)
+        current_user.must_change_password = False
         current_user.updated_at = get_utc_now_for_auth_route()
 
         create_audit_log(

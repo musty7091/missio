@@ -30,6 +30,8 @@ import {
 } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useTranslation, type TranslationKey } from "../../i18n/language"
+import { BilingualUserManagementPanel } from "./BilingualUserManagementPanel"
+import { PasswordResetRequestsPanel } from "./PasswordResetRequestsPanel"
 import {
   changeBusinessUserRole,
   createBusinessUser,
@@ -201,6 +203,10 @@ function canShowDailyClosingSettings(user: UserMeResponse) {
   return user.business_id !== null && user.role === "boss"
 }
 
+function canShowPasswordResetRequests(user: UserMeResponse) {
+  return user.role === "super_admin" || user.role === "boss" || user.role === "manager"
+}
+
 function buildDailyClosingSettingsForm(
   settings: BusinessDailyClosingSettingsResponse | null,
 ): DailyClosingSettingsFormState {
@@ -268,7 +274,7 @@ function InfoRow({ icon, label, value }: InfoRowProps) {
   )
 }
 
-function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
+export function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
   const { t } = useTranslation()
   const [users, setUsers] = useState<BusinessUser[]>([])
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
@@ -635,7 +641,7 @@ function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
           className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95 disabled:opacity-50"
         >
           <RefreshCw size={18} />
-          Yenile
+          {t("profile.dailyClosing.refresh")}
         </button>
       </div>
 
@@ -1063,12 +1069,8 @@ export function ProfilePanel({
 
       setDailyClosingSettings(response)
       setDailyClosingForm(buildDailyClosingSettingsForm(response))
-    } catch (error) {
-      if (error instanceof Error) {
-        setDailyClosingErrorMessage(error.message)
-      } else {
-        setDailyClosingErrorMessage("Gün kapanışı ayarları alınamadı.")
-      }
+    } catch {
+      setDailyClosingErrorMessage(t("profile.dailyClosing.loadError"))
     } finally {
       setIsLoadingDailyClosingSettings(false)
     }
@@ -1218,7 +1220,7 @@ export function ProfilePanel({
 
   async function handleSaveDailyClosingSettings() {
     if (!canShowDailyClosingSettings(user)) {
-      setDailyClosingErrorMessage("Bu ayarı sadece işletme sahibi değiştirebilir.")
+      setDailyClosingErrorMessage(t("profile.dailyClosing.ownerOnly"))
       return
     }
 
@@ -1235,18 +1237,13 @@ export function ProfilePanel({
 
       setDailyClosingSettings(response)
       setDailyClosingForm(buildDailyClosingSettingsForm(response))
-      setDailyClosingStatusMessage("Gün kapanışı ayarları kaydedildi.")
-    } catch (error) {
-      if (error instanceof Error) {
-        setDailyClosingErrorMessage(error.message)
-      } else {
-        setDailyClosingErrorMessage("Gün kapanışı ayarları kaydedilemedi.")
-      }
+      setDailyClosingStatusMessage(t("profile.dailyClosing.saveSuccess"))
+    } catch {
+      setDailyClosingErrorMessage(t("profile.dailyClosing.saveError"))
     } finally {
       setIsSavingDailyClosingSettings(false)
     }
   }
-
 
   async function handleChangeOwnPassword() {
     const currentPassword = passwordForm.current_password.trim()
@@ -1421,9 +1418,11 @@ export function ProfilePanel({
             </div>
 
             <div className="min-w-0">
-              <h3 className="text-lg font-black tracking-tight">Gün Kapanışı Ayarları</h3>
+              <h3 className="text-lg font-black tracking-tight">
+                {t("profile.dailyClosing.title")}
+              </h3>
               <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-                Otomatik gün kapanışı açıksa, gün manuel kapatılmadığında sistem belirlenen saatte raporu oluşturur.
+                {t("profile.dailyClosing.description")}
               </p>
             </div>
           </div>
@@ -1444,10 +1443,10 @@ export function ProfilePanel({
             <label className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-4">
               <span className="min-w-0">
                 <span className="block text-sm font-black text-[var(--missio-text-main)]">
-                  Otomatik gün kapanışı
+                  {t("profile.dailyClosing.autoLabel")}
                 </span>
                 <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                  Kapalıysa gün sadece manuel kapanır. Açıkken sistem 23:45 ve sonrasında kapanmamış günü kapatır.
+                  {t("profile.dailyClosing.autoHelp")}
                 </span>
               </span>
 
@@ -1468,7 +1467,7 @@ export function ProfilePanel({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="grid gap-1.5">
                 <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
-                  Kapanış Saati
+                  {t("profile.dailyClosing.timeLabel")}
                 </span>
                 <input
                   type="time"
@@ -1486,7 +1485,7 @@ export function ProfilePanel({
 
               <label className="grid gap-1.5">
                 <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
-                  Saat Dilimi
+                  {t("profile.dailyClosing.timezoneLabel")}
                 </span>
                 <select
                   value={dailyClosingForm.timezone}
@@ -1508,11 +1507,11 @@ export function ProfilePanel({
 
             <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3">
               <p className="text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                Gün kapanışı raporu tamamlanan, onay bekleyen, reddedilen ve yapılmayan görevleri kayda alır. Görevler ertesi güne otomatik devretmez. Patron veya yönetici rapora göre ertesi gün yeniden görev verebilir.
+                {t("profile.dailyClosing.info")}
               </p>
               {dailyClosingSettings && (
                 <p className="mt-2 text-xs font-black text-[var(--missio-text-main)]">
-                  İşletme: {dailyClosingSettings.business_name}
+                  {t("profile.dailyClosing.business")}: {dailyClosingSettings.business_name}
                 </p>
               )}
             </div>
@@ -1525,7 +1524,7 @@ export function ProfilePanel({
                 className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95 disabled:opacity-50"
               >
                 <RefreshCw size={18} />
-                Yenile
+                {t("profile.dailyClosing.refresh")}
               </button>
 
               <button
@@ -1535,14 +1534,18 @@ export function ProfilePanel({
                 className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:opacity-50"
               >
                 <Save size={18} />
-                {isSavingDailyClosingSettings ? "Kaydediliyor" : "Kaydet"}
+                {isSavingDailyClosingSettings
+                  ? t("profile.dailyClosing.saving")
+                  : t("profile.dailyClosing.save")}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {canShowUserManagement(user) && <UserManagementPanel currentUser={user} />}
+      {canShowPasswordResetRequests(user) && <PasswordResetRequestsPanel />}
+
+      {canShowUserManagement(user) && <BilingualUserManagementPanel currentUser={user} />}
 
       <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
         <div className="flex items-start gap-3">

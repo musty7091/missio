@@ -1,4 +1,4 @@
-﻿import {
+import {
   AlertCircle,
   BellRing,
   CheckCircle2,
@@ -11,6 +11,7 @@
   UsersRound,
 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useTranslation, type AppLanguage } from "../../i18n/language"
 import {
   listBusinessUsers,
   type BusinessUser,
@@ -31,7 +32,136 @@ type PanelMessage = {
   text: string
 }
 
-function formatDateTime(value: string | null) {
+type RequestPanelTexts = {
+  badge: string
+  title: string
+  description: string
+  refreshAria: string
+  resultTitle: string
+  staffLabel: string
+  staffSelectPlaceholder: string
+  allEligibleStaff: string
+  noteLabel: string
+  notePlaceholder: string
+  sending: string
+  sendButton: string
+  recentTitle: string
+  emptyRecent: string
+  responsePrefix: string
+  latitude: string
+  longitude: string
+  openMap: string
+  userFallbackPrefix: string
+  noBusiness: string
+  selectStaff: string
+  noEligibleStaff: string
+  loadError: string
+  createError: string
+  requestCreated: string
+  requestCreatedWithMissingNotifications: string
+  statusPending: string
+  statusSeen: string
+  statusShared: string
+  statusPermissionDenied: string
+  statusFailed: string
+  statusExpired: string
+  statusCancelled: string
+  notificationSent: string
+  notificationPartialFailed: string
+  notificationNoSubscription: string
+  notificationFailed: string
+  notificationConfigurationError: string
+  notificationPending: string
+}
+
+const requestPanelTexts: Record<AppLanguage, RequestPanelTexts> = {
+  tr: {
+    badge: "Konum yoklama",
+    title: "Personelden konum iste",
+    description: "Personel uygulamay? a?t???nda bekleyen konum iste?ini g?r?r.",
+    refreshAria: "Konum yoklama panelini yenile",
+    resultTitle: "??lem sonucu",
+    staffLabel: "Personel",
+    staffSelectPlaceholder: "Personel se?",
+    allEligibleStaff: "T?m uygun personeller",
+    noteLabel: "Not",
+    notePlaceholder: "?rn: Depo ??k??? ?ncesi konum payla?.",
+    sending: "?stek g?nderiliyor",
+    sendButton: "Konum ?ste",
+    recentTitle: "Son yoklamalar",
+    emptyRecent: "Hen?z konum yoklamas? olu?turulmad?.",
+    responsePrefix: "Yan?t",
+    latitude: "Enlem",
+    longitude: "Boylam",
+    openMap: "Haritada A?",
+    userFallbackPrefix: "Kullan?c?",
+    noBusiness: "??letme bilgisi bulunamad?.",
+    selectStaff: "Konum istemek i?in personel se?melisin.",
+    noEligibleStaff: "Konum istenebilecek aktif personel bulunamad?.",
+    loadError: "Konum yoklama bilgileri al?namad?.",
+    createError: "Konum iste?i olu?turulamad?.",
+    requestCreated: "{created} konum iste?i olu?turuldu.",
+    requestCreatedWithMissingNotifications:
+      "{created} konum iste?i olu?turuldu. {missing} ki?ide bildirim kayd? yok; istek yine de uygulama i?inde bekleyecek.",
+    statusPending: "Bekleniyor",
+    statusSeen: "G?r?ld?",
+    statusShared: "Konum payla??ld?",
+    statusPermissionDenied: "Konum izni kapal?",
+    statusFailed: "Ba?ar?s?z",
+    statusExpired: "S?re doldu",
+    statusCancelled: "?ptal",
+    notificationSent: "Bildirim g?nderildi",
+    notificationPartialFailed: "Bildirim k?smen g?nderildi",
+    notificationNoSubscription: "Cihaz bildirime kay?tl? de?il",
+    notificationFailed: "Bildirim ba?ar?s?z",
+    notificationConfigurationError: "Bildirim ayar? eksik",
+    notificationPending: "Bildirim beklemede",
+  },
+  en: {
+    badge: "Location check",
+    title: "Request staff location",
+    description: "When the staff member opens the app, they will see the pending location request.",
+    refreshAria: "Refresh location check panel",
+    resultTitle: "Action result",
+    staffLabel: "Staff",
+    staffSelectPlaceholder: "Select staff",
+    allEligibleStaff: "All eligible staff",
+    noteLabel: "Note",
+    notePlaceholder: "Example: Share location before leaving the warehouse.",
+    sending: "Sending request",
+    sendButton: "Request Location",
+    recentTitle: "Recent checks",
+    emptyRecent: "No location check has been created yet.",
+    responsePrefix: "Response",
+    latitude: "Latitude",
+    longitude: "Longitude",
+    openMap: "Open in Maps",
+    userFallbackPrefix: "User",
+    noBusiness: "Business information was not found.",
+    selectStaff: "Select a staff member to request location.",
+    noEligibleStaff: "No active eligible staff member was found.",
+    loadError: "Location check information could not be loaded.",
+    createError: "Location request could not be created.",
+    requestCreated: "{created} location request was created.",
+    requestCreatedWithMissingNotifications:
+      "{created} location request was created. {missing} user(s) do not have a notification subscription; the request will still wait inside the app.",
+    statusPending: "Waiting",
+    statusSeen: "Seen",
+    statusShared: "Location shared",
+    statusPermissionDenied: "Location permission disabled",
+    statusFailed: "Failed",
+    statusExpired: "Expired",
+    statusCancelled: "Cancelled",
+    notificationSent: "Notification sent",
+    notificationPartialFailed: "Notification partially sent",
+    notificationNoSubscription: "Device is not registered for notifications",
+    notificationFailed: "Notification failed",
+    notificationConfigurationError: "Notification configuration missing",
+    notificationPending: "Notification pending",
+  },
+}
+
+function formatDateTime(value: string | null, language: AppLanguage) {
   if (!value) {
     return "-"
   }
@@ -42,7 +172,7 @@ function formatDateTime(value: string | null) {
     return "-"
   }
 
-  return date.toLocaleString("tr-TR", {
+  return date.toLocaleString(language === "tr" ? "tr-TR" : "en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -51,14 +181,14 @@ function formatDateTime(value: string | null) {
   })
 }
 
-function getStatusLabel(check: LocationCheck) {
-  if (check.status === "pending") return "Bekleniyor"
-  if (check.status === "seen") return "Görüldü"
-  if (check.status === "shared") return "Konum paylaşıldı"
-  if (check.status === "permission_denied") return "Konum izni kapalı"
-  if (check.status === "failed") return "Başarısız"
-  if (check.status === "expired") return "Süre doldu"
-  if (check.status === "cancelled") return "İptal"
+function getStatusLabel(check: LocationCheck, texts: RequestPanelTexts) {
+  if (check.status === "pending") return texts.statusPending
+  if (check.status === "seen") return texts.statusSeen
+  if (check.status === "shared") return texts.statusShared
+  if (check.status === "permission_denied") return texts.statusPermissionDenied
+  if (check.status === "failed") return texts.statusFailed
+  if (check.status === "expired") return texts.statusExpired
+  if (check.status === "cancelled") return texts.statusCancelled
 
   return check.status
 }
@@ -79,30 +209,29 @@ function getStatusClass(check: LocationCheck) {
   return "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200"
 }
 
-function getNotificationLabel(check: LocationCheck) {
+function getNotificationLabel(check: LocationCheck, texts: RequestPanelTexts) {
   if (check.notification_status === "sent") {
-    return "Bildirim gönderildi"
+    return texts.notificationSent
   }
 
   if (check.notification_status === "partial_failed") {
-    return "Bildirim kısmen gönderildi"
+    return texts.notificationPartialFailed
   }
 
   if (check.notification_status === "no_subscription") {
-    return "Cihaz bildirime kayıtlı değil"
+    return texts.notificationNoSubscription
   }
 
   if (check.notification_status === "failed") {
-    return "Bildirim başarısız"
+    return texts.notificationFailed
   }
 
   if (check.notification_status === "configuration_error") {
-    return "Bildirim ayarı eksik"
+    return texts.notificationConfigurationError
   }
 
-  return "Bildirim beklemede"
+  return texts.notificationPending
 }
-
 
 function buildGoogleMapsUrl(check: LocationCheck) {
   if (check.latitude === null || check.longitude === null) {
@@ -138,10 +267,20 @@ function getUserLabel(user: BusinessUser) {
   return `${user.full_name} @${user.username}`
 }
 
+function replaceMessageVariables(template: string, values: Record<string, number | string>) {
+  return Object.entries(values).reduce(
+    (currentText, [key, value]) => currentText.replace(`{${key}}`, String(value)),
+    template,
+  )
+}
+
 export function LocationCheckRequestPanel({
   businessId,
   allowedTargetRoles = ["manager", "staff"],
 }: LocationCheckRequestPanelProps) {
+  const { language } = useTranslation()
+  const texts = requestPanelTexts[language]
+
   const [users, setUsers] = useState<BusinessUser[]>([])
   const [checks, setChecks] = useState<LocationCheck[]>([])
   const [selectedUserId, setSelectedUserId] = useState<number | "all" | "">("")
@@ -187,19 +326,16 @@ export function LocationCheckRequestPanel({
 
         setUsers(usersResponse)
         setChecks(checksResponse.checks)
-      } catch (error) {
+      } catch {
         setMessage({
           tone: "error",
-          text:
-            error instanceof Error
-              ? error.message
-              : "Konum yoklama bilgileri alınamadı.",
+          text: texts.loadError,
         })
       } finally {
         setIsLoading(false)
       }
     },
-    [businessId],
+    [businessId, texts.loadError],
   )
 
   useEffect(() => {
@@ -233,7 +369,7 @@ export function LocationCheckRequestPanel({
     if (!businessId) {
       setMessage({
         tone: "error",
-        text: "İşletme bilgisi bulunamadı.",
+        text: texts.noBusiness,
       })
       return
     }
@@ -241,7 +377,7 @@ export function LocationCheckRequestPanel({
     if (!selectedUserId) {
       setMessage({
         tone: "warning",
-        text: "Konum istemek için personel seçmelisin.",
+        text: texts.selectStaff,
       })
       return
     }
@@ -254,7 +390,7 @@ export function LocationCheckRequestPanel({
     if (selectedTargetIds.length === 0) {
       setMessage({
         tone: "warning",
-        text: "Konum istenebilecek aktif personel bulunamadı.",
+        text: texts.noEligibleStaff,
       })
       return
     }
@@ -279,20 +415,22 @@ export function LocationCheckRequestPanel({
         tone: noSubscriptionCount > 0 ? "warning" : "success",
         text:
           noSubscriptionCount > 0
-            ? `${response.created_count} konum isteği oluşturuldu. ${noSubscriptionCount} kişide bildirim kaydı yok; istek yine de uygulama içinde bekleyecek.`
-            : `${response.created_count} konum isteği oluşturuldu.`,
+            ? replaceMessageVariables(texts.requestCreatedWithMissingNotifications, {
+                created: response.created_count,
+                missing: noSubscriptionCount,
+              })
+            : replaceMessageVariables(texts.requestCreated, {
+                created: response.created_count,
+              }),
       })
 
       setRequestNote("")
       setSelectedUserId("")
       await loadPanelData(false)
-    } catch (error) {
+    } catch {
       setMessage({
         tone: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Konum isteği oluşturulamadı.",
+        text: texts.createError,
       })
     } finally {
       setIsSending(false)
@@ -309,13 +447,13 @@ export function LocationCheckRequestPanel({
 
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-200">
-              Konum yoklama
+              {texts.badge}
             </p>
             <h2 className="mt-1 text-base font-black text-slate-950 dark:text-white">
-              Personelden konum iste
+              {texts.title}
             </h2>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-700 dark:text-slate-200">
-              Personel uygulamayı açtığında bekleyen konum isteğini görür.
+              {texts.description}
             </p>
           </div>
         </div>
@@ -325,7 +463,7 @@ export function LocationCheckRequestPanel({
           onClick={() => void loadPanelData(false)}
           disabled={isLoading}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-cyan-700 shadow-sm transition active:scale-95 disabled:cursor-wait disabled:opacity-60 dark:bg-slate-900 dark:text-cyan-100"
-          aria-label="Konum yoklama panelini yenile"
+          aria-label={texts.refreshAria}
         >
           {isLoading ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
         </button>
@@ -341,7 +479,7 @@ export function LocationCheckRequestPanel({
             ) : (
               <AlertCircle size={16} />
             )}
-            İşlem sonucu
+            {texts.resultTitle}
           </div>
           {message.text}
         </div>
@@ -350,7 +488,7 @@ export function LocationCheckRequestPanel({
       <div className="space-y-2.5">
         <label className="block">
           <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-slate-200">
-            Personel
+            {texts.staffLabel}
           </span>
 
           <select
@@ -366,8 +504,8 @@ export function LocationCheckRequestPanel({
             }}
             className="min-h-12 w-full rounded-2xl border border-white/80 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-cyan-400 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
           >
-            <option value="">Personel seç</option>
-            {targetUsers.length > 1 && <option value="all">Tüm uygun personeller</option>}
+            <option value="">{texts.staffSelectPlaceholder}</option>
+            {targetUsers.length > 1 && <option value="all">{texts.allEligibleStaff}</option>}
             {targetUsers.map((user) => (
               <option key={user.id} value={user.id}>
                 {getUserLabel(user)}
@@ -378,7 +516,7 @@ export function LocationCheckRequestPanel({
 
         <label className="block">
           <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-slate-200">
-            Not
+            {texts.noteLabel}
           </span>
 
           <textarea
@@ -386,7 +524,7 @@ export function LocationCheckRequestPanel({
             onChange={(event) => setRequestNote(event.target.value)}
             rows={2}
             maxLength={1000}
-            placeholder="Örn: Depo çıkışı öncesi konum paylaş."
+            placeholder={texts.notePlaceholder}
             className="w-full resize-none rounded-2xl border border-white/80 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-cyan-400 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
           />
         </label>
@@ -400,12 +538,12 @@ export function LocationCheckRequestPanel({
           {isSending ? (
             <>
               <Loader2 className="animate-spin" size={18} />
-              İstek gönderiliyor
+              {texts.sending}
             </>
           ) : (
             <>
               <Send size={18} />
-              Konum İste
+              {texts.sendButton}
             </>
           )}
         </button>
@@ -414,7 +552,7 @@ export function LocationCheckRequestPanel({
       <div className="mt-4 border-t border-cyan-200 pt-3 dark:border-cyan-900">
         <div className="mb-2 flex items-center justify-between gap-3">
           <p className="text-xs font-black uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">
-            Son yoklamalar
+            {texts.recentTitle}
           </p>
 
           <div className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[0.65rem] font-black text-cyan-700 dark:bg-slate-900 dark:text-cyan-100">
@@ -425,7 +563,7 @@ export function LocationCheckRequestPanel({
 
         {recentChecks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-cyan-200 bg-white/60 p-4 text-center text-xs font-bold leading-5 text-slate-600 dark:border-cyan-900 dark:bg-slate-950/50 dark:text-slate-300">
-            Henüz konum yoklaması oluşturulmadı.
+            {texts.emptyRecent}
           </div>
         ) : (
           <div className="space-y-2">
@@ -437,35 +575,35 @@ export function LocationCheckRequestPanel({
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-black text-slate-950 dark:text-white">
-                      {check.target_user_full_name || check.target_username || `Kullanıcı #${check.target_user_id}`}
+                      {check.target_user_full_name || check.target_username || `${texts.userFallbackPrefix} #${check.target_user_id}`}
                     </p>
                     <p className="mt-0.5 text-xs font-bold text-slate-500 dark:text-slate-400">
-                      {formatDateTime(check.requested_at_utc)}
+                      {formatDateTime(check.requested_at_utc, language)}
                     </p>
                   </div>
 
                   <span className={`rounded-full px-2.5 py-1 text-[0.65rem] font-black ${getStatusClass(check)}`}>
-                    {getStatusLabel(check)}
+                    {getStatusLabel(check, texts)}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 text-[0.68rem] font-bold text-slate-500 dark:text-slate-400">
                   <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-900">
                     <BellRing size={12} />
-                    {getNotificationLabel(check)}
+                    {getNotificationLabel(check, texts)}
                   </span>
 
                   {check.responded_at_utc && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-900">
                       <Clock3 size={12} />
-                      Yanıt: {formatDateTime(check.responded_at_utc)}
+                      {texts.responsePrefix}: {formatDateTime(check.responded_at_utc, language)}
                     </span>
                   )}
 
                   {check.location_accuracy !== null && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-900">
                       <MapPin size={12} />
-                      ±{Math.round(check.location_accuracy)} m
+                      ?{Math.round(check.location_accuracy)} m
                     </span>
                   )}
                 </div>
@@ -474,12 +612,12 @@ export function LocationCheckRequestPanel({
                   <div className="mt-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 dark:border-cyan-900 dark:bg-cyan-950/20">
                     <div className="mb-2 grid grid-cols-2 gap-2 text-[0.68rem] font-bold text-slate-600 dark:text-slate-300">
                       <div>
-                        <span className="block text-slate-400 dark:text-slate-500">Enlem</span>
+                        <span className="block text-slate-400 dark:text-slate-500">{texts.latitude}</span>
                         <span className="font-black">{formatCoordinate(check.latitude)}</span>
                       </div>
 
                       <div>
-                        <span className="block text-slate-400 dark:text-slate-500">Boylam</span>
+                        <span className="block text-slate-400 dark:text-slate-500">{texts.longitude}</span>
                         <span className="font-black">{formatCoordinate(check.longitude)}</span>
                       </div>
                     </div>
@@ -491,7 +629,7 @@ export function LocationCheckRequestPanel({
                       className="flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-3 text-xs font-black text-white shadow-sm transition active:scale-95"
                     >
                       <MapPin size={15} />
-                      Haritada Aç
+                      {texts.openMap}
                     </a>
                   </div>
                 )}

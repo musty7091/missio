@@ -31,7 +31,35 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 SUBSCRIPTION_LOCK_BYPASS_PATHS = {
     "/api/v1/auth/me",
+    "/api/v1/auth/me/password",
 }
+
+PASSWORD_CHANGE_REQUIRED_BYPASS_PATHS = {
+    "/api/v1/auth/me",
+    "/api/v1/auth/me/password",
+}
+
+
+def ensure_current_user_password_change_allows_operation(
+    *,
+    current_user: User,
+    request: Request,
+) -> None:
+    """Block normal operations until the user changes a temporary password."""
+
+    if not current_user.must_change_password:
+        return
+
+    if request.url.path in PASSWORD_CHANGE_REQUIRED_BYPASS_PATHS:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "code": "PASSWORD_CHANGE_REQUIRED",
+            "message": "Devam etmek i?in ?nce ?ifrenizi de?i?tirmeniz gerekir.",
+        },
+    )
 
 
 def ensure_current_user_subscription_allows_operation(
@@ -99,6 +127,11 @@ def get_current_user(
             detail="Oturum doğrulanamadı.",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+
+    ensure_current_user_password_change_allows_operation(
+        current_user=current_user,
+        request=request,
+    )
 
     ensure_current_user_subscription_allows_operation(
         current_user=current_user,
