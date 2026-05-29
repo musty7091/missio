@@ -25,7 +25,7 @@ export function mapApiTaskToTodayTask(task: ApiTask): TodayTask {
     assignedToUserFullName: task.assigned_to_user_full_name,
     assignedToUsername: task.assigned_to_username,
     title: task.title,
-    description: task.description || "Açıklama eklenmemiş.",
+    description: task.description ?? "",
     status: task.status,
     priority: task.priority,
     taskType: task.task_type,

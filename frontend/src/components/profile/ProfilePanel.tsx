@@ -1,16 +1,15 @@
 import {
   AlertCircle,
-  BadgeCheck,
+
   CalendarCheck2,
-  Building2,
-  Camera,
+
   ChevronDown,
   ChevronUp,
   Clock3,
   KeyRound,
   LockKeyhole,
   LogOut,
-  Mail,
+
   Moon,
   Pencil,
   Power,
@@ -19,12 +18,12 @@ import {
   RotateCcw,
   Save,
   Search,
-  ShieldCheck,
+
   SlidersHorizontal,
   Smartphone,
   Sun,
   UserPlus,
-  UserRound,
+
   UsersRound,
   X,
 } from "lucide-react"
@@ -63,12 +62,6 @@ type ProfilePanelProps = {
   onToggleTheme: () => void
   onLogout: () => void
   onProfileUpdated: (user: UserMeResponse) => void
-}
-
-type InfoRowProps = {
-  icon: ReactNode
-  label: string
-  value: string
 }
 
 type UserManagementPanelProps = {
@@ -255,24 +248,6 @@ function normalizeOptionalEmail(value: string) {
   return normalizedValue
 }
 
-function InfoRow({ icon, label, value }: InfoRowProps) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-        {icon}
-      </div>
-
-      <div className="min-w-0">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
-          {label}
-        </p>
-        <p className="mt-1 truncate text-sm font-black text-[var(--missio-text-main)]">
-          {value}
-        </p>
-      </div>
-    </div>
-  )
-}
 
 export function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
   const { t } = useTranslation()
@@ -1008,6 +983,159 @@ export function UserManagementPanel({ currentUser }: UserManagementPanelProps) {
   )
 }
 
+function AccountSheet({
+  isOpen,
+  title,
+  onClose,
+  children,
+}: {
+  isOpen: boolean
+  title: string
+  onClose: () => void
+  children: ReactNode
+}) {
+  if (!isOpen) {
+    return null
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 px-3 pb-3 pt-16 backdrop-blur-sm">
+      <div className="max-h-[88vh] w-full max-w-md overflow-hidden rounded-[2rem] bg-[var(--missio-page-bg)] shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3">
+          <h2 className="text-base font-black text-[var(--missio-text-main)]">
+            {title}
+          </h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--missio-page-bg)] text-[var(--missio-text-main)] transition active:scale-95"
+            aria-label="Kapat"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(88vh-4rem)] overflow-y-auto p-3">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AccountInfoLine({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--missio-border)] py-3 last:border-b-0">
+      <span className="text-sm font-bold text-[var(--missio-text-muted)]">
+        {label}
+      </span>
+      <span className="max-w-[58%] truncate text-right text-sm font-black text-[var(--missio-text-main)]">
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function AccountActionRow({
+  icon,
+  title,
+  value,
+  onClick,
+  danger = false,
+}: {
+  icon: ReactNode
+  title: string
+  value?: string
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        danger
+          ? "flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-left text-rose-700 transition active:scale-[0.99] dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
+          : "flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 text-left text-[var(--missio-text-main)] transition active:scale-[0.99]"
+      }
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className={
+            danger
+              ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/70 dark:bg-white/10"
+              : "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200"
+          }
+        >
+          {icon}
+        </span>
+
+        <span className="min-w-0">
+          <span className="block text-sm font-black">
+            {title}
+          </span>
+          {value && (
+            <span className="mt-0.5 block truncate text-xs font-bold opacity-70">
+              {value}
+            </span>
+          )}
+        </span>
+      </span>
+
+      <span className="shrink-0 text-xl font-black opacity-45">›</span>
+    </button>
+  )
+}
+
+function AccountSectionCard({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-[1.6rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
+      <h2 className="text-base font-black text-[var(--missio-text-main)]">
+        {title}
+      </h2>
+
+      <div className="mt-3 grid gap-3">
+        {children}
+      </div>
+    </section>
+  )
+}
+function formatAccountRuntimeMessage(message: string | null, language: string) {
+  if (!message) {
+    return null
+  }
+
+  if (language !== "en") {
+    return message
+  }
+
+  if (message === "Web Push sistemi backend tarafında aktif değil.") {
+    return "Web Push is not enabled on the backend."
+  }
+
+  if (message === "Bildirim izni reddedildi.") {
+    return "Notification permission was denied."
+  }
+
+  if (message === "Bildirim sistemi bu tarayıcıda desteklenmiyor.") {
+    return "Notifications are not supported in this browser."
+  }
+
+  return message
+}
 export function ProfilePanel({
   user,
   theme,
@@ -1015,7 +1143,7 @@ export function ProfilePanel({
   onLogout,
   onProfileUpdated,
 }: ProfilePanelProps) {
-  const { t } = useTranslation()
+  const { language, setLanguage, t } = useTranslation()
   const emailValue = user.email && user.email.trim() ? user.email : t("profile.info.emailMissing")
   const initials = getInitials(user.full_name)
   const [isRequestingPushPermission, setIsRequestingPushPermission] = useState(false)
@@ -1046,6 +1174,12 @@ export function ProfilePanel({
   const [isSavingDailyClosingSettings, setIsSavingDailyClosingSettings] = useState(false)
   const [dailyClosingStatusMessage, setDailyClosingStatusMessage] = useState<string | null>(null)
   const [dailyClosingErrorMessage, setDailyClosingErrorMessage] = useState<string | null>(null)
+  const [isProfileEditOpen, setIsProfileEditOpen] = useState(false)
+  const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false)
+  const [isDailyClosingSheetOpen, setIsDailyClosingSheetOpen] = useState(false)
+  const [isPushSheetOpen, setIsPushSheetOpen] = useState(false)
+  const [isUserManagementSheetOpen, setIsUserManagementSheetOpen] = useState(false)
+  const [isPasswordResetSheetOpen, setIsPasswordResetSheetOpen] = useState(false)
 
   useEffect(() => {
     setProfileForm({
@@ -1298,79 +1432,193 @@ export function ProfilePanel({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.24),transparent_34%),linear-gradient(135deg,rgba(15,23,42,1),rgba(2,6,23,1))]" />
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full border border-cyan-300/20" />
 
-          <div className="relative flex items-center gap-4">
-            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.6rem] bg-cyan-400/10 text-xl font-black text-cyan-200 ring-1 ring-cyan-300/30">
-              {initials}
-              <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-xl bg-cyan-400 text-slate-950 ring-4 ring-slate-950">
-                <Camera size={14} />
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.6rem] bg-cyan-400/10 text-xl font-black text-cyan-200 ring-1 ring-cyan-300/30">
+                {initials}
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
+                  {language === "tr" ? "Hesabım" : "My Account"}
+                </p>
+                <h1 className="mt-1 truncate text-2xl font-black tracking-tight">
+                  {user.full_name}
+                </h1>
+                <p className="mt-1 truncate text-sm font-bold text-slate-300">
+                  {getTranslatedRoleLabel(user.role, t)} · {user.business_id === null ? t("profile.info.noBusiness") : language === "tr" ? "İşletme hesabı" : "Business account"}
+                </p>
               </div>
             </div>
 
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
-                {t("profile.account.badge")}
-              </p>
-              <h2 className="mt-1 truncate text-2xl font-black tracking-tight">
-                {user.full_name}
-              </h2>
-              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-black text-cyan-100">
-                <BadgeCheck size={14} />
-                {getTranslatedRoleLabel(user.role, t)}
-              </div>
-            </div>
+            <span className="shrink-0 rounded-full bg-emerald-300 px-3 py-1 text-xs font-black text-slate-950">
+              {user.is_active ? t("profile.status.active") : t("profile.status.passive")}
+            </span>
           </div>
-        </div>
-
-        <div className="space-y-3 p-4">
-          <InfoRow
-            icon={<UserRound size={20} />}
-            label={t("profile.info.username")}
-            value={user.username}
-          />
-
-          <InfoRow icon={<Mail size={20} />} label={t("profile.info.email")} value={emailValue} />
-
-          <InfoRow
-            icon={<Building2 size={20} />}
-            label={t("profile.info.businessId")}
-            value={user.business_id === null ? t("profile.info.noBusiness") : String(user.business_id)}
-          />
-
-          <InfoRow
-            icon={<ShieldCheck size={20} />}
-            label={t("profile.info.accountStatus")}
-            value={user.is_active ? t("profile.status.active") : t("profile.status.passive")}
-          />
         </div>
       </div>
 
-      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-            <UserRound size={22} />
+      {(profileStatusMessage || passwordStatusMessage || pushStatusMessage || dailyClosingStatusMessage) && (
+        <div className="rounded-[1.35rem] border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+          {formatAccountRuntimeMessage(profileStatusMessage || passwordStatusMessage || pushStatusMessage || dailyClosingStatusMessage, language)}
+        </div>
+      )}
+
+      {(profileErrorMessage || passwordErrorMessage || pushErrorMessage || dailyClosingErrorMessage) && (
+        <div className="rounded-[1.35rem] border border-rose-200 bg-rose-50 p-3 text-sm font-black text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          {formatAccountRuntimeMessage(profileErrorMessage || passwordErrorMessage || pushErrorMessage || dailyClosingErrorMessage, language)}
+        </div>
+      )}
+
+      <AccountSectionCard title={language === "tr" ? "Hesap Bilgileri" : "Account Information"}>
+        <div className="rounded-2xl bg-[var(--missio-page-bg)] px-4">
+          <AccountInfoLine label={language === "tr" ? "Ad Soyad" : "Full Name"} value={user.full_name} />
+          <AccountInfoLine label={language === "tr" ? "Kullanıcı Adı" : "Username"} value={user.username} />
+          <AccountInfoLine label={language === "tr" ? "E-posta" : "Email"} value={emailValue} />
+          <AccountInfoLine label={language === "tr" ? "Rol" : "Role"} value={getTranslatedRoleLabel(user.role, t)} />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setProfileErrorMessage(null)
+            setProfileStatusMessage(null)
+            setIsProfileEditOpen(true)
+          }}
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95"
+        >
+          <Pencil size={18} />
+          {language === "tr" ? "Bilgileri Düzenle" : "Edit Information"}
+        </button>
+      </AccountSectionCard>
+
+      <AccountSectionCard title={language === "tr" ? "Güvenlik" : "Security"}>
+        <AccountActionRow
+          icon={<KeyRound size={20} />}
+          title={language === "tr" ? "Şifre değiştir" : "Change Password"}
+          value={language === "tr" ? "Hesap güvenliği" : "Account security"}
+          onClick={() => {
+            setPasswordErrorMessage(null)
+            setPasswordStatusMessage(null)
+            setIsPasswordSheetOpen(true)
+          }}
+        />
+</AccountSectionCard>
+
+      <AccountSectionCard title={language === "tr" ? "Uygulama Tercihleri" : "App Preferences"}>
+        <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
+              <SlidersHorizontal size={20} />
+            </span>
+
+            <div>
+              <p className="text-sm font-black text-[var(--missio-text-main)]">{language === "tr" ? "Dil" : "Language"}</p>
+              <p className="text-xs font-bold text-[var(--missio-text-muted)]">{language === "tr" ? "Uygulama dili" : "Application language"}</p>
+            </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-black tracking-tight">{t("profile.form.title")}</h3>
-            <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              {t("profile.form.description")}
-            </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setLanguage("tr")}
+              className={
+                language === "tr"
+                  ? "rounded-2xl bg-[var(--missio-primary)] px-3 py-3 text-sm font-black text-white"
+                  : "rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 py-3 text-sm font-black text-[var(--missio-text-main)]"
+              }
+            >
+              Türkçe
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLanguage("en")}
+              className={
+                language === "en"
+                  ? "rounded-2xl bg-[var(--missio-primary)] px-3 py-3 text-sm font-black text-white"
+                  : "rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 py-3 text-sm font-black text-[var(--missio-text-main)]"
+              }
+            >
+              English
+            </button>
           </div>
         </div>
 
-        {profileStatusMessage && (
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-            {profileStatusMessage}
-          </div>
-        )}
+        <AccountActionRow
+          icon={theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
+          title={language === "tr" ? "Tema" : "Theme"}
+          value={theme === "light" ? language === "tr" ? "Açık tema" : "Light theme" : language === "tr" ? "Koyu tema" : "Dark theme"}
+          onClick={onToggleTheme}
+        />
 
-        {profileErrorMessage && (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-            {profileErrorMessage}
-          </div>
-        )}
+        <AccountActionRow
+          icon={<Smartphone size={20} />}
+          title="Bildirimler"
+          value={isPushEnabled ? t("profile.push.enabled") : t("profile.push.disabled")}
+          onClick={() => {
+            setPushErrorMessage(null)
+            setPushStatusMessage(null)
+            setIsPushSheetOpen(true)
+          }}
+        />
+      </AccountSectionCard>
 
-        <div className="mt-4 grid gap-3">
+      {(canShowDailyClosingSettings(user) || canShowUserManagement(user) || canShowPasswordResetRequests(user)) && (
+        <AccountSectionCard title={language === "tr" ? "Yönetim İşlemleri" : "Management"}>
+          {canShowDailyClosingSettings(user) && (
+            <AccountActionRow
+              icon={<CalendarCheck2 size={20} />}
+              title={t("profile.dailyClosing.title")}
+              value={dailyClosingForm.auto_daily_closing_enabled ? language === "tr" ? "Otomatik açık" : "Automatic on" : language === "tr" ? "Otomatik kapalı" : "Automatic off"}
+              onClick={() => {
+                setDailyClosingErrorMessage(null)
+                setDailyClosingStatusMessage(null)
+                setIsDailyClosingSheetOpen(true)
+              }}
+            />
+          )}
+
+          {canShowUserManagement(user) && (
+            <AccountActionRow
+              icon={<UsersRound size={20} />}
+              title={language === "tr" ? "Kullanıcı Yönetimi" : "User Management"}
+              value={language === "tr" ? "Kullanıcı ekle, düzenle ve pasifleştir" : "Add, edit and deactivate users"}
+              onClick={() => setIsUserManagementSheetOpen(true)}
+            />
+          )}
+
+          {canShowPasswordResetRequests(user) && (
+            <AccountActionRow
+              icon={<LockKeyhole size={20} />}
+              title={language === "tr" ? "Şifre Sıfırlama Talepleri" : "Password Reset Requests"}
+              value={language === "tr" ? "Şifre taleplerini takip et" : "Track password reset requests"}
+              onClick={() => setIsPasswordResetSheetOpen(true)}
+            />
+          )}
+        </AccountSectionCard>
+      )}
+<button
+        type="button"
+        onClick={onLogout}
+        className="flex min-h-14 w-full items-center justify-center gap-2 rounded-[1.6rem] border border-rose-200 bg-rose-50 px-4 text-sm font-black text-rose-700 shadow-sm transition active:scale-[0.99] dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
+      >
+        <LogOut size={19} />
+        {t("profile.quick.logout")}
+      </button>
+
+      <AccountSheet
+        isOpen={isProfileEditOpen}
+        title={language === "tr" ? "Bilgileri Düzenle" : "Edit Information"}
+        onClose={() => setIsProfileEditOpen(false)}
+      >
+        <div className="space-y-3">
+          {profileErrorMessage && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-black text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              {profileErrorMessage}
+            </div>
+          )}
+
           <input
             value={profileForm.full_name}
             onChange={(event) =>
@@ -1381,7 +1629,7 @@ export function ProfilePanel({
             }
             placeholder={t("profile.form.fullNamePlaceholder")}
             autoComplete="name"
-            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+            className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-[var(--missio-primary)]"
           />
 
           <input
@@ -1395,185 +1643,33 @@ export function ProfilePanel({
             placeholder={t("profile.form.emailPlaceholder")}
             type="email"
             autoComplete="email"
-            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+            className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-[var(--missio-primary)]"
           />
 
           <button
             type="button"
             onClick={() => void handleUpdateMyProfile()}
             disabled={isUpdatingProfile}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:opacity-60"
           >
             <Save size={18} />
             {isUpdatingProfile ? t("profile.form.saving") : t("profile.form.save")}
           </button>
         </div>
-      </div>
+      </AccountSheet>
 
-      {canShowDailyClosingSettings(user) && (
-        <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-              <CalendarCheck2 size={22} />
-            </div>
-
-            <div className="min-w-0">
-              <h3 className="text-lg font-black tracking-tight">
-                {t("profile.dailyClosing.title")}
-              </h3>
-              <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-                {t("profile.dailyClosing.description")}
-              </p>
-            </div>
-          </div>
-
-          {dailyClosingStatusMessage && (
-            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-              {dailyClosingStatusMessage}
+      <AccountSheet
+        isOpen={isPasswordSheetOpen}
+        title={language === "tr" ? "Şifre Değiştir" : "Change Password"}
+        onClose={() => setIsPasswordSheetOpen(false)}
+      >
+        <div className="space-y-3">
+          {passwordErrorMessage && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-black text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              {passwordErrorMessage}
             </div>
           )}
 
-          {dailyClosingErrorMessage && (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-              {dailyClosingErrorMessage}
-            </div>
-          )}
-
-          <div className="mt-4 grid gap-3">
-            <label className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-4">
-              <span className="min-w-0">
-                <span className="block text-sm font-black text-[var(--missio-text-main)]">
-                  {t("profile.dailyClosing.autoLabel")}
-                </span>
-                <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                  {t("profile.dailyClosing.autoHelp")}
-                </span>
-              </span>
-
-              <input
-                type="checkbox"
-                checked={dailyClosingForm.auto_daily_closing_enabled}
-                disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
-                onChange={(event) =>
-                  setDailyClosingForm((currentForm) => ({
-                    ...currentForm,
-                    auto_daily_closing_enabled: event.target.checked,
-                  }))
-                }
-                className="h-6 w-6 shrink-0 accent-cyan-500 disabled:opacity-50"
-              />
-            </label>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="grid gap-1.5">
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
-                  {t("profile.dailyClosing.timeLabel")}
-                </span>
-                <input
-                  type="time"
-                  value={dailyClosingForm.daily_closing_time}
-                  disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
-                  onChange={(event) =>
-                    setDailyClosingForm((currentForm) => ({
-                      ...currentForm,
-                      daily_closing_time: event.target.value || "23:45",
-                    }))
-                  }
-                  className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400 disabled:opacity-50"
-                />
-              </label>
-
-              <label className="grid gap-1.5">
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
-                  {t("profile.dailyClosing.timezoneLabel")}
-                </span>
-                <select
-                  value={dailyClosingForm.timezone}
-                  disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
-                  onChange={(event) =>
-                    setDailyClosingForm((currentForm) => ({
-                      ...currentForm,
-                      timezone: event.target.value,
-                    }))
-                  }
-                  className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400 disabled:opacity-50"
-                >
-                  <option value="Asia/Nicosia">Asia/Nicosia</option>
-                  <option value="Europe/Istanbul">Europe/Istanbul</option>
-                  <option value="Europe/London">Europe/London</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3">
-              <p className="text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                {t("profile.dailyClosing.info")}
-              </p>
-              {dailyClosingSettings && (
-                <p className="mt-2 text-xs font-black text-[var(--missio-text-main)]">
-                  {t("profile.dailyClosing.business")}: {dailyClosingSettings.business_name}
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => void loadDailyClosingSettings()}
-                disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
-                className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95 disabled:opacity-50"
-              >
-                <RefreshCw size={18} />
-                {t("profile.dailyClosing.refresh")}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void handleSaveDailyClosingSettings()}
-                disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
-                className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:opacity-50"
-              >
-                <Save size={18} />
-                {isSavingDailyClosingSettings
-                  ? t("profile.dailyClosing.saving")
-                  : t("profile.dailyClosing.save")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {canShowPasswordResetRequests(user) && <PasswordResetRequestsPanel />}
-
-      {canShowUserManagement(user) && <BilingualUserManagementPanel currentUser={user} />}
-
-      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-            <LockKeyhole size={22} />
-          </div>
-
-          <div>
-            <h3 className="text-lg font-black tracking-tight">{t("profile.security.title")}</h3>
-            <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              {t("profile.security.description")}
-            </p>
-          </div>
-        </div>
-
-        {passwordStatusMessage && (
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-            {passwordStatusMessage}
-          </div>
-        )}
-
-        {passwordErrorMessage && (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-            {passwordErrorMessage}
-          </div>
-        )}
-
-        <div className="mt-4 grid gap-3">
           <input
             value={passwordForm.current_password}
             onChange={(event) =>
@@ -1585,7 +1681,7 @@ export function ProfilePanel({
             placeholder={t("profile.security.currentPassword")}
             type="password"
             autoComplete="current-password"
-            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+            className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-[var(--missio-primary)]"
           />
 
           <input
@@ -1599,7 +1695,7 @@ export function ProfilePanel({
             placeholder={t("profile.security.newPassword")}
             type="password"
             autoComplete="new-password"
-            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+            className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-[var(--missio-primary)]"
           />
 
           <input
@@ -1613,20 +1709,20 @@ export function ProfilePanel({
             placeholder={t("profile.security.newPasswordRepeat")}
             type="password"
             autoComplete="new-password"
-            className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
+            className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-[var(--missio-primary)]"
           />
 
           <button
             type="button"
             onClick={() => void handleChangeOwnPassword()}
             disabled={isChangingPassword}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:opacity-60"
           >
             <KeyRound size={18} />
             {isChangingPassword ? t("profile.security.saving") : t("profile.security.save")}
           </button>
 
-          <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-3">
+          <div className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3">
             <div className="flex items-start gap-2">
               <Clock3 size={17} className="mt-0.5 shrink-0 text-[var(--missio-text-muted)]" />
               <p className="text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
@@ -1635,130 +1731,172 @@ export function ProfilePanel({
             </div>
           </div>
         </div>
-      </div>
+      </AccountSheet>
 
-      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-              <Smartphone size={22} />
+      <AccountSheet
+        isOpen={isDailyClosingSheetOpen}
+        title={t("profile.dailyClosing.title")}
+        onClose={() => setIsDailyClosingSheetOpen(false)}
+      >
+        <div className="space-y-3">
+          {dailyClosingErrorMessage && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-black text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              {dailyClosingErrorMessage}
             </div>
+          )}
 
-            <div className="min-w-0">
-              <h3 className="text-lg font-black tracking-tight">{t("profile.push.title")}</h3>
-              <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-                {t("profile.push.description")}
-              </p>
-            </div>
-          </div>
+          <label className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-4">
+            <span className="min-w-0">
+              <span className="block text-sm font-black text-[var(--missio-text-main)]">
+                {t("profile.dailyClosing.autoLabel")}
+              </span>
+              <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+                {t("profile.dailyClosing.autoHelp")}
+              </span>
+            </span>
 
-          <span
-            className={
-              isPushEnabled
-                ? "shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
-                : "shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600 dark:bg-slate-900 dark:text-slate-300"
-            }
+            <input
+              type="checkbox"
+              checked={dailyClosingForm.auto_daily_closing_enabled}
+              disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+              onChange={(event) =>
+                setDailyClosingForm((currentForm) => ({
+                  ...currentForm,
+                  auto_daily_closing_enabled: event.target.checked,
+                }))
+              }
+              className="h-6 w-6 shrink-0 accent-cyan-500 disabled:opacity-50"
+            />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
+              {t("profile.dailyClosing.timeLabel")}
+            </span>
+            <input
+              type="time"
+              value={dailyClosingForm.daily_closing_time}
+              disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+              onChange={(event) =>
+                setDailyClosingForm((currentForm) => ({
+                  ...currentForm,
+                  daily_closing_time: event.target.value,
+                }))
+              }
+              className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400 disabled:opacity-50"
+            />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--missio-text-muted)]">
+              {t("profile.dailyClosing.timezoneLabel")}
+            </span>
+            <input
+              value={dailyClosingForm.timezone}
+              disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+              onChange={(event) =>
+                setDailyClosingForm((currentForm) => ({
+                  ...currentForm,
+                  timezone: event.target.value,
+                }))
+              }
+              className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400 disabled:opacity-50"
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={() => void handleSaveDailyClosingSettings()}
+            disabled={isLoadingDailyClosingSettings || isSavingDailyClosingSettings}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPushEnabled ? t("profile.push.enabled") : t("profile.push.disabled")}
-          </span>
+            <Save size={18} />
+            {isSavingDailyClosingSettings ? t("profile.dailyClosing.saving") : t("profile.dailyClosing.save")}
+          </button>
+
+          {dailyClosingSettings && (
+            <p className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
+              Güncel ayar: {dailyClosingSettings.daily_closing_time} · {dailyClosingSettings.timezone}
+            </p>
+          )}
         </div>
+      </AccountSheet>
 
-        {pushStatusMessage && (
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-            {pushStatusMessage}
-          </div>
-        )}
+      <AccountSheet
+        isOpen={isPushSheetOpen}
+        title={t("profile.push.title")}
+        onClose={() => setIsPushSheetOpen(false)}
+      >
+        <div className="space-y-3">
+          {pushErrorMessage && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-black text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              {formatAccountRuntimeMessage(pushErrorMessage, language)}
+            </div>
+          )}
 
-        {pushErrorMessage && (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-            {pushErrorMessage}
-          </div>
-        )}
+          <p className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
+            {t("profile.push.description")}
+          </p>
 
-        <button
-          type="button"
-          role="switch"
-          aria-checked={isPushEnabled}
-          onClick={() => void handleTogglePushNotifications()}
-          disabled={isRequestingPushPermission}
-          className="mt-4 flex min-h-14 w-full items-center justify-between gap-4 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <span>
-            {isRequestingPushPermission
-              ? t("profile.push.preparing")
-              : isPushEnabled
-                ? t("profile.push.disable")
-                : t("profile.push.enable")}
-          </span>
-
-          <span
-            className={
-              isPushEnabled
-                ? "relative h-7 w-12 rounded-full bg-[var(--missio-primary)] shadow-inner"
-                : "relative h-7 w-12 rounded-full bg-slate-300 shadow-inner dark:bg-slate-700"
-            }
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isPushEnabled}
+            onClick={() => void handleTogglePushNotifications()}
+            disabled={isRequestingPushPermission}
+            className="flex min-h-14 w-full items-center justify-between gap-4 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <span>
+              {isRequestingPushPermission
+                ? t("profile.push.preparing")
+                : isPushEnabled
+                  ? t("profile.push.disable")
+                  : t("profile.push.enable")}
+            </span>
+
             <span
               className={
                 isPushEnabled
-                  ? "absolute right-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-all"
-                  : "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-all"
+                  ? "relative h-7 w-12 rounded-full bg-[var(--missio-primary)] shadow-inner"
+                  : "relative h-7 w-12 rounded-full bg-slate-300 shadow-inner dark:bg-slate-700"
               }
-            />
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => void handleSendWebPushTest()}
-          disabled={!isPushEnabled || isSendingPushTest}
-          className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSendingPushTest ? t("profile.push.testSending") : t("profile.push.testSend")}
-        </button>
-      </div>
-
-      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
-        <h3 className="text-lg font-black tracking-tight">{t("profile.quick.title")}</h3>
-        <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-          {t("profile.quick.description")}
-        </p>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-4 text-sm font-black text-[var(--missio-text-main)] transition active:scale-95"
-          >
-            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-            {t("profile.quick.theme")}
+            >
+              <span
+                className={
+                  isPushEnabled
+                    ? "absolute right-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-all"
+                    : "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-all"
+                }
+              />
+            </span>
           </button>
 
           <button
             type="button"
-            onClick={onLogout}
-            className="flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-black text-red-600 transition active:scale-95 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+            onClick={() => void handleSendWebPushTest()}
+            disabled={!isPushEnabled || isSendingPushTest}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <LogOut size={18} />
-            {t("profile.quick.logout")}
+            {isSendingPushTest ? t("profile.push.testSending") : t("profile.push.testSend")}
           </button>
         </div>
-      </div>
+      </AccountSheet>
 
-      <div className="rounded-[2rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-xl shadow-slate-900/5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--missio-primary-soft)] text-cyan-700 dark:text-cyan-200">
-            <Smartphone size={22} />
-          </div>
+      <AccountSheet
+        isOpen={isUserManagementSheetOpen}
+        title={language === "tr" ? "Kullanıcı Yönetimi" : "User Management"}
+        onClose={() => setIsUserManagementSheetOpen(false)}
+      >
+        <BilingualUserManagementPanel currentUser={user} />
+      </AccountSheet>
 
-          <div>
-            <h3 className="text-lg font-black tracking-tight">{t("profile.mobile.title")}</h3>
-            <p className="mt-1 text-sm font-semibold leading-6 text-[var(--missio-text-muted)]">
-              {t("profile.mobile.description")}
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
+      <AccountSheet
+        isOpen={isPasswordResetSheetOpen}
+        title={language === "tr" ? "Şifre Sıfırlama Talepleri" : "Password Reset Requests"}
+        onClose={() => setIsPasswordResetSheetOpen(false)}
+      >
+        <PasswordResetRequestsPanel />
+      </AccountSheet>
+</section>
   )
 }

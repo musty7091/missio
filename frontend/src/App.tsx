@@ -1,9 +1,9 @@
 import {
-  AlertCircle,
+
   BarChart3,
   Bell,
   CalendarClock,
-  ClipboardCheck,
+
   LockKeyhole,
   PhoneCall,
   UserRound,
@@ -15,24 +15,25 @@ import { ForcedPasswordChangePanel } from "./components/auth/ForcedPasswordChang
 import {
   AppStatePanel,
   FullScreenStatus,
-  TaskLoadingSkeleton,
+
 } from "./components/common/AppStatePanel"
 import { AppHeader } from "./components/layout/AppHeader"
 import { BottomNavigation, type AppTab } from "./components/layout/BottomNavigation"
 import { BossDashboardPanel } from "./components/boss/BossDashboardPanel"
 import { BossReportsPanel } from "./components/boss/BossReportsPanel"
 import { ManagerTasksPanel } from "./components/manager/ManagerTasksPanel"
+import { StaffDashboardPanel } from "./components/staff/StaffDashboardPanel"
 import { NotificationPanel } from "./components/notifications/NotificationPanel"
 import { ProfilePanel } from "./components/profile/ProfilePanel"
 import { ReportsPanel } from "./components/reports/ReportsPanel"
 import { SuperAdminBusinessesPanel } from "./components/super-admin/SuperAdminBusinessesPanel"
-import { TaskCard } from "./components/tasks/TaskCard"
+
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel"
-import { TaskFilterTabs, type TaskListFilter } from "./components/tasks/TaskFilterTabs"
-import { TaskGroupHeader } from "./components/tasks/TaskGroupHeader"
-import { TodayOperationSummary } from "./components/tasks/TodayOperationSummary"
-import { StaffLocationCheckPanel } from "./components/location-checks/StaffLocationCheckPanel"
-import { LocationCheckRequestPanel } from "./components/location-checks/LocationCheckRequestPanel"
+
+
+
+
+
 import { useTranslation } from "./i18n/language"
 import { getCurrentUser } from "./services/authService"
 import { clearMissioAppBadge } from "./services/appBadgeService"
@@ -389,7 +390,7 @@ export default function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
   const [selectedTaskSnapshot, setSelectedTaskSnapshot] = useState<TodayTask | null>(null)
   const taskDetailHistoryTokenRef = useRef<string | null>(null)
-  const [taskListFilter, setTaskListFilter] = useState<TaskListFilter>("all")
+
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [tasksErrorMessage, setTasksErrorMessage] = useState<string | null>(null)
@@ -790,35 +791,7 @@ export default function App() {
       ).length,
     }
   }, [tasks])
-
-  const filteredTasks = useMemo(() => {
-    if (taskListFilter === "waiting") {
-      return tasks.filter(
-        (task) => task.status === "assigned" || task.status === "rejected",
-      )
-    }
-
-    if (taskListFilter === "active") {
-      return tasks.filter((task) => task.status === "in_progress")
-    }
-
-    if (taskListFilter === "completed") {
-      return tasks.filter((task) => task.status === "completed" || task.status === "approved")
-    }
-
-    return tasks
-  }, [taskListFilter, tasks])
-
-  const routineFilteredTasks = useMemo(() => {
-    return filteredTasks.filter((task) => task.taskType === "routine")
-  }, [filteredTasks])
-
-  const extraFilteredTasks = useMemo(() => {
-    return filteredTasks.filter((task) => task.taskType === "extra")
-  }, [filteredTasks])
-
-
-  const bottomNotificationCount = useMemo(() => getBottomNotificationCount(tasks), [tasks])
+const bottomNotificationCount = useMemo(() => getBottomNotificationCount(tasks), [tasks])
 
   async function handleLogout() {
     try {
@@ -839,7 +812,7 @@ export default function App() {
     setSelectedTaskSnapshot(null)
     setSelectedTaskId(null)
     taskDetailHistoryTokenRef.current = null
-    setTaskListFilter("all")
+
     window.localStorage.setItem("missio-active-tab", "tasks")
     setActiveTab("tasks")
   }
@@ -966,17 +939,15 @@ export default function App() {
           currentUser.role === "super_admin" ? (
             <SuperAdminBusinessesPanel />
           ) : currentUser.role === "staff" ? (
-            <>
-            <TodayOperationSummary
+            <StaffDashboardPanel
+              tasks={tasks}
+              isLoadingTasks={isLoadingTasks}
+              errorMessage={tasksErrorMessage}
+              busyTaskId={busyTaskId}
+              notificationCount={bottomNotificationCount}
               totalCount={taskStats.totalCount}
               completedCount={taskStats.completedCount}
-              activeCount={taskStats.activeCount}
-              waitingCount={taskStats.waitingCount}
-              rejectedCount={taskStats.rejectedCount}
-              remainingCount={taskStats.remainingCount}
-            />
-
-            <StaffLocationCheckPanel
+              onRefresh={() => void loadTodayTasks()}
               onChanged={() =>
                 void loadTodayTasks({
                   showLoading: false,
@@ -984,110 +955,27 @@ export default function App() {
                   keepExistingOnError: true,
                 })
               }
+              onOpenTaskDetails={openTaskDetails}
             />
-
-            {tasks.length > 0 && (
-              <TaskFilterTabs
-                activeFilter={taskListFilter}
-                tasks={tasks}
-                onFilterChange={setTaskListFilter}
-              />
-            )}
-
-            <section className="flex flex-1 flex-col gap-2.5 pb-24">
-              {isLoadingTasks && <TaskLoadingSkeleton />}
-
-              {!isLoadingTasks && tasksErrorMessage && (
-                <AppStatePanel
-                  icon={<AlertCircle size={30} />}
-                  eyebrow="Görev ekranı"
-                  title="Görevler alınamadı"
-                  description={tasksErrorMessage}
-                  tone="error"
-                  actionLabel="Tekrar dene"
-                  onAction={() => void loadTodayTasks()}
-                />
-              )}
-
-              {!isLoadingTasks && !tasksErrorMessage && tasks.length === 0 && (
-                <AppStatePanel
-                  icon={<ClipboardCheck size={30} />}
-                  eyebrow="Bugünkü görevler"
-                  title="Bugün atanmış görev yok"
-                  description="Yeni görev atandığında burada görünecek."
-                />
-              )}
-
-              {!isLoadingTasks &&
-                !tasksErrorMessage &&
-                tasks.length > 0 &&
-                filteredTasks.length === 0 && (
-                  <AppStatePanel
-                    icon={<ClipboardCheck size={30} />}
-                    eyebrow="Görev filtresi"
-                    title="Bu filtrede görev yok"
-                    description="Başka bir filtre seçerek diğer görevleri görüntüleyebilirsin."
-                  />
-                )}
-
-              {!isLoadingTasks &&
-                !tasksErrorMessage &&
-                routineFilteredTasks.length > 0 && (
-                  <>
-                    <TaskGroupHeader type="routine" count={routineFilteredTasks.length} />
-
-                    {routineFilteredTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        isBusy={busyTaskId === task.id}
-                        onOpenDetails={openTaskDetails}
-                      />
-                    ))}
-                  </>
-                )}
-
-              {!isLoadingTasks &&
-                !tasksErrorMessage &&
-                extraFilteredTasks.length > 0 && (
-                  <>
-                    <TaskGroupHeader type="extra" count={extraFilteredTasks.length} />
-
-                    {extraFilteredTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        isBusy={busyTaskId === task.id}
-                        onOpenDetails={openTaskDetails}
-                      />
-                    ))}
-                  </>
-                )}
-            </section>
-          </>
           ) : currentUser.role === "boss" ? (
             <>
-              <LocationCheckRequestPanel businessId={currentUser.business_id} />
-
               <BossDashboardPanel
                 businessId={currentUser.business_id}
+                currentUser={currentUser}
                 onOpenApprovals={() => setActiveTab("notifications")}
                 onOpenReports={() => setActiveTab("reports")}
               />
             </>
           ) : (
             <>
-              <LocationCheckRequestPanel
-                businessId={currentUser.business_id}
-                allowedTargetRoles={["staff"]}
-              />
-
-              <ManagerTasksPanel
+<ManagerTasksPanel
                 businessId={currentUser.business_id}
                 currentUserId={currentUser.id}
                 busyTaskId={busyTaskId}
                 onOpenOwnTaskDetails={openTaskDetails}
                 onChanged={() => void loadTodayTasks()}
+              onOpenReports={() => setActiveTab("reports")}
+              onOpenApprovals={() => setActiveTab("notifications")}
               />
             </>
           )
