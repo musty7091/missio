@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react"
 import { Camera, FileCheck2, ImageIcon, Loader2, MapPin, Mic, Send, Sparkles, Square, Trash2, X } from "lucide-react"
 
+import { useTranslation } from "../../i18n/language"
 import { listBusinessUsers, type BusinessUser } from "../../services/businessUserService"
 import {
   createExtraTask,
@@ -66,11 +67,15 @@ function buildDueAtUtcFromLocalTime(timeValue: string) {
   return dueDate.toISOString()
 }
 
-function getSelectedUserLabel(users: BusinessUser[], selectedUserId: string) {
+function getSelectedUserLabel(
+  users: BusinessUser[],
+  selectedUserId: string,
+  emptyLabel: string,
+) {
   const selectedUser = users.find((user) => String(user.id) === selectedUserId)
 
   if (!selectedUser) {
-    return "Personel seçilmedi"
+    return emptyLabel
   }
 
   return `${selectedUser.full_name} @${selectedUser.username}`
@@ -116,6 +121,10 @@ export function TaskAssignSheet({
   onCreated,
   onSuccess,
 }: TaskAssignSheetProps) {
+  const { language } = useTranslation()
+  const isTurkish = language === "tr"
+  const tx = (tr: string, en: string) => (isTurkish ? tr : en)
+
   const [users, setUsers] = useState<BusinessUser[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -151,19 +160,29 @@ export function TaskAssignSheet({
     [assignableRoles, users],
   )
 
-  const selectedUserLabel = getSelectedUserLabel(assignableUsers, assignedToUserId)
-  const selectedTaskModeLabel = taskMode === "routine" ? "Rutin görev" : "Tek seferlik görev"
-  const selectedDueTimeLabel = dueTime || "Saat belirtilmedi"
+  const selectedUserLabel = getSelectedUserLabel(
+    assignableUsers,
+    assignedToUserId,
+    tx("Personel seçilmedi", "No staff selected"),
+  )
+
+  const selectedTaskModeLabel =
+    taskMode === "routine"
+      ? tx("Rutin görev", "Routine task")
+      : tx("Tek seferlik görev", "One-time task")
+
+  const selectedDueTimeLabel = dueTime || tx("Saat belirtilmedi", "No time set")
+
   const requirementSummary =
     [
-      requiresPhoto ? "Fotoğraf" : null,
-      requiresLocation ? "Konum" : null,
-      requiresManagerApproval ? "Yönetici onayı" : null,
-      referencePhotoFile ? "Referans fotoğraf" : null,
-      voiceNoteBlob ? "Sesli not" : null,
+      requiresPhoto ? tx("Fotoğraf", "Photo") : null,
+      requiresLocation ? tx("Konum", "Location") : null,
+      requiresManagerApproval ? tx("Yönetici onayı", "Manager approval") : null,
+      referencePhotoFile ? tx("Referans fotoğraf", "Reference photo") : null,
+      voiceNoteBlob ? tx("Sesli not", "Voice note") : null,
     ]
       .filter(Boolean)
-      .join(" + ") || "Ek şart yok"
+      .join(" + ") || tx("Ek şart yok", "No extra requirement")
 
   function resetForm() {
     setTaskMode("extra")
@@ -214,7 +233,7 @@ export function TaskAssignSheet({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Personel listesi alınamadı.")
+        setErrorMessage(tx("Personel listesi alınamadı.", "Staff list could not be loaded."))
       }
     } finally {
       setIsLoadingUsers(false)
@@ -353,17 +372,26 @@ export function TaskAssignSheet({
 
   async function startVoiceRecording() {
     if (taskMode === "routine") {
-      setErrorMessage("Sesli görev notu şimdilik sadece tek seferlik görevlerde destekleniyor.")
+      setErrorMessage(tx(
+        "Sesli görev notu şimdilik sadece tek seferlik görevlerde destekleniyor.",
+        "Voice task notes are currently supported only for one-time tasks.",
+      ))
       return
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setErrorMessage("Bu tarayıcı ses kaydını desteklemiyor.")
+      setErrorMessage(tx(
+        "Bu tarayıcı ses kaydını desteklemiyor.",
+        "This browser does not support voice recording.",
+      ))
       return
     }
 
     if (typeof MediaRecorder === "undefined") {
-      setErrorMessage("Bu tarayıcı ses kaydını desteklemiyor.")
+      setErrorMessage(tx(
+        "Bu tarayıcı ses kaydını desteklemiyor.",
+        "This browser does not support voice recording.",
+      ))
       return
     }
 
@@ -399,7 +427,10 @@ export function TaskAssignSheet({
 
         if (recordedBlob.size <= 0) {
           setVoiceRecordingState("idle")
-          setErrorMessage("Ses kaydı alınamadı. Lütfen tekrar dene.")
+          setErrorMessage(tx(
+            "Ses kaydı alınamadı. Lütfen tekrar dene.",
+            "Voice recording could not be captured. Please try again.",
+          ))
           return
         }
 
@@ -430,7 +461,10 @@ export function TaskAssignSheet({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Ses kaydı başlatılamadı.")
+        setErrorMessage(tx(
+          "Ses kaydı başlatılamadı.",
+          "Voice recording could not be started.",
+        ))
       }
     }
   }
@@ -458,7 +492,6 @@ export function TaskAssignSheet({
     setVoiceElapsedSeconds(0)
   }
 
-
   function handleReferencePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
 
@@ -468,7 +501,10 @@ export function TaskAssignSheet({
     }
 
     if (!file.type.startsWith("image/")) {
-      setErrorMessage("Referans fotoğrafı için sadece görsel dosyası seçebilirsin.")
+      setErrorMessage(tx(
+        "Referans fotoğrafı için sadece görsel dosyası seçebilirsin.",
+        "Only image files can be selected as reference photos.",
+      ))
       event.target.value = ""
       setReferencePhotoFile(null)
       return
@@ -497,27 +533,42 @@ export function TaskAssignSheet({
     const trimmedDescription = description.trim()
 
     if (!businessId) {
-      setErrorMessage("Bu kullanıcı için işletme bilgisi bulunamadı.")
+      setErrorMessage(tx(
+        "Bu kullanıcı için işletme bilgisi bulunamadı.",
+        "Business information could not be found for this user.",
+      ))
       return
     }
 
     if (!selectedUserId) {
-      setErrorMessage("Görev atanacak personeli seçmelisin.")
+      setErrorMessage(tx(
+        "Görev atanacak personeli seçmelisin.",
+        "You must select a staff member for this task.",
+      ))
       return
     }
 
     if (trimmedTitle.length < 2) {
-      setErrorMessage("Görev başlığı en az 2 karakter olmalıdır.")
+      setErrorMessage(tx(
+        "Görev başlığı en az 2 karakter olmalıdır.",
+        "Task title must be at least 2 characters.",
+      ))
       return
     }
 
     if (taskMode === "routine" && (referencePhotoFile || voiceNoteBlob)) {
-      setErrorMessage("Referans fotoğrafı ve sesli not şimdilik sadece tek seferlik görevlerde destekleniyor.")
+      setErrorMessage(tx(
+        "Referans fotoğrafı ve sesli not şimdilik sadece tek seferlik görevlerde destekleniyor.",
+        "Reference photos and voice notes are currently supported only for one-time tasks.",
+      ))
       return
     }
 
     if (voiceRecordingState === "recording") {
-      setErrorMessage("Görevi kaydetmeden önce ses kaydını durdurmalısın.")
+      setErrorMessage(tx(
+        "Görevi kaydetmeden önce ses kaydını durdurmalısın.",
+        "You must stop the voice recording before saving the task.",
+      ))
       return
     }
 
@@ -545,7 +596,10 @@ export function TaskAssignSheet({
           assigned_to_user_id: selectedUserId,
         })
 
-        onSuccess?.("Rutin görev oluşturuldu ve bugünün görevlerine işlendi.")
+        onSuccess?.(tx(
+          "Rutin görev oluşturuldu ve bugünün görevlerine işlendi.",
+          "Routine task was created and added to today's tasks.",
+        ))
       } else {
         const createdTaskResponse = await createExtraTask({
           assigned_to_user_id: selectedUserId,
@@ -583,8 +637,14 @@ export function TaskAssignSheet({
 
         onSuccess?.(
           referencePhotoFile || voiceNoteBlob
-            ? "Tek seferlik görev medya ekleriyle personele atandı."
-            : "Tek seferlik görev personele atandı.",
+            ? tx(
+                "Tek seferlik görev medya ekleriyle personele atandı.",
+                "One-time task was assigned to staff with media attachments.",
+              )
+            : tx(
+                "Tek seferlik görev personele atandı.",
+                "One-time task was assigned to staff.",
+              ),
         )
       }
 
@@ -595,7 +655,7 @@ export function TaskAssignSheet({
       if (error instanceof Error) {
         setErrorMessage(error.message)
       } else {
-        setErrorMessage("Görev oluşturulamadı.")
+        setErrorMessage(tx("Görev oluşturulamadı.", "Task could not be created."))
       }
     } finally {
       setIsSaving(false)
@@ -613,11 +673,13 @@ export function TaskAssignSheet({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-                Yeni görev
+                {tx("Yeni görev", "New task")}
               </p>
 
               <h3 className="mt-1 text-xl font-black text-[var(--missio-text-main)]">
-                {taskMode === "extra" ? "Tek seferlik görev ata" : "Rutin görev oluştur"}
+                {taskMode === "extra"
+                  ? tx("Tek seferlik görev ata", "Assign one-time task")
+                  : tx("Rutin görev oluştur", "Create routine task")}
               </h3>
             </div>
 
@@ -626,7 +688,7 @@ export function TaskAssignSheet({
               onClick={closeSheet}
               disabled={isSaving}
               className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--missio-card-bg)] text-[var(--missio-text-main)] shadow-sm disabled:opacity-60"
-              aria-label="Kapat"
+              aria-label={tx("Kapat", "Close")}
             >
               <X size={20} />
             </button>
@@ -642,7 +704,7 @@ export function TaskAssignSheet({
 
           <section>
             <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Görev tipi
+              {tx("Görev tipi", "Task type")}
             </p>
 
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[var(--missio-card-bg)] p-1">
@@ -655,7 +717,7 @@ export function TaskAssignSheet({
                     : "min-h-12 rounded-2xl px-3 text-sm font-black text-[var(--missio-text-muted)]"
                 }
               >
-                Tek seferlik
+                {tx("Tek seferlik", "One-time")}
               </button>
 
               <button
@@ -667,25 +729,33 @@ export function TaskAssignSheet({
                     : "min-h-12 rounded-2xl px-3 text-sm font-black text-[var(--missio-text-muted)]"
                 }
               >
-                Rutin
+                {tx("Rutin", "Routine")}
               </button>
             </div>
 
             <p className="mt-2 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
               {taskMode === "extra"
-                ? "Tek seferlik görev yalnızca bugün için atanır."
-                : "Rutin görev şablonu oluşturulur ve bugüne de işlenir."}
+                ? tx(
+                    "Tek seferlik görev yalnızca bugün için atanır.",
+                    "One-time task is assigned only for today.",
+                  )
+                : tx(
+                    "Rutin görev şablonu oluşturulur ve bugüne de işlenir.",
+                    "A routine task template is created and also added to today.",
+                  )}
             </p>
           </section>
 
           <section>
             <div className="mb-2 flex items-center justify-between gap-3">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                Personel
+                {tx("Personel", "Staff")}
               </p>
 
               <span className="rounded-full bg-cyan-100 px-2.5 py-1 text-[0.65rem] font-black text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
-                {isLoadingUsers ? "Yükleniyor" : `${assignableUsers.length} aktif`}
+                {isLoadingUsers
+                  ? tx("Yükleniyor", "Loading")
+                  : tx(`${assignableUsers.length} aktif`, `${assignableUsers.length} active`)}
               </span>
             </div>
 
@@ -696,7 +766,9 @@ export function TaskAssignSheet({
               className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400 disabled:opacity-60"
             >
               {assignableUsers.length === 0 ? (
-                <option value="">Aktif personel yok</option>
+                <option value="">
+                  {tx("Aktif personel yok", "No active staff")}
+                </option>
               ) : (
                 assignableUsers.map((user) => (
                   <option key={user.id} value={user.id}>
@@ -709,24 +781,27 @@ export function TaskAssignSheet({
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Görev başlığı
+              {tx("Görev başlığı", "Task title")}
             </span>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Örn: Raf düzeni kontrol edilsin"
+              placeholder={tx("Örn: Raf düzeni kontrol edilsin", "Example: Check shelf order")}
               className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
             />
           </label>
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Açıklama
+              {tx("Açıklama", "Description")}
             </span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Personelin görevi nasıl yapacağını açıkla..."
+              placeholder={tx(
+                "Personelin görevi nasıl yapacağını açıkla...",
+                "Explain how the staff member should complete the task...",
+              )}
               className="min-h-24 w-full resize-none rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
             />
           </label>
@@ -734,7 +809,9 @@ export function TaskAssignSheet({
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                {taskMode === "routine" ? "Her gün saat" : "Bugün saat"}
+                {taskMode === "routine"
+                  ? tx("Her gün saat", "Daily time")
+                  : tx("Bugün saat", "Today time")}
               </span>
               <input
                 type="time"
@@ -746,36 +823,36 @@ export function TaskAssignSheet({
 
             <label className="block">
               <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                Öncelik
+                {tx("Öncelik", "Priority")}
               </span>
               <select
                 value={priority}
                 onChange={(event) => setPriority(event.target.value as TaskAssignPriority)}
                 className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
               >
-                <option value="low">Düşük</option>
-                <option value="normal">Normal</option>
-                <option value="high">Yüksek</option>
-                <option value="urgent">Acil</option>
+                <option value="low">{tx("Düşük", "Low")}</option>
+                <option value="normal">{tx("Normal", "Normal")}</option>
+                <option value="high">{tx("Yüksek", "High")}</option>
+                <option value="urgent">{tx("Acil", "Urgent")}</option>
               </select>
             </label>
           </div>
 
           <section>
             <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-              Görev şartları
+              {tx("Görev şartları", "Task requirements")}
             </p>
 
             <div className="grid grid-cols-3 gap-2">
               <RequirementToggle
-                label="Fotoğraf"
+                label={tx("Fotoğraf", "Photo")}
                 icon={<Camera size={18} />}
                 isActive={requiresPhoto}
                 onToggle={() => setRequiresPhoto((value) => !value)}
               />
 
               <RequirementToggle
-                label="Konum"
+                label={tx("Konum", "Location")}
                 icon={<MapPin size={18} />}
                 isActive={requiresLocation}
                 isDisabled={!allowLocationRequirement}
@@ -787,14 +864,13 @@ export function TaskAssignSheet({
               />
 
               <RequirementToggle
-                label="Onay"
+                label={tx("Onay", "Approval")}
                 icon={<FileCheck2 size={18} />}
                 isActive={requiresManagerApproval}
                 onToggle={() => setRequiresManagerApproval((value) => !value)}
               />
             </div>
           </section>
-
 
           <section className="rounded-[1.4rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3">
             <div className="mb-3 flex items-start gap-3">
@@ -804,23 +880,29 @@ export function TaskAssignSheet({
 
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Referans fotoğrafı
+                  {tx("Referans fotoğrafı", "Reference photo")}
                 </p>
                 <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                  Personel görevi açınca bu görseli “yapılacak işin örneği” olarak görecek.
+                  {tx(
+                    "Personel görevi açınca bu görseli yapılacak işin örneği olarak görecek.",
+                    "The staff member will see this image as an example of the task.",
+                  )}
                 </p>
               </div>
             </div>
 
             {taskMode === "routine" ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
-                Referans fotoğrafı şimdilik sadece tek seferlik görevlerde kullanılabilir.
+                {tx(
+                  "Referans fotoğrafı şimdilik sadece tek seferlik görevlerde kullanılabilir.",
+                  "Reference photos are currently available only for one-time tasks.",
+                )}
               </div>
             ) : referencePhotoPreviewUrl ? (
               <div className="overflow-hidden rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)]">
                 <img
                   src={referencePhotoPreviewUrl}
-                  alt="Referans fotoğrafı önizleme"
+                  alt={tx("Referans fotoğrafı önizleme", "Reference photo preview")}
                   className="max-h-56 w-full object-cover"
                 />
 
@@ -835,14 +917,14 @@ export function TaskAssignSheet({
                     disabled={isSaving}
                     className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-black text-red-600 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
                   >
-                    Kaldır
+                    {tx("Kaldır", "Remove")}
                   </button>
                 </div>
               </div>
             ) : (
               <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-4 py-4 text-center text-sm font-black text-[var(--missio-text-muted)] active:scale-[0.99]">
                 <ImageIcon size={24} />
-                Referans fotoğrafı seç
+                {tx("Referans fotoğrafı seç", "Select reference photo")}
                 <input
                   type="file"
                   accept="image/*"
@@ -862,17 +944,23 @@ export function TaskAssignSheet({
 
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Sesli görev notu
+                  {tx("Sesli görev notu", "Voice task note")}
                 </p>
                 <p className="mt-1 text-xs font-semibold leading-5 text-[var(--missio-text-muted)]">
-                  En fazla 30 saniyelik kısa bir sesli açıklama kaydedebilirsin.
+                  {tx(
+                    "En fazla 30 saniyelik kısa bir sesli açıklama kaydedebilirsin.",
+                    "You can record a short voice note up to 30 seconds.",
+                  )}
                 </p>
               </div>
             </div>
 
             {taskMode === "routine" ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-black leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-200">
-                Sesli görev notu şimdilik sadece tek seferlik görevlerde kullanılabilir.
+                {tx(
+                  "Sesli görev notu şimdilik sadece tek seferlik görevlerde kullanılabilir.",
+                  "Voice task notes are currently available only for one-time tasks.",
+                )}
               </div>
             ) : (
               <div className="rounded-[1.35rem] border border-[var(--missio-border)] bg-[var(--missio-page-bg)] p-3">
@@ -880,10 +968,10 @@ export function TaskAssignSheet({
                   <div>
                     <p className="text-sm font-black text-[var(--missio-text-main)]">
                       {voiceRecordingState === "recording"
-                        ? "Kayıt yapılıyor..."
+                        ? tx("Kayıt yapılıyor...", "Recording...")
                         : voiceRecordingState === "recorded"
-                          ? "Sesli not hazır"
-                          : "Kayıt hazır"}
+                          ? tx("Sesli not hazır", "Voice note ready")
+                          : tx("Kayıt hazır", "Ready to record")}
                     </p>
                     <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
                       {formatVoiceSeconds(voiceElapsedSeconds)} / 00:30
@@ -929,7 +1017,7 @@ export function TaskAssignSheet({
                       className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-500/20 disabled:opacity-60"
                     >
                       <Square size={17} />
-                      Kaydı durdur
+                      {tx("Kaydı durdur", "Stop recording")}
                     </button>
                   ) : (
                     <button
@@ -939,7 +1027,9 @@ export function TaskAssignSheet({
                       className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-teal-500/20 disabled:opacity-60"
                     >
                       <Mic size={17} />
-                      {voiceNoteBlob ? "Yeniden kaydet" : "Kayıt başlat"}
+                      {voiceNoteBlob
+                        ? tx("Yeniden kaydet", "Record again")
+                        : tx("Kayıt başlat", "Start recording")}
                     </button>
                   )}
 
@@ -949,7 +1039,7 @@ export function TaskAssignSheet({
                       onClick={removeVoiceNote}
                       disabled={isSaving}
                       className="flex min-h-12 items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-600 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
-                      aria-label="Sesli notu sil"
+                      aria-label={tx("Sesli notu sil", "Delete voice note")}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -963,11 +1053,11 @@ export function TaskAssignSheet({
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                  Kaydetmeden önce
+                  {tx("Kaydetmeden önce", "Before saving")}
                 </p>
 
                 <h4 className="mt-1 text-sm font-black text-[var(--missio-text-main)]">
-                  Görev özeti
+                  {tx("Görev özeti", "Task summary")}
                 </h4>
               </div>
 
@@ -979,7 +1069,7 @@ export function TaskAssignSheet({
             <div className="grid grid-cols-2 gap-2 text-xs font-bold">
               <div className="rounded-2xl bg-white/60 px-3 py-2 dark:bg-white/5">
                 <p className="text-[0.62rem] font-black uppercase tracking-wide text-[var(--missio-text-muted)]">
-                  Personel
+                  {tx("Personel", "Staff")}
                 </p>
                 <p className="mt-1 truncate text-[var(--missio-text-main)]">
                   {selectedUserLabel}
@@ -988,7 +1078,7 @@ export function TaskAssignSheet({
 
               <div className="rounded-2xl bg-white/60 px-3 py-2 dark:bg-white/5">
                 <p className="text-[0.62rem] font-black uppercase tracking-wide text-[var(--missio-text-muted)]">
-                  Saat
+                  {tx("Saat", "Time")}
                 </p>
                 <p className="mt-1 truncate text-[var(--missio-text-main)]">
                   {selectedDueTimeLabel}
@@ -997,7 +1087,7 @@ export function TaskAssignSheet({
 
               <div className="col-span-2 rounded-2xl bg-white/60 px-3 py-2 dark:bg-white/5">
                 <p className="text-[0.62rem] font-black uppercase tracking-wide text-[var(--missio-text-muted)]">
-                  Şartlar
+                  {tx("Şartlar", "Requirements")}
                 </p>
                 <p className="mt-1 text-[var(--missio-text-main)]">
                   {requirementSummary}
@@ -1019,7 +1109,10 @@ export function TaskAssignSheet({
             ) : (
               <Sparkles size={18} />
             )}
-            {taskMode === "extra" ? "Tek seferlik görevi ata" : "Rutin görevi oluştur"}
+
+            {taskMode === "extra"
+              ? tx("Tek seferlik görevi ata", "Assign one-time task")
+              : tx("Rutin görevi oluştur", "Create routine task")}
           </button>
         </div>
       </div>
