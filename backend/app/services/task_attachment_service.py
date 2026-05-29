@@ -35,7 +35,7 @@ from app.services.task_service import (
 register_heif_opener()
 
 
-MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_FILE_SIZE_BYTES = 25 * 1024 * 1024
 MAX_STORED_FILE_SIZE_BYTES = 3 * 1024 * 1024
 MAX_ATTACHMENTS_PER_TASK = 3
 MAX_IMAGE_LONG_EDGE_PX = 1600
@@ -202,7 +202,7 @@ def read_upload_file_content(upload_file: UploadFile) -> bytes:
 
     if len(content) > MAX_UPLOAD_FILE_SIZE_BYTES:
         raise TaskAttachmentFileError(
-            "Dosya çok büyük. Yüklenebilecek maksimum görsel boyutu 10 MB."
+            "Dosya çok büyük. Yüklenebilecek maksimum görsel boyutu 25 MB."
         )
 
     return content
