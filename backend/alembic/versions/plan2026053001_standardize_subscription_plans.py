@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 
 revision = "plan2026053001"
-down_revision = "auto2026052801"
+down_revision = "pwdreset2026052801"
 branch_labels = None
 depends_on = None
 
