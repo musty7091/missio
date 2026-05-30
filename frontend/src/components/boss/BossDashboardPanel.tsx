@@ -39,6 +39,8 @@ type CreateUserFormState = {
   email: string
 }
 
+type TaskHistoryMode = "all" | "completed" | "approval"
+
 const emptyCreateUserForm: CreateUserFormState = {
   full_name: "",
   username: "",
@@ -101,6 +103,123 @@ function getClosureStatusTone(todayClosure: DailyOperationClosure | null) {
   }
 
   return "bg-emerald-300 text-slate-950"
+}
+
+function getTaskStatusLabel(task: TodayTask, isTurkish: boolean) {
+  if (task.status === "assigned") {
+    return isTurkish ? "Atandı" : "Assigned"
+  }
+
+  if (task.status === "in_progress") {
+    return isTurkish ? "İşlemde" : "In progress"
+  }
+
+  if (task.status === "completed" && task.requiresManagerApproval) {
+    return isTurkish ? "Onay bekliyor" : "Waiting approval"
+  }
+
+  if (task.status === "completed") {
+    return isTurkish ? "Tamamlandı" : "Completed"
+  }
+
+  if (task.status === "approved") {
+    return isTurkish ? "Onaylandı" : "Approved"
+  }
+
+  if (task.status === "rejected") {
+    return isTurkish ? "Reddedildi" : "Rejected"
+  }
+
+  if (task.status === "cancelled") {
+    return isTurkish ? "İptal edildi" : "Cancelled"
+  }
+
+  return task.status
+}
+
+function getTaskStatusTone(task: TodayTask) {
+  if (task.status === "approved") {
+    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+  }
+
+  if (task.status === "completed" && task.requiresManagerApproval) {
+    return "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
+  }
+
+  if (task.status === "completed") {
+    return "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-200"
+  }
+
+  if (task.status === "in_progress") {
+    return "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-200"
+  }
+
+  if (task.status === "rejected") {
+    return "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200"
+  }
+
+  if (task.status === "cancelled") {
+    return "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+  }
+
+  return "bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200"
+}
+
+function getTaskTypeLabel(task: TodayTask, isTurkish: boolean) {
+  if (task.taskType === "routine") {
+    return isTurkish ? "Rutin" : "Routine"
+  }
+
+  return isTurkish ? "Ekstra" : "Extra"
+}
+
+function formatTaskDateTime(value: string | null, isTurkish: boolean) {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  return date.toLocaleString(isTurkish ? "tr-TR" : "en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function getTaskHistoryTitle(mode: TaskHistoryMode, isTurkish: boolean) {
+  if (mode === "completed") {
+    return isTurkish ? "Tamamlanan Görevler" : "Completed Tasks"
+  }
+
+  if (mode === "approval") {
+    return isTurkish ? "Onay Bekleyen Görevler" : "Tasks Waiting Approval"
+  }
+
+  return isTurkish ? "Bugünkü Görevler" : "Today Tasks"
+}
+
+function getTaskHistoryDescription(mode: TaskHistoryMode, isTurkish: boolean) {
+  if (mode === "completed") {
+    return isTurkish
+      ? "Bugün tamamlanan ve kapanan görevler."
+      : "Tasks completed and closed today."
+  }
+
+  if (mode === "approval") {
+    return isTurkish
+      ? "Personelin tamamladığı, patron/yönetici onayı bekleyen görevler."
+      : "Tasks completed by staff and waiting for boss/manager approval."
+  }
+
+  return isTurkish
+    ? "Bugün işletme içinde verilen tüm görevlerin kısa geçmişi."
+    : "Short history of all tasks assigned in the business today."
 }
 
 function normalizeOptionalEmail(value: string) {
@@ -186,16 +305,211 @@ function QuickActionCard({
 function SummaryMiniCard({
   label,
   value,
+  onClick,
+  hint,
 }: {
   label: string
   value: string | number
+  onClick?: () => void
+  hint?: string
 }) {
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="rounded-2xl bg-white/10 px-3 py-3 text-left transition active:scale-[0.98]"
+      >
+        <p className="text-2xl font-black text-white">{value}</p>
+        <p className="mt-1 text-[0.68rem] font-bold leading-4 text-slate-300">
+          {label}
+        </p>
+        {hint && (
+          <p className="mt-2 text-[0.62rem] font-black uppercase tracking-wide text-cyan-100">
+            {hint}
+          </p>
+        )}
+      </button>
+    )
+  }
+
   return (
     <div className="rounded-2xl bg-white/10 px-3 py-3">
       <p className="text-2xl font-black text-white">{value}</p>
       <p className="mt-1 text-[0.68rem] font-bold leading-4 text-slate-300">
         {label}
       </p>
+      {hint && (
+        <p className="mt-2 text-[0.62rem] font-black uppercase tracking-wide text-cyan-100">
+          {hint}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function TaskHistorySheetContent({
+  tasks,
+  mode,
+  isTurkish,
+  onOpenApprovals,
+}: {
+  tasks: TodayTask[]
+  mode: TaskHistoryMode
+  isTurkish: boolean
+  onOpenApprovals: () => void
+}) {
+  const filteredTasks = useMemo(() => {
+    const modeFilteredTasks = tasks.filter((task) => {
+      if (mode === "completed") {
+        return isTaskCompletedOrClosed(task)
+      }
+
+      if (mode === "approval") {
+        return isApprovalWaiting(task)
+      }
+
+      return true
+    })
+
+    return [...modeFilteredTasks].sort((firstTask, secondTask) => {
+      const firstTime = new Date(firstTask.updatedAtUtc || firstTask.createdAtUtc).getTime()
+      const secondTime = new Date(secondTask.updatedAtUtc || secondTask.createdAtUtc).getTime()
+
+      return secondTime - firstTime
+    })
+  }, [mode, tasks])
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4">
+        <p className="text-sm font-black text-[var(--missio-text-main)]">
+          {getTaskHistoryTitle(mode, isTurkish)}
+        </p>
+        <p className="mt-1 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
+          {getTaskHistoryDescription(mode, isTurkish)}
+        </p>
+        <div className="mt-3 inline-flex rounded-full bg-[var(--missio-page-bg)] px-3 py-1 text-xs font-black text-[var(--missio-text-main)]">
+          {isTurkish ? `${filteredTasks.length} görev` : `${filteredTasks.length} tasks`}
+        </div>
+      </div>
+
+      {mode === "approval" && filteredTasks.length > 0 && (
+        <button
+          type="button"
+          onClick={onOpenApprovals}
+          className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-lg shadow-teal-500/20 transition active:scale-95"
+        >
+          {isTurkish ? "Onay ekranına git" : "Go to approvals"}
+        </button>
+      )}
+
+      {filteredTasks.length === 0 && (
+        <div className="rounded-[1.5rem] border border-dashed border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-5 text-center">
+          <p className="text-sm font-black text-[var(--missio-text-main)]">
+            {isTurkish ? "Görev bulunamadı" : "No task found"}
+          </p>
+          <p className="mt-1 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
+            {isTurkish
+              ? "Bu filtreye uygun bugünkü görev kaydı yok."
+              : "There is no task record matching this filter today."}
+          </p>
+        </div>
+      )}
+
+      {filteredTasks.map((task) => (
+        <article
+          key={task.id}
+          className="rounded-[1.5rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-black leading-5 text-[var(--missio-text-main)]">
+                {task.title}
+              </p>
+              <p className="mt-1 text-xs font-bold text-[var(--missio-text-muted)]">
+                {task.assignedToUserFullName ||
+                  task.assignedToUsername ||
+                  (isTurkish ? "Personel bilgisi yok" : "No personnel information")}
+              </p>
+            </div>
+
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-black ${getTaskStatusTone(task)}`}>
+              {getTaskStatusLabel(task, isTurkish)}
+            </span>
+          </div>
+
+          {task.description && (
+            <p className="mt-3 rounded-2xl bg-[var(--missio-page-bg)] p-3 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
+              {task.description}
+            </p>
+          )}
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold text-[var(--missio-text-muted)]">
+            <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3">
+              <p className="text-[0.65rem] font-black uppercase tracking-wide">
+                {isTurkish ? "Tür" : "Type"}
+              </p>
+              <p className="mt-1 text-[var(--missio-text-main)]">
+                {getTaskTypeLabel(task, isTurkish)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3">
+              <p className="text-[0.65rem] font-black uppercase tracking-wide">
+                {isTurkish ? "Atanma" : "Assigned"}
+              </p>
+              <p className="mt-1 text-[var(--missio-text-main)]">
+                {formatTaskDateTime(task.assignedAtUtc || task.createdAtUtc, isTurkish)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3">
+              <p className="text-[0.65rem] font-black uppercase tracking-wide">
+                {isTurkish ? "Tamamlanma" : "Completed"}
+              </p>
+              <p className="mt-1 text-[var(--missio-text-main)]">
+                {formatTaskDateTime(task.completedAtUtc, isTurkish)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-[var(--missio-page-bg)] p-3">
+              <p className="text-[0.65rem] font-black uppercase tracking-wide">
+                {isTurkish ? "Onay" : "Approval"}
+              </p>
+              <p className="mt-1 text-[var(--missio-text-main)]">
+                {formatTaskDateTime(task.approvedAtUtc, isTurkish)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {task.requiresPhoto && (
+              <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[0.65rem] font-black text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-200">
+                {isTurkish ? "Fotoğraf şartı" : "Photo required"}
+              </span>
+            )}
+
+            {task.requiresLocation && (
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[0.65rem] font-black text-blue-800 dark:bg-blue-950/60 dark:text-blue-200">
+                {isTurkish ? "Konum şartı" : "Location required"}
+              </span>
+            )}
+
+            {task.requiresManagerApproval && (
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[0.65rem] font-black text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                {isTurkish ? "Onay şartı" : "Approval required"}
+              </span>
+            )}
+
+            {task.hasVoiceNote && (
+              <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[0.65rem] font-black text-violet-800 dark:bg-violet-950/60 dark:text-violet-200">
+                {isTurkish ? "Ses notu" : "Voice note"}
+              </span>
+            )}
+          </div>
+        </article>
+      ))}
     </div>
   )
 }
@@ -215,7 +529,11 @@ function CreateUserSheetContent({
 
   async function handleCreateUser() {
     if (!businessId) {
-      setErrorMessage(isTurkish ? "İşletme bilgisi bulunamadı." : "Business information could not be found.")
+      setErrorMessage(
+        isTurkish
+          ? "İşletme bilgisi bulunamadı."
+          : "Business information could not be found.",
+      )
       return
     }
 
@@ -225,7 +543,11 @@ function CreateUserSheetContent({
     const email = normalizeOptionalEmail(form.email)
 
     if (!fullName || !username || !password) {
-      setErrorMessage(isTurkish ? "Ad soyad, kullanıcı adı ve şifre zorunludur." : "Full name, username and password are required.")
+      setErrorMessage(
+        isTurkish
+          ? "Ad soyad, kullanıcı adı ve şifre zorunludur."
+          : "Full name, username and password are required.",
+      )
       return
     }
 
@@ -333,6 +655,7 @@ export function BossDashboardPanel({
   const [isLocationRequestOpen, setIsLocationRequestOpen] = useState(false)
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false)
   const [isPersonnelOpen, setIsPersonnelOpen] = useState(false)
+  const [taskHistoryMode, setTaskHistoryMode] = useState<TaskHistoryMode | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   async function loadDashboard(
@@ -448,6 +771,11 @@ export function BossDashboardPanel({
     })
   }
 
+  function openTaskHistory(mode: TaskHistoryMode) {
+    setSuccessMessage(null)
+    setTaskHistoryMode(mode)
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-4 text-white shadow-xl shadow-slate-950/20">
@@ -479,26 +807,39 @@ export function BossDashboardPanel({
           <SummaryMiniCard
             label={isTurkish ? "Bugünkü görev" : "Today tasks"}
             value={tasks.length}
+            hint={isTurkish ? "Detayı gör" : "View details"}
+            onClick={() => openTaskHistory("all")}
           />
 
           <SummaryMiniCard
             label={isTurkish ? "Tamamlanan" : "Completed"}
             value={completedCount}
+            hint={isTurkish ? "Geçmiş" : "History"}
+            onClick={() => openTaskHistory("completed")}
           />
 
           <SummaryMiniCard
             label={isTurkish ? "Bekleyen onay" : "Pending approval"}
             value={approvalWaitingCount}
+            hint={isTurkish ? "Kontrol et" : "Review"}
+            onClick={() => openTaskHistory("approval")}
           />
 
-          <div className="rounded-2xl bg-white/10 px-3 py-3">
+          <button
+            type="button"
+            onClick={onOpenReports}
+            className="rounded-2xl bg-white/10 px-3 py-3 text-left transition active:scale-[0.98]"
+          >
             <p className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${closureStatusTone}`}>
               {closureStatusText}
             </p>
             <p className="mt-2 text-[0.68rem] font-bold leading-4 text-slate-300">
               {isTurkish ? "Gün kapanışı" : "Daily closing"}
             </p>
-          </div>
+            <p className="mt-2 text-[0.62rem] font-black uppercase tracking-wide text-cyan-100">
+              {isTurkish ? "Rapor" : "Report"}
+            </p>
+          </button>
         </div>
       </section>
 
@@ -517,7 +858,7 @@ export function BossDashboardPanel({
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
           <div>
-<h2 className="mt-1 text-lg font-black text-[var(--missio-text-main)]">
+            <h2 className="mt-1 text-lg font-black text-[var(--missio-text-main)]">
               {isTurkish ? "Hızlı İşlemler" : "Quick Actions"}
             </h2>
           </div>
@@ -622,6 +963,22 @@ export function BossDashboardPanel({
           <BilingualUserManagementPanel currentUser={currentUser} />
         </ActionSheet>
       )}
+
+      <ActionSheet
+        isOpen={taskHistoryMode !== null}
+        title={getTaskHistoryTitle(taskHistoryMode ?? "all", isTurkish)}
+        onClose={() => setTaskHistoryMode(null)}
+      >
+        <TaskHistorySheetContent
+          tasks={tasks}
+          mode={taskHistoryMode ?? "all"}
+          isTurkish={isTurkish}
+          onOpenApprovals={() => {
+            setTaskHistoryMode(null)
+            onOpenApprovals()
+          }}
+        />
+      </ActionSheet>
     </div>
   )
 }
