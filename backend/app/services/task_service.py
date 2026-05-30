@@ -110,6 +110,14 @@ class TaskEventListResult:
     total_count: int
 
 
+@dataclass(frozen=True)
+class ScheduledTaskNotificationCandidate:
+    """Scheduled task notification candidate."""
+
+    task: Task
+    assigned_to_user: User
+
+
 TASK_ASSIGNABLE_ROLES = {
     UserRole.MANAGER.value,
     UserRole.STAFF.value,
@@ -129,6 +137,9 @@ WEB_PUSH_APPROVER_ROLES = {
     UserRole.BOSS.value,
     UserRole.MANAGER.value,
 }
+
+SCHEDULED_TASK_NOTIFICATION_WAITING_EVENT_TYPE = "extra_task_scheduled_notification_waiting"
+SCHEDULED_TASK_NOTIFICATION_SENT_EVENT_TYPE = "extra_task_scheduled_notification_sent"
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +179,23 @@ def normalize_datetime_to_utc(value: datetime | None) -> datetime | None:
         return value.replace(tzinfo=timezone.utc)
 
     return value.astimezone(timezone.utc)
+
+
+def should_defer_extra_task_assignment_notification(
+    *,
+    due_at_utc: datetime | None,
+    now_utc: datetime | None = None,
+) -> bool:
+    """Return whether an extra task assignment notification must be delayed."""
+
+    normalized_due_at_utc = normalize_datetime_to_utc(due_at_utc)
+
+    if normalized_due_at_utc is None:
+        return False
+
+    reference_now = now_utc or get_utc_now()
+
+    return normalized_due_at_utc > reference_now
 
 
 def calculate_due_at_utc(
@@ -381,6 +409,95 @@ def create_task_event(
     db.add(event)
 
     return event
+
+
+def has_task_event_type(
+    db: Session,
+    *,
+    task_id: int,
+    event_type: str,
+) -> bool:
+    """Return whether a task event type already exists for task."""
+
+    event_id = db.execute(
+        select(TaskEvent.id)
+        .where(
+            TaskEvent.task_id == task_id,
+            TaskEvent.event_type == event_type,
+        )
+        .limit(1)
+    ).scalar_one_or_none()
+
+    return event_id is not None
+
+
+def create_scheduled_task_notification_waiting_event(
+    db: Session,
+    *,
+    task: Task,
+    user_id: int | None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> TaskEvent:
+    """Record that an extra task assignment notification is waiting for its due time."""
+
+    if has_task_event_type(
+        db,
+        task_id=task.id,
+        event_type=SCHEDULED_TASK_NOTIFICATION_WAITING_EVENT_TYPE,
+    ):
+        return db.execute(
+            select(TaskEvent)
+            .where(
+                TaskEvent.task_id == task.id,
+                TaskEvent.event_type == SCHEDULED_TASK_NOTIFICATION_WAITING_EVENT_TYPE,
+            )
+            .order_by(TaskEvent.id.asc())
+            .limit(1)
+        ).scalar_one()
+
+    return create_task_event(
+        db=db,
+        task=task,
+        user_id=user_id,
+        event_type=SCHEDULED_TASK_NOTIFICATION_WAITING_EVENT_TYPE,
+        old_status=None,
+        new_status=task.status,
+        note="Planlı görev bildirimi seçilen tarih ve saate kadar bekletildi.",
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+
+def create_scheduled_task_notification_sent_event(
+    db: Session,
+    *,
+    task: Task,
+    attempted_count: int,
+    sent_count: int,
+    failed_count: int,
+) -> TaskEvent | None:
+    """Record that a scheduled assignment notification was already processed."""
+
+    if has_task_event_type(
+        db,
+        task_id=task.id,
+        event_type=SCHEDULED_TASK_NOTIFICATION_SENT_EVENT_TYPE,
+    ):
+        return None
+
+    return create_task_event(
+        db=db,
+        task=task,
+        user_id=None,
+        event_type=SCHEDULED_TASK_NOTIFICATION_SENT_EVENT_TYPE,
+        old_status=task.status,
+        new_status=task.status,
+        note=(
+            "Planlı görev bildirimi işlendi. "
+            f"Deneme: {attempted_count}, başarılı: {sent_count}, başarısız: {failed_count}."
+        ),
+    )
 
 
 def build_task_web_push_url(task: Task) -> str:
@@ -854,6 +971,15 @@ def create_extra_task(
         ip_address=ip_address,
         user_agent=user_agent,
     )
+
+    if should_defer_extra_task_assignment_notification(due_at_utc=task.due_at_utc, now_utc=now):
+        create_scheduled_task_notification_waiting_event(
+            db=db,
+            task=task,
+            user_id=current_user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
 
     # Ekstra görev bildirimi route katmanında, ana işlem commit edildikten sonra
     # tek kez gönderilir. Böylece çift bildirim ve bildirim hatasının görev
@@ -1427,6 +1553,61 @@ def update_task(
     )
 
     return task
+
+
+def list_due_scheduled_extra_task_notification_candidates(
+    db: Session,
+    *,
+    now_utc: datetime | None = None,
+    limit: int = 100,
+) -> list[ScheduledTaskNotificationCandidate]:
+    """Return due scheduled extra tasks whose assignment notification was not processed."""
+
+    reference_now = now_utc or get_utc_now()
+
+    waiting_event_exists = (
+        select(TaskEvent.id)
+        .where(
+            TaskEvent.task_id == Task.id,
+            TaskEvent.event_type == SCHEDULED_TASK_NOTIFICATION_WAITING_EVENT_TYPE,
+        )
+        .exists()
+    )
+    sent_event_exists = (
+        select(TaskEvent.id)
+        .where(
+            TaskEvent.task_id == Task.id,
+            TaskEvent.event_type == SCHEDULED_TASK_NOTIFICATION_SENT_EVENT_TYPE,
+        )
+        .exists()
+    )
+
+    rows = (
+        db.execute(
+            select(Task, User)
+            .join(User, Task.assigned_to_user_id == User.id)
+            .where(
+                Task.deleted_at_utc.is_(None),
+                Task.task_type == TASK_TYPE_EXTRA,
+                Task.status == TASK_STATUS_ASSIGNED,
+                Task.assigned_to_user_id.is_not(None),
+                Task.due_at_utc.is_not(None),
+                Task.due_at_utc <= reference_now,
+                waiting_event_exists,
+                ~sent_event_exists,
+                User.is_active.is_(True),
+                User.business_id == Task.business_id,
+            )
+            .order_by(Task.due_at_utc.asc(), Task.id.asc())
+            .limit(limit)
+        )
+        .all()
+    )
+
+    return [
+        ScheduledTaskNotificationCandidate(task=task, assigned_to_user=assigned_to_user)
+        for task, assigned_to_user in rows
+    ]
 
 
 def start_task(

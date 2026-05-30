@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -89,9 +90,12 @@ from app.services.task_service import (
     get_task_or_error,
     get_task_template_or_error,
     list_business_tasks,
+    list_due_scheduled_extra_task_notification_candidates,
     list_incomplete_tasks_for_report,
     list_task_events,
     reject_task,
+    should_defer_extra_task_assignment_notification,
+    create_scheduled_task_notification_sent_event,
     soft_delete_task,
     start_task,
     update_routine_task_template,
@@ -153,6 +157,30 @@ def validate_optional_location_values(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="location_accuracy negatif olamaz.",
+        )
+
+
+def verify_system_job_secret(x_missio_system_job_secret: str | None) -> None:
+    """Verify Cloud Scheduler/system job shared secret."""
+
+    configured_secret = os.getenv("MISSIO_SYSTEM_JOB_SECRET", "").strip()
+
+    if not configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sistem işi gizli anahtarı tanımlı değil.",
+        )
+
+    if not x_missio_system_job_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sistem işi yetkisi doğrulanamadı.",
+        )
+
+    if x_missio_system_job_secret.strip() != configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sistem işi yetkisi doğrulanamadı.",
         )
 
 
@@ -921,20 +949,30 @@ def create_extra_task_endpoint(
 
         task_response = build_task_response(task, db=db)
 
-        send_task_assigned_web_push_notification_safely(
-            db=db,
-            task=task,
-            assigned_to_user=assigned_to_user,
-        )
+        if should_defer_extra_task_assignment_notification(due_at_utc=task.due_at_utc):
+            logger.info(
+                "MISSIO_SCHEDULED_TASK_NOTIFICATION_DEFERRED task_id=%s assigned_to_user_id=%s due_at_utc=%s",
+                task.id,
+                assigned_to_user.id,
+                task.due_at_utc,
+            )
+            message = "Ekstra görev planlandı. Bildirim seçilen tarih ve saatte gönderilecek."
+        else:
+            send_task_assigned_web_push_notification_safely(
+                db=db,
+                task=task,
+                assigned_to_user=assigned_to_user,
+            )
 
-        commit_notification_side_effects_safely(
-            db=db,
-            context="task_assigned_notification",
-        )
+            commit_notification_side_effects_safely(
+                db=db,
+                context="task_assigned_notification",
+            )
+            message = "Ekstra görev oluşturuldu."
 
         return TaskCreatedResponse(
             task=task_response,
-            message="Ekstra görev oluşturuldu.",
+            message=message,
         )
     except HTTPException:
         db.rollback()
@@ -1133,6 +1171,63 @@ def list_incomplete_tasks_for_report_endpoint(
         raise
     except Exception as exc:
         raise map_task_service_error(exc) from exc
+
+
+@router.post(
+    "/system/send-due-scheduled-notifications",
+)
+def send_due_scheduled_task_notifications_endpoint(
+    x_missio_system_job_secret: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Send due scheduled one-time task assignment notifications."""
+
+    verify_system_job_secret(x_missio_system_job_secret)
+
+    candidates = list_due_scheduled_extra_task_notification_candidates(
+        db=db,
+        limit=100,
+    )
+
+    checked_count = len(candidates)
+    processed_count = 0
+    notification_attempt_count = 0
+    notification_sent_count = 0
+    notification_failed_count = 0
+
+    for candidate in candidates:
+        result = send_task_assigned_web_push_notification_safely(
+            db=db,
+            task=candidate.task,
+            assigned_to_user=candidate.assigned_to_user,
+        )
+
+        attempted_count = int(result.get("attempted_count", 0))
+        sent_count = int(result.get("sent_count", 0))
+        failed_count = int(result.get("failed_count", 0))
+
+        notification_attempt_count += attempted_count
+        notification_sent_count += sent_count
+        notification_failed_count += failed_count
+
+        create_scheduled_task_notification_sent_event(
+            db=db,
+            task=candidate.task,
+            attempted_count=attempted_count,
+            sent_count=sent_count,
+            failed_count=failed_count,
+        )
+        processed_count += 1
+
+    db.commit()
+
+    return {
+        "checked_count": checked_count,
+        "processed_count": processed_count,
+        "notification_attempt_count": notification_attempt_count,
+        "notification_sent_count": notification_sent_count,
+        "notification_failed_count": notification_failed_count,
+    }
 
 
 @router.post(

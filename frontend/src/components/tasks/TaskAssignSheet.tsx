@@ -12,6 +12,7 @@ import {
 
 export type TaskAssignMode = "extra" | "routine"
 export type TaskAssignPriority = "low" | "normal" | "high" | "urgent"
+type ExtraTaskScheduleMode = "now" | "scheduled"
 
 type TaskAssignSheetProps = {
   businessId: number | null
@@ -33,18 +34,31 @@ function getLocalTodayDateKey() {
   return `${year}-${month}-${day}`
 }
 
-function buildDueAtUtcFromLocalTime(timeValue: string) {
-  if (!timeValue) {
+function parseLocalDateTime(dateValue: string, timeValue: string) {
+  if (!dateValue || !timeValue) {
     return null
   }
 
+  const [yearText, monthText, dayText] = dateValue.split("-")
   const [hourText, minuteText] = timeValue.split(":")
+
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const day = Number(dayText)
   const hour = Number(hourText)
   const minute = Number(minuteText)
 
   if (
+    Number.isNaN(year) ||
+    Number.isNaN(month) ||
+    Number.isNaN(day) ||
     Number.isNaN(hour) ||
     Number.isNaN(minute) ||
+    year < 2000 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
     hour < 0 ||
     hour > 23 ||
     minute < 0 ||
@@ -53,18 +67,56 @@ function buildDueAtUtcFromLocalTime(timeValue: string) {
     return null
   }
 
-  const now = new Date()
-  const dueDate = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    hour,
-    minute,
-    0,
-    0,
-  )
+  const localDate = new Date(year, month - 1, day, hour, minute, 0, 0)
 
-  return dueDate.toISOString()
+  if (
+    localDate.getFullYear() !== year ||
+    localDate.getMonth() !== month - 1 ||
+    localDate.getDate() !== day ||
+    localDate.getHours() !== hour ||
+    localDate.getMinutes() !== minute
+  ) {
+    return null
+  }
+
+  return localDate
+}
+
+function buildDueAtUtcFromLocalDateTime(dateValue: string, timeValue: string) {
+  const localDate = parseLocalDateTime(dateValue, timeValue)
+
+  if (!localDate) {
+    return null
+  }
+
+  return localDate.toISOString()
+}
+
+function isFutureLocalDateTime(dateValue: string, timeValue: string) {
+  const localDate = parseLocalDateTime(dateValue, timeValue)
+
+  if (!localDate) {
+    return false
+  }
+
+  return localDate.getTime() > Date.now()
+}
+
+function formatLocalDateLabel(dateValue: string) {
+  if (!dateValue) {
+    return ""
+  }
+
+  const [yearText, monthText, dayText] = dateValue.split("-")
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const day = Number(dayText)
+
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+    return dateValue
+  }
+
+  return `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}.${year}`
 }
 
 function getSelectedUserLabel(
@@ -133,6 +185,8 @@ export function TaskAssignSheet({
   const [assignedToUserId, setAssignedToUserId] = useState("")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
+  const [extraScheduleMode, setExtraScheduleMode] = useState<ExtraTaskScheduleMode>("now")
+  const [dueDate, setDueDate] = useState(getLocalTodayDateKey())
   const [dueTime, setDueTime] = useState("")
   const [priority, setPriority] = useState<TaskAssignPriority>("normal")
   const [requiresPhoto, setRequiresPhoto] = useState(false)
@@ -171,7 +225,14 @@ export function TaskAssignSheet({
       ? tx("Rutin görev", "Routine task")
       : tx("Tek seferlik görev", "One-time task")
 
-  const selectedDueTimeLabel = dueTime || tx("Saat belirtilmedi", "No time set")
+  const selectedDueTimeLabel =
+    taskMode === "routine"
+      ? dueTime || tx("Saat belirtilmedi", "No time set")
+      : extraScheduleMode === "scheduled"
+        ? dueDate && dueTime
+          ? `${formatLocalDateLabel(dueDate)} ${dueTime}`
+          : tx("Plan zamanı eksik", "Schedule time missing")
+        : tx("Hemen gönder", "Send now")
 
   const requirementSummary =
     [
@@ -189,6 +250,8 @@ export function TaskAssignSheet({
     setAssignedToUserId("")
     setTitle("")
     setDescription("")
+    setExtraScheduleMode("now")
+    setDueDate(getLocalTodayDateKey())
     setDueTime("")
     setPriority("normal")
     setRequiresPhoto(false)
@@ -572,6 +635,32 @@ export function TaskAssignSheet({
       return
     }
 
+    if (taskMode === "extra" && extraScheduleMode === "scheduled") {
+      if (!dueDate || !dueTime) {
+        setErrorMessage(tx(
+          "Planlı görev için tarih ve saat seçmelisin.",
+          "You must select a date and time for scheduled tasks.",
+        ))
+        return
+      }
+
+      if (!buildDueAtUtcFromLocalDateTime(dueDate, dueTime)) {
+        setErrorMessage(tx(
+          "Planlı görev tarihi veya saati geçersiz.",
+          "Scheduled task date or time is invalid.",
+        ))
+        return
+      }
+
+      if (!isFutureLocalDateTime(dueDate, dueTime)) {
+        setErrorMessage(tx(
+          "Planlı görev zamanı gelecekte olmalıdır. Hemen göndermek için 'Hemen gönder' seçeneğini kullan.",
+          "Scheduled task time must be in the future. Use 'Send now' to notify immediately.",
+        ))
+        return
+      }
+    }
+
     setIsSaving(true)
     setErrorMessage(null)
 
@@ -607,7 +696,10 @@ export function TaskAssignSheet({
           description: trimmedDescription || null,
           category_id: null,
           priority,
-          due_at_utc: buildDueAtUtcFromLocalTime(dueTime),
+          due_at_utc:
+            extraScheduleMode === "scheduled"
+              ? buildDueAtUtcFromLocalDateTime(dueDate, dueTime)
+              : null,
           requires_photo: requiresPhoto,
           requires_location: requiresLocation,
           requires_manager_approval: requiresManagerApproval,
@@ -635,17 +727,24 @@ export function TaskAssignSheet({
           })
         }
 
-        onSuccess?.(
-          referencePhotoFile || voiceNoteBlob
-            ? tx(
-                "Tek seferlik görev medya ekleriyle personele atandı.",
-                "One-time task was assigned to staff with media attachments.",
-              )
-            : tx(
-                "Tek seferlik görev personele atandı.",
-                "One-time task was assigned to staff.",
-              ),
-        )
+        if (extraScheduleMode === "scheduled") {
+          onSuccess?.(tx(
+            "Tek seferlik görev planlandı. Bildirim seçilen tarih ve saatte personele ulaşacak.",
+            "One-time task was scheduled. The notification will reach the staff member at the selected date and time.",
+          ))
+        } else {
+          onSuccess?.(
+            referencePhotoFile || voiceNoteBlob
+              ? tx(
+                  "Tek seferlik görev medya ekleriyle personele atandı.",
+                  "One-time task was assigned to staff with media attachments.",
+                )
+              : tx(
+                  "Tek seferlik görev personele atandı.",
+                  "One-time task was assigned to staff.",
+                ),
+          )
+        }
       }
 
       resetForm()
@@ -722,7 +821,11 @@ export function TaskAssignSheet({
 
               <button
                 type="button"
-                onClick={() => setTaskMode("routine")}
+                onClick={() => {
+                  setTaskMode("routine")
+                  setExtraScheduleMode("now")
+                  setDueDate(getLocalTodayDateKey())
+                }}
                 className={
                   taskMode === "routine"
                     ? "min-h-12 rounded-2xl bg-cyan-500 px-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20"
@@ -736,8 +839,8 @@ export function TaskAssignSheet({
             <p className="mt-2 text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
               {taskMode === "extra"
                 ? tx(
-                    "Tek seferlik görev yalnızca bugün için atanır.",
-                    "One-time task is assigned only for today.",
+                    "Tek seferlik görev hemen gönderilebilir veya seçilen ileri tarih ve saate planlanabilir.",
+                    "One-time task can be sent now or scheduled for a future date and time.",
                   )
                 : tx(
                     "Rutin görev şablonu oluşturulur ve bugüne de işlenir.",
@@ -806,12 +909,81 @@ export function TaskAssignSheet({
             />
           </label>
 
-          <div className="grid grid-cols-2 gap-2">
+          {taskMode === "extra" ? (
+            <section className="rounded-[1.4rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-3">
+              <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+                {tx("Gönderim zamanı", "Send time")}
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[var(--missio-page-bg)] p-1">
+                <button
+                  type="button"
+                  onClick={() => setExtraScheduleMode("now")}
+                  className={
+                    extraScheduleMode === "now"
+                      ? "min-h-12 rounded-2xl bg-cyan-500 px-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20"
+                      : "min-h-12 rounded-2xl px-3 text-sm font-black text-[var(--missio-text-muted)]"
+                  }
+                >
+                  {tx("Hemen gönder", "Send now")}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExtraScheduleMode("scheduled")
+                    setDueDate((currentDate) => currentDate || getLocalTodayDateKey())
+                  }}
+                  className={
+                    extraScheduleMode === "scheduled"
+                      ? "min-h-12 rounded-2xl bg-cyan-500 px-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20"
+                      : "min-h-12 rounded-2xl px-3 text-sm font-black text-[var(--missio-text-muted)]"
+                  }
+                >
+                  {tx("Planlı gönder", "Schedule")}
+                </button>
+              </div>
+
+              {extraScheduleMode === "scheduled" ? (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+                      {tx("Tarih", "Date")}
+                    </span>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      min={getLocalTodayDateKey()}
+                      onChange={(event) => setDueDate(event.target.value)}
+                      className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+                      {tx("Saat", "Time")}
+                    </span>
+                    <input
+                      type="time"
+                      value={dueTime}
+                      onChange={(event) => setDueTime(event.target.value)}
+                      className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-page-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <p className="mt-3 rounded-2xl bg-cyan-50 px-3 py-3 text-xs font-black leading-5 text-cyan-800 dark:bg-cyan-950/35 dark:text-cyan-100">
+                  {tx(
+                    "Görev kaydedildiği anda personele bildirim gider.",
+                    "The staff member will be notified as soon as the task is saved.",
+                  )}
+                </p>
+              )}
+            </section>
+          ) : (
             <label className="block">
               <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                {taskMode === "routine"
-                  ? tx("Her gün saat", "Daily time")
-                  : tx("Bugün saat", "Today time")}
+                {tx("Her gün saat", "Daily time")}
               </span>
               <input
                 type="time"
@@ -820,23 +992,23 @@ export function TaskAssignSheet({
                 className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
               />
             </label>
+          )}
 
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
-                {tx("Öncelik", "Priority")}
-              </span>
-              <select
-                value={priority}
-                onChange={(event) => setPriority(event.target.value as TaskAssignPriority)}
-                className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
-              >
-                <option value="low">{tx("Düşük", "Low")}</option>
-                <option value="normal">{tx("Normal", "Normal")}</option>
-                <option value="high">{tx("Yüksek", "High")}</option>
-                <option value="urgent">{tx("Acil", "Urgent")}</option>
-              </select>
-            </label>
-          </div>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
+              {tx("Öncelik", "Priority")}
+            </span>
+            <select
+              value={priority}
+              onChange={(event) => setPriority(event.target.value as TaskAssignPriority)}
+              className="min-h-12 w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-3 text-sm font-bold text-[var(--missio-text-main)] outline-none focus:border-cyan-400"
+            >
+              <option value="low">{tx("Düşük", "Low")}</option>
+              <option value="normal">{tx("Normal", "Normal")}</option>
+              <option value="high">{tx("Yüksek", "High")}</option>
+              <option value="urgent">{tx("Acil", "Urgent")}</option>
+            </select>
+          </label>
 
           <section>
             <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--missio-text-muted)]">
@@ -1078,7 +1250,7 @@ export function TaskAssignSheet({
 
               <div className="rounded-2xl bg-white/60 px-3 py-2 dark:bg-white/5">
                 <p className="text-[0.62rem] font-black uppercase tracking-wide text-[var(--missio-text-muted)]">
-                  {tx("Saat", "Time")}
+                  {taskMode === "routine" ? tx("Saat", "Time") : tx("Gönderim", "Send time")}
                 </p>
                 <p className="mt-1 truncate text-[var(--missio-text-main)]">
                   {selectedDueTimeLabel}
