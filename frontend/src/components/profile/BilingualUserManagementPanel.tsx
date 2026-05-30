@@ -38,11 +38,13 @@ type CreateUserFormState = {
   password: string
   role: BusinessUserRole
   email: string
+  supervisor_user_id: string
 }
 
 type EditUserFormState = {
   full_name: string
   email: string
+  supervisor_user_id: string
   is_active: boolean
 }
 
@@ -68,6 +70,11 @@ type UserManagementTexts = {
   usernamePlaceholder: string
   emailPlaceholder: string
   temporaryPasswordPlaceholder: string
+  supervisorLabel: string
+  supervisorPlaceholder: string
+  supervisorUnassigned: string
+  supervisorRequiredForStaff: string
+  managerListEmpty: string
   saveUser: string
   userList: string
   showing: string
@@ -123,6 +130,11 @@ const textsByLanguage: Record<AppLanguage, UserManagementTexts> = {
     usernamePlaceholder: "Kullanıcı adı",
     emailPlaceholder: "E-posta",
     temporaryPasswordPlaceholder: "Geçici şifre",
+    supervisorLabel: "Sorumlu Yönetici",
+    supervisorPlaceholder: "Sorumlu yönetici seç",
+    supervisorUnassigned: "Atanmadı",
+    supervisorRequiredForStaff: "Personel oluşturmak için sorumlu yönetici seçilmelidir.",
+    managerListEmpty: "Önce aktif bir yönetici oluşturmalısınız.",
     saveUser: "Kullanıcıyı kaydet",
     userList: "Kullanıcı listesi",
     showing: "gösteriliyor",
@@ -176,6 +188,11 @@ const textsByLanguage: Record<AppLanguage, UserManagementTexts> = {
     usernamePlaceholder: "Username",
     emailPlaceholder: "Email",
     temporaryPasswordPlaceholder: "Temporary password",
+    supervisorLabel: "Responsible Manager",
+    supervisorPlaceholder: "Select responsible manager",
+    supervisorUnassigned: "Not assigned",
+    supervisorRequiredForStaff: "A responsible manager must be selected when creating staff.",
+    managerListEmpty: "You must create an active manager first.",
     saveUser: "Save user",
     userList: "User list",
     showing: "showing",
@@ -218,6 +235,7 @@ const emptyCreateForm: CreateUserFormState = {
   password: "",
   role: "staff",
   email: "",
+  supervisor_user_id: "",
 }
 
 function getAllowedCreateRoles(currentRole: string): BusinessUserRole[] {
@@ -242,6 +260,16 @@ function getRoleLabel(role: string, texts: UserManagementTexts) {
 
 function getActiveLabel(isActive: boolean, texts: UserManagementTexts) {
   return isActive ? texts.statusActive : texts.statusPassive
+}
+
+function getSupervisorText(user: BusinessUser, texts: UserManagementTexts) {
+  if (user.role !== "staff") {
+    return null
+  }
+
+  const supervisorName = user.supervisor_full_name?.trim()
+
+  return `${texts.supervisorLabel}: ${supervisorName || texts.supervisorUnassigned}`
 }
 
 function canEditTargetUser(currentUser: UserMeResponse, targetUser: BusinessUser) {
@@ -285,6 +313,7 @@ export function BilingualUserManagementPanel({
   const [editForm, setEditForm] = useState<EditUserFormState>({
     full_name: "",
     email: "",
+    supervisor_user_id: "",
     is_active: true,
   })
   const [resetPasswordValue, setResetPasswordValue] = useState("")
@@ -312,6 +341,14 @@ export function BilingualUserManagementPanel({
     return users.find((user) => user.id === selectedUserId) ?? null
   }, [selectedUserId, users])
 
+  const managerUsers = useMemo(() => {
+    return users
+      .filter((user) => user.role === "manager" && user.is_active)
+      .sort((firstUser, secondUser) =>
+        firstUser.full_name.localeCompare(secondUser.full_name, language === "tr" ? "tr" : "en"),
+      )
+  }, [users, language])
+
   const userStats = useMemo(() => {
     const activeCount = users.filter((user) => user.is_active).length
     const passiveCount = users.length - activeCount
@@ -331,7 +368,9 @@ export function BilingualUserManagementPanel({
         !normalizedSearch ||
         businessUser.full_name.toLowerCase().includes(normalizedSearch) ||
         businessUser.username.toLowerCase().includes(normalizedSearch) ||
-        (businessUser.email ?? "").toLowerCase().includes(normalizedSearch)
+        (businessUser.email ?? "").toLowerCase().includes(normalizedSearch) ||
+        (businessUser.supervisor_full_name ?? "").toLowerCase().includes(normalizedSearch) ||
+        (businessUser.supervisor_username ?? "").toLowerCase().includes(normalizedSearch)
 
       const matchesRole = roleFilter === "all" || businessUser.role === roleFilter
 
@@ -376,6 +415,7 @@ export function BilingualUserManagementPanel({
       setEditForm({
         full_name: "",
         email: "",
+        supervisor_user_id: "",
         is_active: true,
       })
       setResetPasswordValue("")
@@ -385,6 +425,9 @@ export function BilingualUserManagementPanel({
     setEditForm({
       full_name: selectedUser.full_name,
       email: selectedUser.email ?? "",
+      supervisor_user_id: selectedUser.supervisor_user_id
+        ? String(selectedUser.supervisor_user_id)
+        : "",
       is_active: selectedUser.is_active,
     })
     setResetPasswordValue("")
@@ -408,6 +451,12 @@ export function BilingualUserManagementPanel({
       return
     }
 
+    if (createForm.role === "staff" && !createForm.supervisor_user_id) {
+      setMessage(null)
+      setErrorMessage(texts.supervisorRequiredForStaff)
+      return
+    }
+
     setIsSaving(true)
     setMessage(null)
     setErrorMessage(null)
@@ -420,6 +469,10 @@ export function BilingualUserManagementPanel({
         role: createForm.role,
         email: normalizeOptionalEmail(createForm.email),
         theme_preference: null,
+        supervisor_user_id:
+          createForm.role === "staff" && createForm.supervisor_user_id
+            ? Number(createForm.supervisor_user_id)
+            : null,
       })
 
       setMessage(texts.createSuccess)
@@ -446,6 +499,10 @@ export function BilingualUserManagementPanel({
       const response = await updateBusinessUser(currentUser.business_id, selectedUser.id, {
         full_name: editForm.full_name.trim(),
         email: normalizeOptionalEmail(editForm.email),
+        supervisor_user_id:
+          selectedUser.role === "staff" && editForm.supervisor_user_id
+            ? Number(editForm.supervisor_user_id)
+            : null,
         is_active: editForm.is_active,
       })
 
@@ -719,6 +776,8 @@ export function BilingualUserManagementPanel({
                     setCreateForm((currentForm) => ({
                       ...currentForm,
                       role: event.target.value as BusinessUserRole,
+                      supervisor_user_id:
+                        event.target.value === "staff" ? currentForm.supervisor_user_id : "",
                     }))
                   }
                   className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400"
@@ -729,6 +788,31 @@ export function BilingualUserManagementPanel({
                     </option>
                   ))}
                 </select>
+
+                {createForm.role === "staff" && (
+                  <select
+                    value={createForm.supervisor_user_id}
+                    onChange={(event) =>
+                      setCreateForm((currentForm) => ({
+                        ...currentForm,
+                        supervisor_user_id: event.target.value,
+                      }))
+                    }
+                    disabled={managerUsers.length === 0}
+                    className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400 disabled:opacity-50"
+                  >
+                    <option value="">
+                      {managerUsers.length === 0
+                        ? texts.managerListEmpty
+                        : texts.supervisorPlaceholder}
+                    </option>
+                    {managerUsers.map((managerUser) => (
+                      <option key={managerUser.id} value={managerUser.id}>
+                        {managerUser.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 <button
                   type="button"
@@ -800,6 +884,12 @@ export function BilingualUserManagementPanel({
                           <p className="mt-1 truncate text-xs font-bold text-[var(--missio-text-muted)]">
                             @{businessUser.username}{" • "}{getRoleLabel(businessUser.role, texts)}
                           </p>
+
+                          {getSupervisorText(businessUser, texts) && (
+                            <p className="mt-1 truncate text-xs font-bold text-[var(--missio-text-muted)]">
+                              {getSupervisorText(businessUser, texts)}
+                            </p>
+                          )}
                         </div>
 
                         <button
@@ -903,6 +993,26 @@ export function BilingualUserManagementPanel({
                   placeholder={texts.emailPlaceholder}
                   className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-bold outline-none focus:border-cyan-400"
                 />
+
+                {selectedUser.role === "staff" && (
+                  <select
+                    value={editForm.supervisor_user_id}
+                    onChange={(event) =>
+                      setEditForm((currentForm) => ({
+                        ...currentForm,
+                        supervisor_user_id: event.target.value,
+                      }))
+                    }
+                    className="rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3 text-sm font-black outline-none focus:border-cyan-400"
+                  >
+                    <option value="">{texts.supervisorUnassigned}</option>
+                    {managerUsers.map((managerUser) => (
+                      <option key={managerUser.id} value={managerUser.id}>
+                        {managerUser.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 <label className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-card-bg)] px-4 py-3">
                   <span className="text-sm font-black">{texts.accountActiveQuestion}</span>

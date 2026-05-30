@@ -9,6 +9,9 @@ export type BusinessUser = {
   username: string
   email: string | null
   role: string
+  supervisor_user_id: number | null
+  supervisor_full_name: string | null
+  supervisor_username: string | null
   is_active: boolean
   theme_preference: string | null
 }
@@ -25,12 +28,14 @@ export type CreateBusinessUserPayload = {
   role: BusinessUserRole
   email?: string | null
   theme_preference?: string | null
+  supervisor_user_id?: number | null
 }
 
 export type UpdateBusinessUserPayload = {
   full_name?: string
   email?: string | null
   theme_preference?: string | null
+  supervisor_user_id?: number | null
   is_active?: boolean
 }
 
