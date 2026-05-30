@@ -74,6 +74,23 @@ const durationByBillingPeriod: Partial<Record<BillingPeriod, string>> = {
   yearly: "365",
 }
 
+const supportedPlanCodes = ["trial", "starter", "professional", "enterprise"] as const
+const paidPlanCodes = ["starter", "professional", "enterprise"] as const
+
+const planDisplayNames: Record<string, string> = {
+  trial: "Trial",
+  starter: "Başlangıç",
+  professional: "Profesyonel",
+  enterprise: "Enterprise",
+}
+
+const planOrder: Record<string, number> = {
+  trial: 10,
+  starter: 20,
+  professional: 30,
+  enterprise: 40,
+}
+
 function optionalText(value: string) {
   const trimmedValue = value.trim()
 
@@ -138,7 +155,7 @@ function formatDateTime(value: string | null) {
   })
 }
 
-function formatMoney(value: string | null, currency: string) {
+function formatMoney(value: string | null | undefined, currency: string) {
   if (!value) {
     return "-"
   }
@@ -217,7 +234,7 @@ function getExtendActionLabel(status: string | null | undefined) {
 
 function getChangePlanActionLabel(status: string | null | undefined) {
   if (status === "trialing") {
-    return "Ücretli plana geçir"
+    return "Ücretli pakete geçir"
   }
 
   return "Paketi değiştir"
@@ -230,7 +247,6 @@ function getStatusActionLabel(status: string | null | undefined) {
 
   return "İşletmeyi askıya al"
 }
-
 
 function addDays(date: Date, days: number) {
   const copiedDate = new Date(date)
@@ -258,6 +274,58 @@ function getEstimatedExtendedEndDate(
   return addDays(now, durationDays)
 }
 
+function isSupportedPlan(plan: SubscriptionPlanResponse) {
+  return (supportedPlanCodes as readonly string[]).includes(plan.code)
+}
+
+function isPaidPlan(plan: SubscriptionPlanResponse) {
+  return (paidPlanCodes as readonly string[]).includes(plan.code)
+}
+
+function comparePlans(firstPlan: SubscriptionPlanResponse, secondPlan: SubscriptionPlanResponse) {
+  return (planOrder[firstPlan.code] ?? 999) - (planOrder[secondPlan.code] ?? 999)
+}
+
+function getPlanDisplayName(plan: SubscriptionPlanResponse | null | undefined) {
+  if (!plan) {
+    return "Paket yok"
+  }
+
+  return planDisplayNames[plan.code] ?? plan.name
+}
+
+function getPlanLimitSummary(plan: SubscriptionPlanResponse | null | undefined) {
+  if (!plan) {
+    return "-"
+  }
+
+  const managerLimit =
+    plan.max_managers === null || plan.max_managers === undefined
+      ? "Yönetici sınırı yok"
+      : `${plan.max_managers} yönetici`
+
+  const dailyTaskLimit =
+    plan.max_daily_tasks === null || plan.max_daily_tasks === undefined
+      ? "Günlük görev sınırı yok"
+      : `günlük ${plan.max_daily_tasks} görev`
+
+  return `${plan.max_users} kullanıcı / ${managerLimit} / ${dailyTaskLimit}`
+}
+
+function getPlanOptionLabel(plan: SubscriptionPlanResponse) {
+  const managerLimit =
+    plan.max_managers === null || plan.max_managers === undefined
+      ? "yönetici sınırı yok"
+      : `${plan.max_managers} yönetici`
+
+  const dailyTaskLimit =
+    plan.max_daily_tasks === null || plan.max_daily_tasks === undefined
+      ? "günlük görev sınırı yok"
+      : `günlük ${plan.max_daily_tasks} görev`
+
+  return `${getPlanDisplayName(plan)} — ${plan.max_users} kullanıcı / ${managerLimit} / ${dailyTaskLimit}`
+}
+
 function getPlanDirection(
   currentPlan: SubscriptionPlanResponse | null,
   selectedPlan: SubscriptionPlanResponse | null,
@@ -266,25 +334,25 @@ function getPlanDirection(
     return {
       label: "Paket seçimi",
       icon: <CreditCard size={18} />,
-      helper: "Mevcut paket ve hedef paket karşılaştırılamıyor.",
+      helper: "Hedef paketi seçerek devam et.",
       tone: "neutral" as const,
     }
   }
 
   if (selectedPlan.id === currentPlan.id) {
     return {
-      label: "Aynı plan",
+      label: "Aynı paket",
       icon: <Info size={18} />,
       helper: "Seçilen paket mevcut paket ile aynı.",
       tone: "neutral" as const,
     }
   }
 
-  if (selectedPlan.max_users > currentPlan.max_users) {
+  if ((planOrder[selectedPlan.code] ?? selectedPlan.max_users) > (planOrder[currentPlan.code] ?? currentPlan.max_users)) {
     return {
       label: "Paket yükseltme",
       icon: <TrendingUp size={18} />,
-      helper: "Yeni paket hemen aktif olur, limitler hemen yükselir.",
+      helper: "Yeni paket hemen aktif olur. Kalan süre korunursa müşterinin mevcut bitiş tarihi değişmez.",
       tone: "success" as const,
     }
   }
@@ -292,7 +360,7 @@ function getPlanDirection(
   return {
     label: "Paket düşürme",
     icon: <TrendingDown size={18} />,
-    helper: "Aktif kullanıcı sayısı yeni paket limitini aşıyorsa işlem engellenir.",
+    helper: "Aktif kullanıcı sayısı hedef paket limitini aşıyorsa işlem engellenir.",
     tone: "warning" as const,
   }
 }
@@ -412,22 +480,20 @@ export function SuperAdminPlanPanel({
   const availablePlans = overview?.available_plans ?? []
   const isTrialCustomer = currentSubscription?.status === "trialing"
 
+  const cleanAvailablePlans = useMemo(() => {
+    return availablePlans.filter(isSupportedPlan).sort(comparePlans)
+  }, [availablePlans])
+
   const planOptions = useMemo(() => {
-    if (isTrialCustomer) {
-      const paidPlans = availablePlans.filter((plan) => plan.code !== "trial")
-
-      return paidPlans.length > 0 ? paidPlans : availablePlans
-    }
-
-    return availablePlans
-  }, [availablePlans, isTrialCustomer])
+    return cleanAvailablePlans.filter(isPaidPlan)
+  }, [cleanAvailablePlans])
 
   const selectedPlan = useMemo(() => {
     return (
-      availablePlans.find((plan) => plan.code === changePlanForm.planCode) ??
+      planOptions.find((plan) => plan.code === changePlanForm.planCode) ??
       null
     )
-  }, [availablePlans, changePlanForm.planCode])
+  }, [planOptions, changePlanForm.planCode])
 
   const durationDays = useMemo(() => {
     const value = Number(extendForm.durationDays)
@@ -454,6 +520,7 @@ export function SuperAdminPlanPanel({
       selectedPlan &&
       overview.active_user_count > selectedPlan.max_users,
   )
+  const hasPaidPlanOptions = planOptions.length > 0
 
   async function loadOverview(resetForms: boolean) {
     setIsLoading(true)
@@ -464,18 +531,20 @@ export function SuperAdminPlanPanel({
       setOverview(response)
 
       if (resetForms) {
-        const firstPaidPlanCode =
-          response.available_plans.find((plan) => plan.code !== "trial")?.code ??
-          response.available_plans[0]?.code ??
-          ""
-        const currentPlanCode =
-          response.current_plan?.code === "trial"
-            ? firstPaidPlanCode
-            : response.current_plan?.code ?? firstPaidPlanCode
+        const cleanPlans = response.available_plans
+          .filter(isSupportedPlan)
+          .sort(comparePlans)
+        const paidPlans = cleanPlans.filter(isPaidPlan)
+        const firstPaidPlanCode = paidPlans[0]?.code ?? ""
+        const currentPlanCode = response.current_plan?.code ?? ""
+        const defaultPlanCode =
+          paidPlans.some((plan) => plan.code === currentPlanCode)
+            ? currentPlanCode
+            : firstPaidPlanCode
 
         setChangePlanForm({
           ...initialChangePlanFormState,
-          planCode: currentPlanCode,
+          planCode: defaultPlanCode,
         })
         setExtendForm(initialExtendFormState)
         setStatusForm(initialStatusFormState)
@@ -536,12 +605,12 @@ export function SuperAdminPlanPanel({
     event.preventDefault()
 
     if (!changePlanForm.planCode) {
-      setOperationErrorMessage("Lütfen hedef plan seç.")
+      setOperationErrorMessage("Lütfen hedef paketi seç.")
       return
     }
 
     if (isSamePlan) {
-      setOperationErrorMessage("Seçilen paket mevcut paket ile aynı. Plan değişikliği yapılmadı.")
+      setOperationErrorMessage("Seçilen paket mevcut paket ile aynı. Paket değişikliği yapılmadı.")
       return
     }
 
@@ -608,13 +677,13 @@ export function SuperAdminPlanPanel({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-              Müşteri erişimi
+              Müşteri aboneliği
             </p>
             <h2 className="mt-1 text-xl font-black text-[var(--missio-text-main)]">
-              Abonelik durumu
+              Paket ve erişim yönetimi
             </h2>
             <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-              {business.name} için deneme süresini, paketini ve sisteme giriş durumunu yönet.
+              {business.name} için paket, süre ve giriş durumunu tek ekrandan yönet.
             </p>
           </div>
 
@@ -642,7 +711,7 @@ export function SuperAdminPlanPanel({
             <div className="grid grid-cols-2 gap-2">
               <InfoCard
                 label="Paket"
-                value={currentPlan?.name ?? "Paket yok"}
+                value={getPlanDisplayName(currentPlan)}
                 helper={getStatusLabel(currentSubscription?.status)}
               />
               <InfoCard
@@ -659,7 +728,17 @@ export function SuperAdminPlanPanel({
                 value={`${overview.active_user_count} / ${
                   currentSubscription?.max_users_snapshot ?? "-"
                 }`}
-                helper="Paket limitine göre kontrol edilir."
+                helper="Patron, yönetici ve personel toplamıdır."
+              />
+              <InfoCard
+                label="Paket limitleri"
+                value={getPlanLimitSummary(currentPlan)}
+                helper="Limitler paket değişince güncellenir."
+              />
+              <InfoCard
+                label="Rapor saklama"
+                value={`${currentSubscription?.report_retention_days_snapshot ?? currentPlan?.report_retention_days ?? "-"} gün`}
+                helper="Tüm paketlerde hedef süre 14 gündür."
               />
               <InfoCard
                 label="Erişim"
@@ -683,8 +762,8 @@ export function SuperAdminPlanPanel({
                   label={getExtendActionLabel(currentSubscription?.status)}
                   helper={
                     isTrialCustomer
-                      ? "Deneme süresi mevcut bitiş tarihinden uzatılır."
-                      : "Mevcut paketin bitiş tarihine süre eklenir."
+                      ? "Sadece deneme süresini uzatır. Paket değişmez."
+                      : "Mevcut paketin bitiş tarihine süre ekler."
                   }
                   icon={<CalendarDays size={18} />}
                   onClick={setActiveMode}
@@ -693,11 +772,7 @@ export function SuperAdminPlanPanel({
                   mode="change-plan"
                   activeMode={activeMode}
                   label={getChangePlanActionLabel(currentSubscription?.status)}
-                  helper={
-                    isTrialCustomer
-                      ? "Müşteri ücretli pakete geçirilir. Kalan süre korunur."
-                      : "Yeni paket hemen aktif olur. Kalan süre korunur."
-                  }
+                  helper="Başlangıç, Profesyonel veya Enterprise paketlerinden biri seçilir."
                   icon={<CreditCard size={18} />}
                   onClick={setActiveMode}
                 />
@@ -705,7 +780,7 @@ export function SuperAdminPlanPanel({
                   mode="status"
                   activeMode={activeMode}
                   label={getStatusActionLabel(currentSubscription?.status)}
-                  helper="Müşterinin sisteme giriş hakkını yönetir."
+                  helper="Müşterinin sisteme giriş hakkını açar veya kapatır."
                   icon={<ShieldCheck size={18} />}
                   onClick={setActiveMode}
                 />
@@ -743,20 +818,20 @@ export function SuperAdminPlanPanel({
             <form className="space-y-4" onSubmit={handleExtendSubmit}>
               <div>
                 <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-                  Deneme / abonelik işlemi
+                  Süre işlemi
                 </p>
                 <h3 className="mt-1 text-lg font-black text-[var(--missio-text-main)]">
                   {getExtendActionLabel(currentSubscription?.status)}
                 </h3>
                 <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-                  Bu işlem paketi değiştirmez. Mevcut paket korunur.
+                  Bu işlem paketi değiştirmez. Sadece bitiş tarihine süre ekler.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-xs font-black text-[var(--missio-text-muted)]">
-                    Periyot
+                    Süre tipi
                   </span>
                   <select
                     className="w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-input-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none"
@@ -766,17 +841,16 @@ export function SuperAdminPlanPanel({
                     }
                     required
                   >
+                    {isTrialCustomer && <option value="trial">Deneme / 14 gün</option>}
                     <option value="monthly">Aylık / 30 gün</option>
                     <option value="yearly">Yıllık / 365 gün</option>
-                    <option value="trial">Deneme / 14 gün</option>
-                    <option value="manual">Manuel</option>
-                    <option value="custom">Özel</option>
+                    <option value="manual">Manuel gün sayısı</option>
                   </select>
                 </label>
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-black text-[var(--missio-text-muted)]">
-                    Süre
+                    Gün
                   </span>
                   <div className="flex items-center gap-2 rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-input-bg)] px-4 py-3">
                     <input
@@ -804,7 +878,7 @@ export function SuperAdminPlanPanel({
                 <div className="flex items-start gap-2">
                   <Info size={18} className="mt-0.5 shrink-0" />
                   <div>
-                    <p>Paket değişmeyecek: {currentPlan?.name ?? "Paket yok"}</p>
+                    <p>Paket değişmeyecek: {getPlanDisplayName(currentPlan)}</p>
                     <p>
                       Tahmini yeni bitiş:{" "}
                       {estimatedExtendedEndDate
@@ -828,7 +902,7 @@ export function SuperAdminPlanPanel({
                       notes: event.target.value,
                     }))
                   }
-                  placeholder="Örn: Müşterinin deneme süresi uzatıldı."
+                  placeholder="Örn: Müşterinin abonelik süresi uzatıldı."
                   maxLength={1000}
                 />
               </label>
@@ -858,16 +932,22 @@ export function SuperAdminPlanPanel({
                   {getChangePlanActionLabel(currentSubscription?.status)}
                 </h3>
                 <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-                  Paket hemen aktif olur. Varsayılan olarak mevcut bitiş tarihi korunur.
+                  Trial sadece yeni işletme açılırken verilir. Buradan ücretli paket seçilir.
                 </p>
               </div>
+
+              {!hasPaidPlanOptions && (
+                <MessageBox type="warning">
+                  Ücretli paket bulunamadı. Plan kayıtları güncellenmeden paket değişikliği yapılamaz.
+                </MessageBox>
+              )}
 
               <label className="block">
                 <span className="mb-1 block text-xs font-black text-[var(--missio-text-muted)]">
                   Yeni paket
                 </span>
                 <select
-                  className="w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-input-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none"
+                  className="w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-input-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none disabled:opacity-60"
                   value={changePlanForm.planCode}
                   onChange={(event) =>
                     setChangePlanForm((currentForm) => ({
@@ -875,11 +955,12 @@ export function SuperAdminPlanPanel({
                       planCode: event.target.value,
                     }))
                   }
+                  disabled={!hasPaidPlanOptions}
                   required
                 >
                   {planOptions.map((plan) => (
                     <option key={plan.id} value={plan.code}>
-                      {plan.name} — {plan.max_users} kullanıcı
+                      {getPlanOptionLabel(plan)}
                     </option>
                   ))}
                 </select>
@@ -899,11 +980,12 @@ export function SuperAdminPlanPanel({
                   </p>
 
                   <div className="grid grid-cols-2 gap-2 text-xs font-bold text-[var(--missio-text-muted)]">
-                    <p>Kullanıcı limiti: {selectedPlan.max_users}</p>
+                    <p>Kullanıcı: {selectedPlan.max_users}</p>
                     <p>Aktif kullanıcı: {overview.active_user_count}</p>
+                    <p>Yönetici: {selectedPlan.max_managers ?? "Sınırsız"}</p>
+                    <p>Günlük görev: {selectedPlan.max_daily_tasks ?? "Sınırsız"}</p>
                     <p>Aylık: {formatMoney(selectedPlan.price_monthly, selectedPlan.currency)}</p>
                     <p>Yıllık: {formatMoney(selectedPlan.price_yearly, selectedPlan.currency)}</p>
-                    <p>Günlük görev: {selectedPlan.max_daily_tasks ?? "Sınırsız"}</p>
                     <p>Rapor saklama: {selectedPlan.report_retention_days} gün</p>
                   </div>
                 </div>
@@ -951,14 +1033,14 @@ export function SuperAdminPlanPanel({
                       notes: event.target.value,
                     }))
                   }
-                  placeholder="Örn: Professional pakete geçirildi, kalan süre korundu."
+                  placeholder="Örn: Profesyonel pakete geçirildi, kalan süre korundu."
                   maxLength={1000}
                 />
               </label>
 
               <button
                 type="submit"
-                disabled={savingMode !== null || isDowngradeBlocked || isSamePlan}
+                disabled={savingMode !== null || !hasPaidPlanOptions || isDowngradeBlocked || isSamePlan}
                 className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--missio-primary)] px-4 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {savingMode === "change-plan" ? (
