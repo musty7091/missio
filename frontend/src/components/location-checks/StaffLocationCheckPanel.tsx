@@ -24,6 +24,7 @@ import type { LocationCheck } from "../../types/locationCheck"
 
 type StaffLocationCheckPanelProps = {
   onChanged?: () => void
+  silentLoading?: boolean
 }
 
 type ActionMessage = {
@@ -206,7 +207,7 @@ function getShareFailureMessage(errorCode: string, texts: StaffPanelTexts) {
   return texts.shareErrorDefault
 }
 
-export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelProps) {
+export function StaffLocationCheckPanel({ onChanged, silentLoading = false }: StaffLocationCheckPanelProps) {
   const { language } = useTranslation()
   const texts = staffPanelTexts[language]
 
@@ -354,6 +355,10 @@ export function StaffLocationCheckPanel({ onChanged }: StaffLocationCheckPanelPr
   }
 
   if (isLoading) {
+    if (silentLoading) {
+      return null
+    }
+
     return (
       <section className="rounded-[1.75rem] border border-[var(--missio-border)] bg-[var(--missio-card-bg)] p-4 shadow-sm">
         <div className="flex items-center gap-3">

@@ -20,6 +20,7 @@ import { listBusinessTasks } from "../../services/taskService"
 import type { TodayTask } from "../../types/task"
 import { mapApiTaskToTodayTask } from "../../utils/apiTaskMapper"
 import { LocationCheckRequestPanel } from "../location-checks/LocationCheckRequestPanel"
+import { StaffLocationCheckPanel } from "../location-checks/StaffLocationCheckPanel"
 import { TaskAssignSheet } from "../tasks/TaskAssignSheet"
 import { TaskCard } from "../tasks/TaskCard"
 
@@ -377,6 +378,11 @@ async function loadManagerData(options: { showLoading?: boolean } = {}) {
     onChanged()
   }
 
+  function handleLocationCheckChanged() {
+    void loadManagerData({ showLoading: false })
+    onChanged()
+  }
+
   const sheetTitle =
     activeSheet === "assign"
       ? isTurkish ? "Görev Ata" : "Assign Task"
@@ -449,6 +455,11 @@ async function loadManagerData(options: { showLoading?: boolean } = {}) {
           <span>{message}</span>
         </div>
       )}
+
+      <StaffLocationCheckPanel
+        silentLoading
+        onChanged={handleLocationCheckChanged}
+      />
 
       <section className="space-y-3">
         <h2 className="px-1 text-lg font-black text-[var(--missio-text-main)]">
