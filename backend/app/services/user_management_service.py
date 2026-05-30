@@ -26,6 +26,10 @@ class InvalidBusinessUserRoleError(BusinessUserManagementError):
     """Raised when a business user role is invalid."""
 
 
+class InvalidBusinessUserSupervisorError(BusinessUserManagementError):
+    """Raised when a business user supervisor is invalid."""
+
+
 ALLOWED_BUSINESS_USER_ROLES = {
     UserRole.BOSS.value,
     UserRole.MANAGER.value,
@@ -52,6 +56,53 @@ def validate_business_user_role(role: str) -> None:
 
     if role not in ALLOWED_BUSINESS_USER_ROLES:
         raise InvalidBusinessUserRoleError("İşletme kullanıcısı rolü geçersiz.")
+
+
+def resolve_business_user_supervisor(
+    db: Session,
+    *,
+    business: Business,
+    target_role: str,
+    supervisor_user_id: int | None,
+) -> User | None:
+    """Return valid supervisor for a staff user or None.
+
+    The supervisor field is intentionally nullable for the first rollout so that
+    existing staff users can be assigned later from the personnel management page.
+    """
+
+    if target_role != UserRole.STAFF.value:
+        if supervisor_user_id is not None:
+            raise InvalidBusinessUserSupervisorError(
+                "Sorumlu yönetici sadece personel kullanıcılar için seçilebilir."
+            )
+
+        return None
+
+    if supervisor_user_id is None:
+        return None
+
+    supervisor_user = db.get(User, supervisor_user_id)
+
+    if supervisor_user is None:
+        raise InvalidBusinessUserSupervisorError("Sorumlu yönetici bulunamadı.")
+
+    if supervisor_user.business_id != business.id:
+        raise InvalidBusinessUserSupervisorError(
+            "Sorumlu yönetici ilgili işletmeye ait değil."
+        )
+
+    if supervisor_user.role != UserRole.MANAGER.value:
+        raise InvalidBusinessUserSupervisorError(
+            "Sorumlu kullanıcı manager rolünde olmalıdır."
+        )
+
+    if not supervisor_user.is_active:
+        raise InvalidBusinessUserSupervisorError(
+            "Pasif manager sorumlu yönetici olarak seçilemez."
+        )
+
+    return supervisor_user
 
 
 def ensure_business_can_add_active_user(
@@ -88,6 +139,7 @@ def create_business_user(
     role: str,
     email: str | None = None,
     theme_preference: str | None = None,
+    supervisor_user_id: int | None = None,
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> User:
@@ -109,6 +161,13 @@ def create_business_user(
         business=business,
     )
 
+    supervisor_user = resolve_business_user_supervisor(
+        db=db,
+        business=business,
+        target_role=role,
+        supervisor_user_id=supervisor_user_id,
+    )
+
     user = create_user_with_password(
         db=db,
         full_name=full_name,
@@ -120,6 +179,10 @@ def create_business_user(
         theme_preference=theme_preference,
         is_active=True,
     )
+
+    user.supervisor_user_id = supervisor_user.id if supervisor_user is not None else None
+    db.add(user)
+    db.flush()
 
     create_audit_log(
         db=db,
@@ -133,6 +196,7 @@ def create_business_user(
             "created_user_id": user.id,
             "username": user.username,
             "role": user.role,
+            "supervisor_user_id": user.supervisor_user_id,
             "created_by_user_id": current_user.id,
             "created_by_role": current_user.role,
         },

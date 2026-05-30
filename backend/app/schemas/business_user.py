@@ -26,6 +26,7 @@ class CreateBusinessUserRequest(BaseModel):
     role: str = Field(min_length=3, max_length=50)
     email: str | None = Field(default=None, max_length=255)
     theme_preference: str | None = Field(default=None, max_length=30)
+    supervisor_user_id: int | None = Field(default=None, gt=0)
 
     @field_validator("full_name", "username", "role", mode="before")
     @classmethod
@@ -91,6 +92,7 @@ class UpdateBusinessUserRequest(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=200)
     email: str | None = Field(default=None, max_length=255)
     theme_preference: str | None = Field(default=None, max_length=30)
+    supervisor_user_id: int | None = Field(default=None, gt=0)
     is_active: bool | None = None
 
     @field_validator("full_name", mode="before")
@@ -197,6 +199,9 @@ class BusinessUserResponse(BaseModel):
     username: str
     email: str | None
     role: str
+    supervisor_user_id: int | None
+    supervisor_full_name: str | None
+    supervisor_username: str | None
     is_active: bool
     theme_preference: str | None
 

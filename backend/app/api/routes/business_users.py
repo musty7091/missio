@@ -36,7 +36,9 @@ from app.services.auth_service import (
 from app.services.user_management_service import (
     BusinessUserManagementError,
     InvalidBusinessUserRoleError,
+    InvalidBusinessUserSupervisorError,
     create_business_user,
+    resolve_business_user_supervisor,
 )
 
 
@@ -229,11 +231,48 @@ def ensure_can_change_business_user_role(
     )
 
 
-def build_business_user_response(user: User) -> BusinessUserResponse:
+def get_business_user_supervisor_for_response(
+    db: Session,
+    user: User,
+) -> User | None:
+    """Return supervisor user for response payload if available."""
+
+    if user.supervisor_user_id is None:
+        return None
+
+    supervisor_user = db.get(User, user.supervisor_user_id)
+
+    if supervisor_user is None:
+        return None
+
+    if supervisor_user.business_id != user.business_id:
+        return None
+
+    return supervisor_user
+
+
+def ensure_can_update_business_user_supervisor(current_user: User) -> None:
+    """Only super admin and boss can change staff supervisor assignments."""
+
+    if current_user.role in {
+        UserRole.SUPER_ADMIN.value,
+        UserRole.BOSS.value,
+    }:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Sorumlu yönetici bilgisini değiştirme yetkiniz yok.",
+    )
+
+
+def build_business_user_response(user: User, *, db: Session) -> BusinessUserResponse:
     """Build safe business user response."""
 
     if user.business_id is None:
         raise RuntimeError("Business user response business_id boş olamaz.")
+
+    supervisor_user = get_business_user_supervisor_for_response(db=db, user=user)
 
     return BusinessUserResponse(
         id=user.id,
@@ -242,6 +281,9 @@ def build_business_user_response(user: User) -> BusinessUserResponse:
         username=user.username,
         email=user.email,
         role=user.role,
+        supervisor_user_id=user.supervisor_user_id,
+        supervisor_full_name=supervisor_user.full_name if supervisor_user is not None else None,
+        supervisor_username=supervisor_user.username if supervisor_user is not None else None,
         is_active=user.is_active,
         theme_preference=user.theme_preference,
     )
@@ -274,6 +316,7 @@ def create_business_user_endpoint(
             role=payload.role,
             email=payload.email,
             theme_preference=payload.theme_preference,
+            supervisor_user_id=payload.supervisor_user_id,
             ip_address=get_client_ip(request),
             user_agent=get_user_agent(request),
         )
@@ -281,7 +324,7 @@ def create_business_user_endpoint(
         db.refresh(user)
 
         return BusinessUserCreatedResponse(
-            user=build_business_user_response(user),
+            user=build_business_user_response(user, db=db),
             message="İşletme kullanıcısı oluşturuldu.",
         )
     except HTTPException:
@@ -307,6 +350,12 @@ def create_business_user_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="İşletme kullanıcısı rolü geçersiz.",
+        ) from exc
+    except InvalidBusinessUserSupervisorError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
         ) from exc
     except AccessControlError as exc:
         db.rollback()
@@ -360,7 +409,7 @@ def list_business_users_endpoint(
             .all()
         )
 
-        return [build_business_user_response(user) for user in users]
+        return [build_business_user_response(user, db=db) for user in users]
     except HTTPException:
         raise
     except AccessControlError as exc:
@@ -393,7 +442,7 @@ def get_business_user_detail_endpoint(
         user = get_business_user_or_404(db=db, user_id=user_id)
         ensure_user_belongs_to_business(user=user, business_id=business.id)
 
-        return build_business_user_response(user)
+        return build_business_user_response(user, db=db)
     except HTTPException:
         raise
     except AccessControlError as exc:
@@ -449,6 +498,18 @@ def update_business_user_endpoint(
         if "theme_preference" in update_fields:
             user.theme_preference = payload.theme_preference
 
+        if "supervisor_user_id" in update_fields:
+            ensure_can_update_business_user_supervisor(current_user)
+            supervisor_user = resolve_business_user_supervisor(
+                db=db,
+                business=business,
+                target_role=user.role,
+                supervisor_user_id=payload.supervisor_user_id,
+            )
+            user.supervisor_user_id = (
+                supervisor_user.id if supervisor_user is not None else None
+            )
+
         if "is_active" in update_fields:
             if user.id == current_user.id and payload.is_active is False:
                 raise HTTPException(
@@ -491,7 +552,7 @@ def update_business_user_endpoint(
         db.refresh(user)
 
         return BusinessUserUpdatedResponse(
-            user=build_business_user_response(user),
+            user=build_business_user_response(user, db=db),
             message="İşletme kullanıcısı güncellendi.",
         )
     except HTTPException:
@@ -502,6 +563,12 @@ def update_business_user_endpoint(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bu işlem için yetkiniz yok.",
+        ) from exc
+    except InvalidBusinessUserSupervisorError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
         ) from exc
     except Exception:
         db.rollback()
@@ -575,7 +642,7 @@ def reset_business_user_password_endpoint(
         db.refresh(user)
 
         return BusinessUserPasswordResetResponse(
-            user=build_business_user_response(user),
+            user=build_business_user_response(user, db=db),
             message="İşletme kullanıcısı şifresi sıfırlandı.",
         )
     except HTTPException:
@@ -626,6 +693,8 @@ def change_business_user_role_endpoint(
         )
 
         user.role = payload.role
+        if user.role != UserRole.STAFF.value:
+            user.supervisor_user_id = None
         user.updated_at = get_utc_now()
 
         create_audit_log(
@@ -653,7 +722,7 @@ def change_business_user_role_endpoint(
         db.refresh(user)
 
         return BusinessUserRoleChangedResponse(
-            user=build_business_user_response(user),
+            user=build_business_user_response(user, db=db),
             message="İşletme kullanıcısı rolü güncellendi.",
         )
     except HTTPException:
