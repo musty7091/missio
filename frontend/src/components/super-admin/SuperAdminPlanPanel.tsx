@@ -157,10 +157,10 @@ function formatMoney(value: string | null, currency: string) {
 
 function getStatusLabel(status: string | null | undefined) {
   const labels: Record<string, string> = {
-    trialing: "Trial",
-    active: "Aktif",
+    trialing: "Deneme sürecinde",
+    active: "Aktif müşteri",
     suspended: "Askıda",
-    cancelled: "İptal",
+    cancelled: "İptal edilmiş",
     expired: "Süresi doldu",
   }
 
@@ -171,21 +171,66 @@ function getStatusLabel(status: string | null | undefined) {
   return labels[status] ?? status
 }
 
-function getBillingPeriodLabel(period: string | null | undefined) {
-  const labels: Record<string, string> = {
-    manual: "Manuel",
-    trial: "Trial",
-    monthly: "Aylık",
-    yearly: "Yıllık",
-    custom: "Özel",
+function getAccessLabel(status: string | null | undefined, isExpired: boolean) {
+  if (isExpired) {
+    return "Süresi doldu"
   }
 
-  if (!period) {
-    return "-"
+  if (status === "suspended") {
+    return "Giriş kapalı"
   }
 
-  return labels[period] ?? period
+  if (status === "cancelled") {
+    return "İptal edilmiş"
+  }
+
+  if (status === "trialing" || status === "active") {
+    return "Giriş açık"
+  }
+
+  return "Kontrol gerekli"
 }
+
+function getAccessHelper(status: string | null | undefined, isExpired: boolean) {
+  if (isExpired) {
+    return "Süre uzatılmadan müşteri giriş yapamaz."
+  }
+
+  if (status === "suspended") {
+    return "Müşteri kullanıcıları sisteme giriş yapamaz."
+  }
+
+  if (status === "cancelled") {
+    return "Müşteri erişimi kapalıdır."
+  }
+
+  return "Müşteri kullanımı açık."
+}
+
+function getExtendActionLabel(status: string | null | undefined) {
+  if (status === "trialing") {
+    return "Denemeyi uzat"
+  }
+
+  return "Aboneliği yenile"
+}
+
+function getChangePlanActionLabel(status: string | null | undefined) {
+  if (status === "trialing") {
+    return "Ücretli plana geçir"
+  }
+
+  return "Paketi değiştir"
+}
+
+function getStatusActionLabel(status: string | null | undefined) {
+  if (status === "suspended") {
+    return "Tekrar aktif et"
+  }
+
+  return "İşletmeyi askıya al"
+}
+
 
 function addDays(date: Date, days: number) {
   const copiedDate = new Date(date)
@@ -219,9 +264,9 @@ function getPlanDirection(
 ) {
   if (!currentPlan || !selectedPlan) {
     return {
-      label: "Plan seçimi",
+      label: "Paket seçimi",
       icon: <CreditCard size={18} />,
-      helper: "Mevcut plan ve hedef plan karşılaştırılamıyor.",
+      helper: "Mevcut paket ve hedef paket karşılaştırılamıyor.",
       tone: "neutral" as const,
     }
   }
@@ -230,24 +275,24 @@ function getPlanDirection(
     return {
       label: "Aynı plan",
       icon: <Info size={18} />,
-      helper: "Seçilen plan mevcut plan ile aynı.",
+      helper: "Seçilen paket mevcut paket ile aynı.",
       tone: "neutral" as const,
     }
   }
 
   if (selectedPlan.max_users > currentPlan.max_users) {
     return {
-      label: "Plan yükseltme",
+      label: "Paket yükseltme",
       icon: <TrendingUp size={18} />,
-      helper: "Yeni plan hemen aktif olur, limitler hemen yükselir.",
+      helper: "Yeni paket hemen aktif olur, limitler hemen yükselir.",
       tone: "success" as const,
     }
   }
 
   return {
-    label: "Plan düşürme",
+    label: "Paket düşürme",
     icon: <TrendingDown size={18} />,
-    helper: "Aktif kullanıcı sayısı yeni plan limitini aşıyorsa işlem engellenir.",
+    helper: "Aktif kullanıcı sayısı yeni paket limitini aşıyorsa işlem engellenir.",
     tone: "warning" as const,
   }
 }
@@ -365,6 +410,17 @@ export function SuperAdminPlanPanel({
   const currentSubscription = overview?.current_subscription ?? null
   const currentPlan = overview?.current_plan ?? null
   const availablePlans = overview?.available_plans ?? []
+  const isTrialCustomer = currentSubscription?.status === "trialing"
+
+  const planOptions = useMemo(() => {
+    if (isTrialCustomer) {
+      const paidPlans = availablePlans.filter((plan) => plan.code !== "trial")
+
+      return paidPlans.length > 0 ? paidPlans : availablePlans
+    }
+
+    return availablePlans
+  }, [availablePlans, isTrialCustomer])
 
   const selectedPlan = useMemo(() => {
     return (
@@ -408,11 +464,14 @@ export function SuperAdminPlanPanel({
       setOverview(response)
 
       if (resetForms) {
-        const currentPlanCode =
-          response.current_plan?.code ??
+        const firstPaidPlanCode =
           response.available_plans.find((plan) => plan.code !== "trial")?.code ??
           response.available_plans[0]?.code ??
           ""
+        const currentPlanCode =
+          response.current_plan?.code === "trial"
+            ? firstPaidPlanCode
+            : response.current_plan?.code ?? firstPaidPlanCode
 
         setChangePlanForm({
           ...initialChangePlanFormState,
@@ -482,13 +541,13 @@ export function SuperAdminPlanPanel({
     }
 
     if (isSamePlan) {
-      setOperationErrorMessage("Seçilen plan mevcut plan ile aynı. Plan değişikliği yapılmadı.")
+      setOperationErrorMessage("Seçilen paket mevcut paket ile aynı. Plan değişikliği yapılmadı.")
       return
     }
 
     if (isDowngradeBlocked) {
       setOperationErrorMessage(
-        "Bu düşürme işlemi yapılamaz. Aktif kullanıcı sayısı seçilen plan limitini aşıyor.",
+        "Bu düşürme işlemi yapılamaz. Aktif kullanıcı sayısı seçilen paket limitini aşıyor.",
       )
       return
     }
@@ -520,7 +579,7 @@ export function SuperAdminPlanPanel({
 
   async function handleStatusUpdate(targetStatus: SubscriptionStatus) {
     if (currentSubscription?.status === targetStatus) {
-      setOperationErrorMessage("Abonelik zaten seçilen durumda.")
+      setOperationErrorMessage("İşletme zaten seçilen durumda.")
       return
     }
 
@@ -549,13 +608,13 @@ export function SuperAdminPlanPanel({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-              Abonelik kontrol merkezi
+              Müşteri erişimi
             </p>
             <h2 className="mt-1 text-xl font-black text-[var(--missio-text-main)]">
-              Plan ve abonelik
+              Abonelik durumu
             </h2>
             <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-              {business.name} için plan, süre ve abonelik durumunu ayrı işlemlerle yönet.
+              {business.name} için deneme süresini, paketini ve sisteme giriş durumunu yönet.
             </p>
           </div>
 
@@ -582,9 +641,9 @@ export function SuperAdminPlanPanel({
           <>
             <div className="grid grid-cols-2 gap-2">
               <InfoCard
-                label="Mevcut plan"
-                value={currentPlan?.name ?? "Plan yok"}
-                helper={`Durum: ${getStatusLabel(currentSubscription?.status)}`}
+                label="Paket"
+                value={currentPlan?.name ?? "Paket yok"}
+                helper={getStatusLabel(currentSubscription?.status)}
               />
               <InfoCard
                 label="Bitiş tarihi"
@@ -600,12 +659,12 @@ export function SuperAdminPlanPanel({
                 value={`${overview.active_user_count} / ${
                   currentSubscription?.max_users_snapshot ?? "-"
                 }`}
-                helper="Yeni plana geçerken bu sayı kontrol edilir."
+                helper="Paket limitine göre kontrol edilir."
               />
               <InfoCard
-                label="Periyot"
-                value={getBillingPeriodLabel(currentSubscription?.billing_period)}
-                helper={overview.is_expired ? "Süresi geçmiş" : "Kullanım açık"}
+                label="Erişim"
+                value={getAccessLabel(currentSubscription?.status, overview.is_expired)}
+                helper={getAccessHelper(currentSubscription?.status, overview.is_expired)}
               />
             </div>
 
@@ -621,24 +680,32 @@ export function SuperAdminPlanPanel({
                 <ActionButton
                   mode="extend"
                   activeMode={activeMode}
-                  label="Süre uzat / yenile"
-                  helper="Plan değişmez. Mevcut bitiş tarihine süre eklenir."
+                  label={getExtendActionLabel(currentSubscription?.status)}
+                  helper={
+                    isTrialCustomer
+                      ? "Deneme süresi mevcut bitiş tarihinden uzatılır."
+                      : "Mevcut paketin bitiş tarihine süre eklenir."
+                  }
                   icon={<CalendarDays size={18} />}
                   onClick={setActiveMode}
                 />
                 <ActionButton
                   mode="change-plan"
                   activeMode={activeMode}
-                  label="Plan değiştir"
-                  helper="Yeni plan hemen aktif olur. Kalan süre korunur."
+                  label={getChangePlanActionLabel(currentSubscription?.status)}
+                  helper={
+                    isTrialCustomer
+                      ? "Müşteri ücretli pakete geçirilir. Kalan süre korunur."
+                      : "Yeni paket hemen aktif olur. Kalan süre korunur."
+                  }
                   icon={<CreditCard size={18} />}
                   onClick={setActiveMode}
                 />
                 <ActionButton
                   mode="status"
                   activeMode={activeMode}
-                  label="Askıya al / aktif et"
-                  helper="Müşteri giriş yetkisini abonelik durumuna göre yönetir."
+                  label={getStatusActionLabel(currentSubscription?.status)}
+                  helper="Müşterinin sisteme giriş hakkını yönetir."
                   icon={<ShieldCheck size={18} />}
                   onClick={setActiveMode}
                 />
@@ -676,13 +743,13 @@ export function SuperAdminPlanPanel({
             <form className="space-y-4" onSubmit={handleExtendSubmit}>
               <div>
                 <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-                  Süre işlemi
+                  Deneme / abonelik işlemi
                 </p>
                 <h3 className="mt-1 text-lg font-black text-[var(--missio-text-main)]">
-                  Süre uzat / yenile
+                  {getExtendActionLabel(currentSubscription?.status)}
                 </h3>
                 <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-                  Bu işlem planı değiştirmez. Mevcut plan korunur.
+                  Bu işlem paketi değiştirmez. Mevcut paket korunur.
                 </p>
               </div>
 
@@ -701,7 +768,7 @@ export function SuperAdminPlanPanel({
                   >
                     <option value="monthly">Aylık / 30 gün</option>
                     <option value="yearly">Yıllık / 365 gün</option>
-                    <option value="trial">Trial / 14 gün</option>
+                    <option value="trial">Deneme / 14 gün</option>
                     <option value="manual">Manuel</option>
                     <option value="custom">Özel</option>
                   </select>
@@ -737,7 +804,7 @@ export function SuperAdminPlanPanel({
                 <div className="flex items-start gap-2">
                   <Info size={18} className="mt-0.5 shrink-0" />
                   <div>
-                    <p>Plan değişmeyecek: {currentPlan?.name ?? "Plan yok"}</p>
+                    <p>Paket değişmeyecek: {currentPlan?.name ?? "Paket yok"}</p>
                     <p>
                       Tahmini yeni bitiş:{" "}
                       {estimatedExtendedEndDate
@@ -761,7 +828,7 @@ export function SuperAdminPlanPanel({
                       notes: event.target.value,
                     }))
                   }
-                  placeholder="Örn: Yıllık yenileme yapıldı."
+                  placeholder="Örn: Müşterinin deneme süresi uzatıldı."
                   maxLength={1000}
                 />
               </label>
@@ -776,7 +843,7 @@ export function SuperAdminPlanPanel({
                 ) : (
                   <CalendarDays size={18} />
                 )}
-                {savingMode === "extend" ? "Uzatılıyor" : "Süreyi uzat"}
+                {savingMode === "extend" ? "Uzatılıyor" : getExtendActionLabel(currentSubscription?.status)}
               </button>
             </form>
           )}
@@ -785,19 +852,19 @@ export function SuperAdminPlanPanel({
             <form className="space-y-4" onSubmit={handleChangePlanSubmit}>
               <div>
                 <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-                  Plan işlemi
+                  Paket işlemi
                 </p>
                 <h3 className="mt-1 text-lg font-black text-[var(--missio-text-main)]">
-                  Plan değiştir
+                  {getChangePlanActionLabel(currentSubscription?.status)}
                 </h3>
                 <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-                  Plan hemen aktif olur. Varsayılan olarak mevcut bitiş tarihi korunur.
+                  Paket hemen aktif olur. Varsayılan olarak mevcut bitiş tarihi korunur.
                 </p>
               </div>
 
               <label className="block">
                 <span className="mb-1 block text-xs font-black text-[var(--missio-text-muted)]">
-                  Hedef plan
+                  Yeni paket
                 </span>
                 <select
                   className="w-full rounded-2xl border border-[var(--missio-border)] bg-[var(--missio-input-bg)] px-4 py-3 text-sm font-bold text-[var(--missio-text-main)] outline-none"
@@ -810,7 +877,7 @@ export function SuperAdminPlanPanel({
                   }
                   required
                 >
-                  {availablePlans.map((plan) => (
+                  {planOptions.map((plan) => (
                     <option key={plan.id} value={plan.code}>
                       {plan.name} — {plan.max_users} kullanıcı
                     </option>
@@ -844,8 +911,8 @@ export function SuperAdminPlanPanel({
 
               {isDowngradeBlocked && (
                 <MessageBox type="warning">
-                  Seçilen planın kullanıcı limiti mevcut aktif kullanıcı sayısından düşük.
-                  Önce aktif kullanıcı sayısını azaltmalı veya daha yüksek plan seçmelisin.
+                  Seçilen paketin kullanıcı limiti mevcut aktif kullanıcı sayısından düşük.
+                  Önce aktif kullanıcı sayısını azaltmalı veya daha yüksek paket seçmelisin.
                 </MessageBox>
               )}
 
@@ -866,7 +933,7 @@ export function SuperAdminPlanPanel({
                     Mevcut bitiş tarihini koru
                   </span>
                   <span className="mt-1 block text-xs font-bold leading-5 text-[var(--missio-text-muted)]">
-                    Tavsiye edilen davranış budur. Plan değişir, kalan süre yanmaz.
+                    Tavsiye edilen davranış budur. Paket değişir, kalan süre yanmaz.
                   </span>
                 </span>
               </label>
@@ -884,7 +951,7 @@ export function SuperAdminPlanPanel({
                       notes: event.target.value,
                     }))
                   }
-                  placeholder="Örn: Professional plana yükseltildi, kalan süre korundu."
+                  placeholder="Örn: Professional pakete geçirildi, kalan süre korundu."
                   maxLength={1000}
                 />
               </label>
@@ -899,7 +966,7 @@ export function SuperAdminPlanPanel({
                 ) : (
                   <CreditCard size={18} />
                 )}
-                {savingMode === "change-plan" ? "Güncelleniyor" : "Planı değiştir"}
+                {savingMode === "change-plan" ? "Güncelleniyor" : getChangePlanActionLabel(currentSubscription?.status)}
               </button>
             </form>
           )}
@@ -908,13 +975,13 @@ export function SuperAdminPlanPanel({
             <div className="space-y-4">
               <div>
                 <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[var(--missio-text-muted)]">
-                  Durum işlemi
+                  Erişim işlemi
                 </p>
                 <h3 className="mt-1 text-lg font-black text-[var(--missio-text-main)]">
-                  Askıya al / tekrar aktif et
+                  Müşteri erişimini yönet
                 </h3>
                 <p className="mt-2 text-sm font-bold leading-6 text-[var(--missio-text-muted)]">
-                  Askıya alınan işletme kullanıcıları sisteme giriş yapamaz.
+                  Askıya alınan işletmede patron, yönetici ve personel sisteme giriş yapamaz.
                 </p>
               </div>
 
@@ -951,7 +1018,7 @@ export function SuperAdminPlanPanel({
                   ) : (
                     <PauseCircle size={18} />
                   )}
-                  Askıya al
+                  İşletmeyi askıya al
                 </button>
 
                 <button
